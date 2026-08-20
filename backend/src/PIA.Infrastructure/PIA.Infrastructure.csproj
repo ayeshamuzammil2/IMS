@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>PIA.Infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PIA.Application\PIA.Application.csproj" />
+  </ItemGroup>
+
+  <!--
+    EF Core packages are PrivateAssets="compile" (NOT "all") so they still flow at RUNTIME to
+    PIA.Api's output (the actual running app needs Pomelo/EFCore/NamingConventions DLLs present),
+    but PIA.Api's own code cannot compile against their types. This is the load-bearing
+    architectural boundary: a controller cannot write PiaDbContext/DbSet<T>/IQueryable<T> code -
+    it must go through an injected service interface from PIA.Application. This is what
+    structurally eliminates v1's largest bug class (controllers each re-implementing, or
+    forgetting, ownership/authorization checks around raw EF queries).
+
+    (PrivateAssets="all" was tried first and was wrong - it also suppresses the "runtime" asset,
+    which broke both `dotnet ef` design-time tooling and would have broken the app itself at
+    startup with a FileNotFoundException for Pomelo.EntityFrameworkCore.MySql.)
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore">
+      <PrivateAssets>compile</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql">
+      <PrivateAssets>compile</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="EFCore.NamingConventions">
+      <PrivateAssets>compile</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="BCrypt.Net-Next" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+    <PackageReference Include="MailKit" />
+    <PackageReference Include="Scriban" />
+    <PackageReference Include="DocumentFormat.OpenXml" />
+    <PackageReference Include="QuestPDF" />
+    <PackageReference Include="QRCoder" />
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    <PackageReference Include="FaceONNX" />
+    <PackageReference Include="Cronos" />
+    <PackageReference Include="TimeZoneConverter" />
+    <PackageReference Include="CsvHelper" />
+    <PackageReference Include="AWSSDK.Rekognition" />
+    <PackageReference Include="AWSSDK.SecurityToken" />
+    <PackageReference Include="Google.Apis.PlayIntegrity.v1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Assets\**" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Assets')" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,32 @@
+# Claude Code session/harness files (not part of the project)
+.claude/
+
+# .NET
+bin/
+obj/
+*.user
+App_Data/
+logs/
+backend/publish/
+
+# Node / Expo
+node_modules/
+.expo/
+.expo-shared/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Env / secrets
+.env
+.env.local
+appsettings.Local.json
+appsettings.*.Local.json
+
+# OS
+.DS_Store
+Thumbs.db

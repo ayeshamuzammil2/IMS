@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>PIA.FaceBench</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\backend\src\PIA.Application\PIA.Application.csproj" />
+    <ProjectReference Include="..\..\backend\src\PIA.Infrastructure\PIA.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

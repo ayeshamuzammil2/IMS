@@ -1,0 +1,57 @@
+import { client, apiBaseUrl } from '../client';
+import { endpoints } from '../endpoints';
+
+export type CertificateStatusKey = 'Locked' | 'PendingApproval' | 'Approved' | 'Issued' | 'Rejected';
+
+export interface CertificateTemplateDto {
+  id: number;
+  name: string;
+  departmentId: number | null;
+  mergeFields: string[];
+  isActive: boolean;
+  createdAtUtc: string;
+}
+
+export interface CertificateDto {
+  internProfileId: number;
+  internFullName: string | null;
+  internCode: string | null;
+  departmentName: string | null;
+  certificateNumber: string | null;
+  status: CertificateStatusKey;
+  generatedFileId: string | null;
+  issueDate: string | null;
+  rejectionReason: string | null;
+}
+
+export const certificatesApi = {
+  getMine: () => client.get<CertificateDto>(endpoints.certificates.mine).then((r) => r.data),
+
+  list: (departmentId?: number) => client.get<CertificateDto[]>(endpoints.certificates.list, { params: { departmentId } }).then((r) => r.data),
+
+  getForIntern: (internProfileId: number) =>
+    client.get<CertificateDto>(endpoints.certificates.forIntern(internProfileId)).then((r) => r.data),
+
+  generate: (internProfileId: number, templateId: number) =>
+    client.post<CertificateDto>(endpoints.certificates.generate(internProfileId), { templateId }).then((r) => r.data),
+
+  approve: (internProfileId: number) => client.post<CertificateDto>(endpoints.certificates.approve(internProfileId)).then((r) => r.data),
+
+  issue: (internProfileId: number) => client.post<CertificateDto>(endpoints.certificates.issue(internProfileId)).then((r) => r.data),
+
+  templates: {
+    list: () => client.get<CertificateTemplateDto[]>(endpoints.certificates.templates.list).then((r) => r.data),
+
+    upload: (name: string, departmentId: number | null, file: { uri: string; name: string; mimeType: string | null }) => {
+      const form = new FormData();
+      form.append('Name', name);
+      if (departmentId !== null) form.append('DepartmentId', String(departmentId));
+      form.append('File', { uri: file.uri, name: file.name, type: file.mimeType ?? 'application/octet-stream' } as unknown as Blob);
+      return client
+        .post<CertificateTemplateDto>(endpoints.certificates.templates.upload, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+        .then((r) => r.data);
+    },
+
+    previewUrl: (templateId: number) => `${apiBaseUrl}/api${endpoints.certificates.templates.preview(templateId)}`,
+  },
+};
