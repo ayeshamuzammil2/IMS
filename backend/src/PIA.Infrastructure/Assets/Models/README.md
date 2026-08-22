@@ -8,15 +8,17 @@ weights are dropped in here.
 
 | File | Purpose | Expected shape |
 |---|---|---|
-| `arcface_r100.onnx` | Face embedding | Input `1x3x112x112` RGB, `(pixel-127.5)/128`, CHW. Output: a single embedding vector (L2-normalized by the provider after inference). |
-| `minifasnet.onnx` | Passive anti-spoofing (PAD) | Input `1x3x80x80` RGB, `pixel/255`, CHW. Output: 3-class logits in the order `[live, print-attack, replay-attack]` (softmax applied by the provider). |
+| `facenet.onnx` | Face embedding | Input `1x3x160x160` RGB, `(pixel-127.5)/128`, CHW. Output: a single `512`-dim embedding vector (L2-normalized by the provider after inference). Converted from the official `timesler/facenet-pytorch` weights (MIT-licensed code; weights pretrained on VGGFace2) - see `LICENSES.md` in this folder for the exact source, SHA-256, and licensing notes recorded for this specific file. |
+| `minifasnet.onnx` | Passive anti-spoofing (PAD) | Input `1x3x80x80` BGR, `pixel/255`, CHW. Output: 3-class logits in the order `[live, print-attack, replay-attack]` (softmax applied by the provider). |
 
 ## Sourcing guidance (do this before enabling face verification)
 
 - **Do not use `buffalo_l` / the standard InsightFace ArcFace release weights** for anything other
   than research - those specific `.onnx` files are published under a non-commercial research
   license despite the InsightFace *code* itself being MIT. Using them in this system would create
-  a real licensing liability the moment it left a personal research sandbox.
+  a real licensing liability the moment it left a personal research sandbox. This is why this
+  project uses `facenet.onnx` (converted from `timesler/facenet-pytorch`, MIT code license)
+  instead - see `LICENSES.md` for the recorded commercial-use verdict on this specific file.
 - Before placing any `.onnx` file here, record its source URL, SHA-256, and a commercial-use
   verdict in `LICENSES.md` in this same folder. A CI check (Phase 9) is expected to fail the build
   if a model file has no corresponding entry - don't skip this step even for a "just testing" file.
