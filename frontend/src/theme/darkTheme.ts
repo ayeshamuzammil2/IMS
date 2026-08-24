@@ -32,6 +32,8 @@ export const darkColors: ThemeColors = {
   info: '#82B1FF',
   infoBg: '#131F33',
   gold: '#E0C060',
+  slate: '#94A3B8',
+  slateLight: '#64748B',
 
   overlay: 'rgba(0,0,0,0.66)',
   shadowColor: '#000000',

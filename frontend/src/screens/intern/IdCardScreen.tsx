@@ -8,6 +8,7 @@ import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
 import { idCardsApi, type IdCardStatusKey } from '../../api/resources/idcards.api';
+import { IdCardPreview } from '../../components/media/IdCardPreview';
 import { apiBaseUrl } from '../../api/client';
 import { downloadAndShare } from '../../lib/downloadAndShare';
 import { useThemedStyles } from '../../theme/useThemedStyles';
@@ -64,17 +65,24 @@ export function IdCardScreen() {
 
   return (
     <Screen scroll>
+      {data.status !== 'Draft' ? (
+        <IdCardPreview
+          fullName={data.internFullName ?? ''}
+          designation={data.designation ?? ''}
+          email={data.email}
+          departmentName={data.departmentName}
+          cardNumber={data.cardNumber}
+          emergencyContactPhone={data.emergencyContactPhone}
+          photoFileId={data.photoFileId}
+        />
+      ) : null}
+
       <View style={s.iconWrap}>
         <config.Icon size={48} color={theme.colors[config.tone === 'muted' ? 'textMuted' : config.tone]} />
       </View>
       <Text variant="h3" style={s.statusLabel} tone={config.tone}>
         {config.label}
       </Text>
-      {data.cardNumber ? (
-        <Text variant="caption" tone="muted" style={s.centerText}>
-          Card No: {data.cardNumber}
-        </Text>
-      ) : null}
       {data.validUntil ? (
         <Text variant="caption" tone="muted" style={s.centerText}>
           Valid until: {new Date(data.validUntil).toLocaleDateString()}

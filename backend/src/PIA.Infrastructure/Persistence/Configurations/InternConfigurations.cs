@@ -50,6 +50,7 @@ public sealed class InternDocumentConfiguration : IEntityTypeConfiguration<Inter
     {
         b.HasKey(x => x.Id);
         b.Property(x => x.Remarks).HasMaxLength(500);
+        b.Property(x => x.ExternalLinkUrl).HasMaxLength(2000);
         b.HasOne(x => x.InternProfile).WithMany(x => x.Documents)
             .HasForeignKey(x => x.InternProfileId).OnDelete(DeleteBehavior.Cascade);
         b.HasIndex(x => new { x.InternProfileId, x.DocumentType, x.Version }).IsUnique();

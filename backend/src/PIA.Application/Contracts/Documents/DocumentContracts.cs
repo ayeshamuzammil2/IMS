@@ -3,7 +3,8 @@ namespace PIA.Application.Contracts.Documents;
 public sealed record DocumentDto(
     int Id,
     string DocumentType,
-    Guid FileId,
+    Guid? FileId,
+    string? ExternalLinkUrl,
     int Version,
     string Status,
     string? Remarks,
@@ -18,6 +19,9 @@ public sealed record UploadDocumentRequest(
     string FileName,
     string? ContentType,
     string DocumentType);
+
+/// <summary>The optional extra slot's link path - the only DocumentType submittable without a file.</summary>
+public sealed record SubmitExtraDocumentLinkRequest(string Url);
 
 public sealed record SubmitSelfDetailsRequest(
     string? Address,
@@ -48,7 +52,6 @@ public sealed record InternDashboardDto(
     string? EmergencyContactPhone,
     string? BloodGroup,
     bool SelfDetailsSubmitted,
-    bool ProfileLocked,
     IReadOnlyList<DocumentDto> Documents);
 
 public sealed record DocumentReviewQueueItemDto(
@@ -57,7 +60,9 @@ public sealed record DocumentReviewQueueItemDto(
     string InternFullName,
     string InternCode,
     string DocumentType,
-    Guid FileId,
+    Guid? FileId,
+    string? ContentType,
+    string? ExternalLinkUrl,
     int Version,
     DateTime UploadedAtUtc);
 

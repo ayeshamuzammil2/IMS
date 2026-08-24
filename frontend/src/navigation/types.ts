@@ -16,6 +16,7 @@ export type AdminDrawerParamList = {
   Departments: undefined;
   IdCards: undefined;
   Certificates: undefined;
+  Messages: undefined;
 };
 
 export type MentorDrawerParamList = {
@@ -29,6 +30,7 @@ export type MentorDrawerParamList = {
   IdCard: undefined;
   GithubRepo: undefined;
   AssignProject: undefined;
+  ContactAdmin: undefined;
 };
 
 export type InternDrawerParamList = {
@@ -39,4 +41,5 @@ export type InternDrawerParamList = {
   Certificate: undefined;
   GithubRepo: undefined;
   InternshipTask: undefined;
+  ContactMentor: undefined;
 };

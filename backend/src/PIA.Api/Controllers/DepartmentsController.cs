@@ -32,6 +32,14 @@ public sealed class DepartmentsController(IDepartmentService departments) : Cont
 
     [HttpDelete("{id:int}")]
     [Authorize(Policy = Policies.Admin)]
+    public async Task<IActionResult> Delete(int id, CancellationToken ct)
+    {
+        await departments.DeleteAsync(id, ct);
+        return NoContent();
+    }
+
+    [HttpPost("{id:int}/deactivate")]
+    [Authorize(Policy = Policies.Admin)]
     public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
     {
         await departments.DeactivateAsync(id, ct);

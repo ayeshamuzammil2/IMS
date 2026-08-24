@@ -6,8 +6,15 @@ namespace PIA.Api.Controllers;
 
 [ApiController]
 [Route("api/notifications")]
-public sealed class NotificationsController(INotificationQueryService notifications, ICurrentUser currentUser) : ControllerBase
+public sealed class NotificationsController(INotificationQueryService notifications, IPushTokenService pushTokens, ICurrentUser currentUser) : ControllerBase
 {
+    [HttpPost("push-token")]
+    public async Task<IActionResult> RegisterPushToken([FromBody] RegisterPushTokenRequest request, CancellationToken ct)
+    {
+        await pushTokens.RegisterAsync(currentUser.UserId, request.ExpoPushToken, request.DeviceId, ct);
+        return NoContent();
+    }
+
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] bool unreadOnly = false, [FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default)
     {
@@ -36,3 +43,5 @@ public sealed class NotificationsController(INotificationQueryService notificati
         return NoContent();
     }
 }
+
+public sealed record RegisterPushTokenRequest(string ExpoPushToken, string? DeviceId);

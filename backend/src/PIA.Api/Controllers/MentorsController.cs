@@ -30,6 +30,13 @@ public sealed class MentorsController(IMentorService mentors) : ControllerBase
         Ok(await mentors.UpdateAsync(id, request, ct));
 
     [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Delete(int id, CancellationToken ct)
+    {
+        await mentors.DeleteAsync(id, ct);
+        return NoContent();
+    }
+
+    [HttpPost("{id:int}/deactivate")]
     public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
     {
         await mentors.DeactivateAsync(id, ct);
@@ -44,9 +51,9 @@ public sealed class MentorsController(IMentorService mentors) : ControllerBase
     }
 
     [HttpPost("{id:int}/reset-password")]
-    public async Task<IActionResult> ResetPassword(int id, CancellationToken ct)
+    public async Task<IActionResult> ResetPassword(int id, [FromBody] ResetMentorPasswordRequest request, CancellationToken ct)
     {
-        await mentors.ResetPasswordAsync(id, ct);
+        await mentors.ResetPasswordAsync(id, request, ct);
         return NoContent();
     }
 

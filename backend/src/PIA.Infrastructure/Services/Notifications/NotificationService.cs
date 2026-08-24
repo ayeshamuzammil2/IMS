@@ -8,7 +8,8 @@ using Scriban;
 
 namespace PIA.Infrastructure.Services.Notifications;
 
-public sealed class NotificationService(PiaDbContext db, IEmailQueue emailQueue, IEmailTemplateRenderer emailRenderer, IClock clock)
+public sealed class NotificationService(
+    PiaDbContext db, IEmailQueue emailQueue, IEmailTemplateRenderer emailRenderer, IPushNotificationSender pushSender, IClock clock)
     : INotificationService
 {
     public async Task NotifyUserAsync(int userId, NotificationTemplate template, IReadOnlyDictionary<string, object?> model, CancellationToken ct)
@@ -37,5 +38,11 @@ public sealed class NotificationService(PiaDbContext db, IEmailQueue emailQueue,
             var rendered = await emailRenderer.RenderAsync(template.EmailTemplateKey, model, ct);
             await emailQueue.EnqueueAsync(recipient.Email, recipient.FullName, rendered.Subject, rendered.Html, template.EmailTemplateKey, ct);
         }
+
+        var pushTokens = await db.PushTokens.AsNoTracking()
+            .Where(t => t.UserId == userId && t.IsActive)
+            .Select(t => t.ExpoPushToken)
+            .ToListAsync(ct);
+        await pushSender.SendAsync(pushTokens, title, body, template.ActionRoute, ct);
     }
 }

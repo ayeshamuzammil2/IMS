@@ -4,7 +4,7 @@ public sealed class PasswordPolicyOptions
 {
     public const string SectionName = "PasswordPolicy";
 
-    public int MinLength { get; set; } = 10;
+    public int MinLength { get; set; } = 8;
     public int MaxLength { get; set; } = 128;
     public bool RequireUppercase { get; set; } = true;
     public bool RequireLowercase { get; set; } = true;

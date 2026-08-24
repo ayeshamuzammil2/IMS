@@ -1,6 +1,6 @@
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
-import { LayoutDashboard, Camera, FileText, IdCard, Award, GitBranch, ClipboardList } from 'lucide-react-native';
+import { LayoutDashboard, Camera, FileText, IdCard, Award, GitBranch, ClipboardList, MessageCircle } from 'lucide-react-native';
 import { useTheme } from '../providers/ThemeProvider';
 import { DrawerContent } from './DrawerContent';
 import { SharedModalStack } from './stacks/SharedModalStack';
@@ -12,6 +12,7 @@ import { IdCardScreen } from '../screens/intern/IdCardScreen';
 import { CertificateScreen } from '../screens/intern/CertificateScreen';
 import { GithubRepoScreen } from '../screens/intern/GithubRepoScreen';
 import { InternshipTaskScreen } from '../screens/intern/InternshipTaskScreen';
+import { ChatScreen } from '../screens/shared/ChatScreen';
 import type { InternDrawerParamList } from './types';
 
 const Drawer = createDrawerNavigator<InternDrawerParamList & { Shared: undefined }>();
@@ -23,6 +24,7 @@ const IdCardStack = makeSectionStack('IdCard', 'ID Card', IdCardScreen);
 const CertificateStack = makeSectionStack('Certificate', 'Certificate', CertificateScreen);
 const GithubStack = makeSectionStack('GithubRepo', 'GitHub Repo', GithubRepoScreen);
 const TaskStack = makeSectionStack('InternshipTask', 'Internship Task', InternshipTaskScreen);
+const ContactMentorStack = makeSectionStack('ContactMentor', 'Contact Mentor', ChatScreen);
 
 export function InternNavigator() {
   const theme = useTheme();
@@ -43,6 +45,7 @@ export function InternNavigator() {
       <Drawer.Screen name="Certificate" component={CertificateStack} options={{ drawerIcon: ({ color, size }) => <Award color={color} size={size} /> }} />
       <Drawer.Screen name="GithubRepo" component={GithubStack} options={{ title: 'GitHub Repo', drawerIcon: ({ color, size }) => <GitBranch color={color} size={size} /> }} />
       <Drawer.Screen name="InternshipTask" component={TaskStack} options={{ title: 'Internship Task', drawerIcon: ({ color, size }) => <ClipboardList color={color} size={size} /> }} />
+      <Drawer.Screen name="ContactMentor" component={ContactMentorStack} options={{ title: 'Contact Mentor', drawerIcon: ({ color, size }) => <MessageCircle color={color} size={size} /> }} />
       <Drawer.Screen name="Shared" component={SharedModalStack} options={{ drawerItemStyle: { display: 'none' } }} />
     </Drawer.Navigator>
   );

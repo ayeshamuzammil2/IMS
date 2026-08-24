@@ -30,9 +30,16 @@ public sealed class DocumentReviewService(
 
         var rows = await query.OrderBy(x => x.Document.UploadedAtUtc).ToListAsync(ct);
 
+        var fileIds = rows.Where(x => x.Document.FileId.HasValue).Select(x => x.Document.FileId!.Value).ToList();
+        var contentTypesByFileId = await db.StoredFiles.AsNoTracking()
+            .Where(f => fileIds.Contains(f.Id))
+            .ToDictionaryAsync(f => f.Id, f => f.ContentType, ct);
+
         return rows.Select(x => new DocumentReviewQueueItemDto(
             x.Document.Id, x.Profile.Id, x.Profile.User.FullName, x.Profile.InternCode,
-            x.Document.DocumentType.ToString(), x.Document.FileId, x.Document.Version, x.Document.UploadedAtUtc)).ToList();
+            x.Document.DocumentType.ToString(), x.Document.FileId,
+            x.Document.FileId.HasValue ? contentTypesByFileId.GetValueOrDefault(x.Document.FileId.Value) : null,
+            x.Document.ExternalLinkUrl, x.Document.Version, x.Document.UploadedAtUtc)).ToList();
     }
 
     public async Task DecideAsync(int documentId, ReviewDocumentRequest request, CancellationToken ct)

@@ -14,7 +14,7 @@ public sealed class VerificationRecomputer(PiaDbContext db, INotificationService
 {
     private static readonly DocumentType[] RequiredTypes =
     [
-        DocumentType.ProfilePhoto, DocumentType.Cnic, DocumentType.Resume, DocumentType.ReferenceLetter,
+        DocumentType.ProfilePhoto, DocumentType.CnicFront, DocumentType.CnicBack, DocumentType.Resume, DocumentType.ReferenceLetter,
     ];
 
     public async Task RecomputeAsync(int internProfileId, CancellationToken ct)

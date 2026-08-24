@@ -12,7 +12,8 @@ public sealed record ReviewQueueItemDto(
     DateTime? DepartureAtUtc,
     double? DistanceM,
     string? GeofenceState,
-    IReadOnlyList<string> Flags);
+    IReadOnlyList<string> Flags,
+    bool AttendanceReady);
 
 public sealed record ReviewDecisionRequest(bool Approve, string? Note);
 

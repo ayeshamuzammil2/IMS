@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { View, Pressable, ActivityIndicator } from 'react-native';
+import { View, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { Power, PowerOff, KeyRound, Trash2 } from 'lucide-react-native';
+import { Power, PowerOff, KeyRound, Trash2, Unlock } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
@@ -14,6 +14,8 @@ import { FormModal } from '../../components/forms/FormModal';
 import { SelectField } from '../../components/forms/SelectField';
 import { DateField } from '../../components/forms/DateField';
 import { TimeField } from '../../components/forms/TimeField';
+import { PasswordStrengthChecklist } from '../../components/forms/PasswordStrengthChecklist';
+import { passwordSchema } from '../../lib/passwordPolicy';
 import { DataTable, type DataTableColumn } from '../../components/data/DataTable';
 import { mentorsApi } from '../../api/resources/mentors.api';
 import { internsApi, type InternDto } from '../../api/resources/interns.api';
@@ -34,6 +36,13 @@ const formShape = {
   degreeProgram: z.string().optional(),
 };
 
+const selfDetailsShape = {
+  address: z.string().optional(),
+  emergencyContactName: z.string().optional(),
+  emergencyContactPhone: z.string().optional(),
+  bloodGroup: z.string().optional(),
+};
+
 const dateTimeRefines = <T extends z.ZodTypeAny>(schema: T) =>
   schema
     .refine((data: any) => data.internshipEndDate > data.internshipStartDate, {
@@ -50,12 +59,21 @@ const createSchema = dateTimeRefines(
     ...formShape,
     email: z.string().min(1, 'Email is required.').email('Enter a valid email address.'),
     cnic: z.string().min(1, 'CNIC is required.'),
+    password: passwordSchema,
+    confirmPassword: z.string().min(1, 'Please confirm the password.'),
   }),
-);
-const updateSchema = dateTimeRefines(z.object(formShape));
+).refine((data) => data.password === data.confirmPassword, {
+  message: 'Passwords do not match.',
+  path: ['confirmPassword'],
+});
+const updateSchema = dateTimeRefines(z.object({ ...formShape, ...selfDetailsShape }));
+const resetPasswordSchema = z
+  .object({ password: passwordSchema, confirmPassword: z.string().min(1, 'Please confirm the password.') })
+  .refine((data) => data.password === data.confirmPassword, { message: 'Passwords do not match.', path: ['confirmPassword'] });
 
 type CreateValues = z.infer<typeof createSchema>;
 type UpdateValues = z.infer<typeof updateSchema>;
+type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 
 const emptyCreate: CreateValues = {
   fullName: '',
@@ -69,6 +87,8 @@ const emptyCreate: CreateValues = {
   dailyEndTime: '',
   universityName: '',
   degreeProgram: '',
+  password: '',
+  confirmPassword: '',
 };
 
 const statusTone: Record<string, 'muted' | 'success' | 'warning' | 'error'> = {
@@ -88,6 +108,7 @@ export function InternsScreen() {
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<InternDto | null>(null);
+  const [resetPasswordTarget, setResetPasswordTarget] = useState<InternDto | null>(null);
 
   const { data: interns = [], isLoading } = useQuery({ queryKey: ['interns'], queryFn: () => internsApi.list() });
   const { data: mentorOptions = [] } = useQuery({
@@ -103,8 +124,15 @@ export function InternsScreen() {
   const createForm = useForm<CreateValues>({ resolver: zodResolver(createSchema), defaultValues: emptyCreate });
   const updateForm = useForm<UpdateValues>({
     resolver: zodResolver(updateSchema),
-    defaultValues: { ...emptyCreate },
+    defaultValues: { ...emptyCreate, ...{ address: '', emergencyContactName: '', emergencyContactPhone: '', bloodGroup: '' } },
   });
+  const resetPasswordForm = useForm<ResetPasswordValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: { password: '', confirmPassword: '' },
+  });
+  const createPassword = createForm.watch('password');
+  const createFullName = createForm.watch('fullName');
+  const resetPassword = resetPasswordForm.watch('password');
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['interns'] });
 
@@ -117,11 +145,12 @@ export function InternsScreen() {
         degreeProgram: values.degreeProgram?.trim() ? values.degreeProgram : null,
       }),
     onSuccess: () => {
-      Toast.show({ type: 'success', text1: 'Intern created', text2: 'A welcome email with the temporary password was sent.' });
+      Toast.show({ type: 'success', text1: 'Intern created', text2: 'Share the password you set with them directly.' });
       invalidate();
       closeModal();
     },
-    onError: (error: any) => Toast.show({ type: 'error', text1: 'Could not create intern', text2: error?.message }),
+    onError: (error: any) =>
+      Toast.show({ type: 'error', text1: 'Could not create intern', text2: error?.response?.data?.message ?? error?.message }),
   });
 
   const updateMutation = useMutation({
@@ -131,6 +160,10 @@ export function InternsScreen() {
         phone: body.phone?.trim() ? body.phone : null,
         universityName: body.universityName?.trim() ? body.universityName : null,
         degreeProgram: body.degreeProgram?.trim() ? body.degreeProgram : null,
+        address: body.address?.trim() ? body.address : null,
+        emergencyContactName: body.emergencyContactName?.trim() ? body.emergencyContactName : null,
+        emergencyContactPhone: body.emergencyContactPhone?.trim() ? body.emergencyContactPhone : null,
+        bloodGroup: body.bloodGroup?.trim() ? body.bloodGroup : null,
       }),
     onSuccess: () => {
       Toast.show({ type: 'success', text1: 'Intern updated' });
@@ -150,9 +183,13 @@ export function InternsScreen() {
   });
 
   const resetPasswordMutation = useMutation({
-    mutationFn: (id: number) => internsApi.resetPassword(id),
-    onSuccess: () => Toast.show({ type: 'success', text1: 'Password reset', text2: 'A new temporary password was emailed.' }),
-    onError: (error: any) => Toast.show({ type: 'error', text1: 'Could not reset password', text2: error?.message }),
+    mutationFn: ({ id, newPassword }: { id: number; newPassword: string }) => internsApi.resetPassword(id, newPassword),
+    onSuccess: () => {
+      Toast.show({ type: 'success', text1: 'Password reset', text2: 'They must sign in with the new password and set their own.' });
+      setResetPasswordTarget(null);
+    },
+    onError: (error: any) =>
+      Toast.show({ type: 'error', text1: 'Could not reset password', text2: error?.response?.data?.message ?? error?.message }),
   });
 
   const deleteMutation = useMutation({
@@ -161,8 +198,52 @@ export function InternsScreen() {
       Toast.show({ type: 'success', text1: 'Intern deleted' });
       invalidate();
     },
-    onError: (error: any) => Toast.show({ type: 'error', text1: 'Could not delete intern', text2: error?.message }),
+    onError: (error: any) =>
+      Toast.show({ type: 'error', text1: 'Could not delete intern', text2: error?.response?.data?.message ?? error?.message }),
   });
+
+  const confirmToggleActive = (intern: InternDto) => {
+    if (!intern.isActive) {
+      toggleActiveMutation.mutate(intern);
+      return;
+    }
+    Alert.alert('Deactivate intern', `Deactivate ${intern.fullName}? They will lose access until reactivated.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Deactivate', style: 'destructive', onPress: () => toggleActiveMutation.mutate(intern) },
+    ]);
+  };
+
+  const openResetPassword = (intern: InternDto) => {
+    resetPasswordForm.reset({ password: '', confirmPassword: '' });
+    setResetPasswordTarget(intern);
+  };
+
+  const confirmDelete = (intern: InternDto) => {
+    Alert.alert('Delete intern', `Permanently delete ${intern.fullName}? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(intern.id) },
+    ]);
+  };
+
+  const unlockMutation = useMutation({
+    mutationFn: (id: number) => internsApi.unlockAttendance(id),
+    onSuccess: () => {
+      Toast.show({ type: 'success', text1: 'Account unlocked' });
+      invalidate();
+    },
+    onError: (error: any) => Toast.show({ type: 'error', text1: 'Could not unlock account', text2: error?.message }),
+  });
+
+  const confirmUnlock = (intern: InternDto) => {
+    Alert.alert(
+      'Unlock account',
+      `Unlock ${intern.fullName}'s account and reset their failed face-verification counter to zero?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Unlock', onPress: () => unlockMutation.mutate(intern.id) },
+      ],
+    );
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -182,6 +263,10 @@ export function InternsScreen() {
       dailyEndTime: intern.dailyEndTime,
       universityName: intern.universityName ?? '',
       degreeProgram: intern.degreeProgram ?? '',
+      address: intern.address ?? '',
+      emergencyContactName: intern.emergencyContactName ?? '',
+      emergencyContactPhone: intern.emergencyContactPhone ?? '',
+      bloodGroup: intern.bloodGroup ?? '',
     } as UpdateValues);
     setModalOpen(true);
   };
@@ -219,25 +304,55 @@ export function InternsScreen() {
       label: 'Status',
       width: 90,
       render: (i) => (
-        <Text variant="caption" tone={i.isActive ? 'success' : 'error'}>
-          {i.isActive ? 'Active' : 'Inactive'}
-        </Text>
+        <View>
+          <Text variant="caption" tone={i.isActive ? 'success' : 'error'}>
+            {i.isActive ? 'Active' : 'Inactive'}
+          </Text>
+          {i.isLockedForUnofficialActivity ? (
+            <Text variant="caption" tone="error">
+              Locked
+            </Text>
+          ) : null}
+        </View>
       ),
     },
     {
       key: 'actions',
       label: 'Actions',
-      width: 130,
+      width: 160,
       render: (i) => {
         const busyToggle = toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === i.id;
-        const busyReset = resetPasswordMutation.isPending && resetPasswordMutation.variables === i.id;
         const busyDelete = deleteMutation.isPending && deleteMutation.variables === i.id;
+        const busyUnlock = unlockMutation.isPending && unlockMutation.variables === i.id;
         return (
           <View style={s.actionsRow}>
-            <Pressable hitSlop={8} onPress={() => resetPasswordMutation.mutate(i.id)}>
-              {busyReset ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : <KeyRound size={18} color={theme.colors.textSecondary} />}
+            {i.isLockedForUnofficialActivity ? (
+              <Pressable
+                hitSlop={8}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  confirmUnlock(i);
+                }}
+              >
+                {busyUnlock ? <ActivityIndicator size="small" color={theme.colors.success} /> : <Unlock size={18} color={theme.colors.success} />}
+              </Pressable>
+            ) : null}
+            <Pressable
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                openResetPassword(i);
+              }}
+            >
+              <KeyRound size={18} color={theme.colors.textSecondary} />
             </Pressable>
-            <Pressable hitSlop={8} onPress={() => toggleActiveMutation.mutate(i)}>
+            <Pressable
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                confirmToggleActive(i);
+              }}
+            >
               {busyToggle ? (
                 <ActivityIndicator size="small" color={theme.colors.textSecondary} />
               ) : i.isActive ? (
@@ -246,7 +361,13 @@ export function InternsScreen() {
                 <Power size={18} color={theme.colors.success} />
               )}
             </Pressable>
-            <Pressable hitSlop={8} onPress={() => deleteMutation.mutate(i.id)}>
+            <Pressable
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                confirmDelete(i);
+              }}
+            >
               {busyDelete ? <ActivityIndicator size="small" color={theme.colors.error} /> : <Trash2 size={18} color={theme.colors.error} />}
             </Pressable>
           </View>
@@ -360,6 +481,26 @@ export function InternsScreen() {
               name="degreeProgram"
               render={({ field }) => <Input label="Degree Program" value={field.value} onChangeText={field.onChange} />}
             />
+            <Controller
+              control={updateForm.control}
+              name="address"
+              render={({ field }) => <Input label="Address" value={field.value} onChangeText={field.onChange} multiline />}
+            />
+            <Controller
+              control={updateForm.control}
+              name="emergencyContactName"
+              render={({ field }) => <Input label="Emergency Contact Name" value={field.value} onChangeText={field.onChange} />}
+            />
+            <Controller
+              control={updateForm.control}
+              name="emergencyContactPhone"
+              render={({ field }) => <Input label="Emergency Contact Phone" value={field.value} onChangeText={field.onChange} keyboardType="phone-pad" />}
+            />
+            <Controller
+              control={updateForm.control}
+              name="bloodGroup"
+              render={({ field }) => <Input label="Blood Group" value={field.value} onChangeText={field.onChange} placeholder="O+" />}
+            />
           </>
         ) : (
           <>
@@ -458,8 +599,88 @@ export function InternsScreen() {
               name="degreeProgram"
               render={({ field }) => <Input label="Degree Program" value={field.value} onChangeText={field.onChange} />}
             />
+            <Controller
+              control={createForm.control}
+              name="password"
+              render={({ field }) => (
+                <Input
+                  label="Initial Password"
+                  required
+                  secureToggle
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  error={createForm.formState.errors.password?.message}
+                />
+              )}
+            />
+            <PasswordStrengthChecklist password={createPassword ?? ''} fullName={createFullName} />
+            <Controller
+              control={createForm.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <Input
+                  label="Confirm Password"
+                  required
+                  secureToggle
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  error={createForm.formState.errors.confirmPassword?.message}
+                />
+              )}
+            />
           </>
         )}
+      </FormModal>
+
+      <FormModal
+        visible={resetPasswordTarget !== null}
+        title="Reset Password"
+        onClose={() => setResetPasswordTarget(null)}
+        footer={
+          <>
+            <Button label="Cancel" variant="ghost" onPress={() => setResetPasswordTarget(null)} />
+            <Button
+              label="Reset Password"
+              loading={resetPasswordMutation.isPending}
+              onPress={resetPasswordForm.handleSubmit((values) => {
+                if (resetPasswordTarget) resetPasswordMutation.mutate({ id: resetPasswordTarget.id, newPassword: values.password });
+              })}
+            />
+          </>
+        }
+      >
+        <Text variant="body" tone="secondary" style={s.resetHint}>
+          Set a new password for {resetPasswordTarget?.fullName}. They will be asked to set their own on next sign-in.
+        </Text>
+        <Controller
+          control={resetPasswordForm.control}
+          name="password"
+          render={({ field }) => (
+            <Input
+              label="New Password"
+              required
+              secureToggle
+              value={field.value}
+              onChangeText={field.onChange}
+              error={resetPasswordForm.formState.errors.password?.message}
+            />
+          )}
+        />
+        <PasswordStrengthChecklist password={resetPassword ?? ''} fullName={resetPasswordTarget?.fullName} />
+        <Controller
+          control={resetPasswordForm.control}
+          name="confirmPassword"
+          render={({ field }) => (
+            <Input
+              label="Confirm Password"
+              required
+              secureToggle
+              value={field.value}
+              onChangeText={field.onChange}
+              error={resetPasswordForm.formState.errors.confirmPassword?.message}
+            />
+          )}
+        />
       </FormModal>
     </Screen>
   );
@@ -473,4 +694,5 @@ const makeStyles = (t: AppTheme) => ({
     marginBottom: t.spacing.md,
   },
   actionsRow: { flexDirection: 'row' as const, gap: t.spacing.md },
+  resetHint: { marginBottom: t.spacing.md },
 });

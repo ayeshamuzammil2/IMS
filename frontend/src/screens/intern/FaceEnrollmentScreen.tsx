@@ -99,6 +99,14 @@ export function FaceEnrollmentScreen() {
             challenge={activeSession.challenge}
             onComplete={(frames) => submitMutation.mutate(frames)}
             onCancel={() => setActiveSession(null)}
+            onTimeout={() => {
+              Toast.show({
+                type: 'error',
+                text1: 'Verification timed out',
+                text2: 'You took too long on a step. Please try again.',
+              });
+              setActiveSession(null);
+            }}
           />
         ) : null}
       </Modal>

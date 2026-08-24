@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { setAccessToken } from '../api/client';
 import { onUnauthorized } from '../api/authEvents';
 import { authApi, type LoginResponse, type MeResponse } from '../api/resources/auth.api';
+import { registerForPushNotifications } from '../lib/pushNotifications';
 
 export type AuthStatus = 'bootstrapping' | 'signedOut' | 'mustReset' | 'signedIn';
 
@@ -91,6 +92,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(fullUser);
     setStatus('signedIn');
   }, []);
+
+  useEffect(() => {
+    if (status === 'signedIn') {
+      registerForPushNotifications();
+    }
+  }, [status]);
 
   useEffect(() => {
     onUnauthorized(() => {

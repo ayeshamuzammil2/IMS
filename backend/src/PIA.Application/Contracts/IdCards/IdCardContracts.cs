@@ -1,6 +1,8 @@
 namespace PIA.Application.Contracts.IdCards;
 
-public sealed record SubmitIdCardRequest(string? Designation);
+/// <summary>Designation is mandatory - IdCardService.SubmitAsync rejects an empty/whitespace value
+/// before generating or previewing anything.</summary>
+public sealed record SubmitIdCardRequest(string Designation);
 
 public sealed record IdCardDto(
     int InternProfileId,
@@ -11,4 +13,8 @@ public sealed record IdCardDto(
     string Status,
     Guid? GeneratedFileId,
     DateOnly? ValidUntil,
-    string? RejectionReason);
+    string? RejectionReason,
+    string? Designation,
+    string? Email,
+    string? EmergencyContactPhone,
+    Guid? PhotoFileId);

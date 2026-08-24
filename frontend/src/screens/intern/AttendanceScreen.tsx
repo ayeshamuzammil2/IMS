@@ -1,5 +1,5 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { View, ActivityIndicator, Modal } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, ActivityIndicator, Modal, Alert } from 'react-native';
 import * as Location from 'expo-location';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
@@ -17,7 +17,11 @@ import { getOrCreateDeviceId } from '../../lib/deviceId';
 import { notifyNow } from '../../lib/localNotifications';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
+import { useAuth } from '../../providers/AuthProvider';
 import type { AppTheme } from '../../theme/types';
+
+const RETRY_COOLDOWN_SECONDS = 15;
+const FACE_FAILURE_CODES = new Set(['FACE_MISMATCH', 'LIVENESS_FAILED', 'SPOOF_DETECTED']);
 
 const stateTone: Record<GeofenceState, 'success' | 'warning' | 'error'> = {
   Inside: 'success',
@@ -35,6 +39,8 @@ const blockerMessages: Record<string, string> = {
   DepartureAlreadyMarked: 'Departure has already been marked today.',
   ArrivalNotYetMarked: 'Mark arrival before departure.',
   ActiveSessionAlreadyOpen: 'An attendance session is already in progress.',
+  NotVerified: 'Your documents are still pending verification. Attendance unlocks once your mentor approves all of them.',
+  FaceNotReady: 'Attendance locked. Pending Profile Picture approval or Face Enrollment.',
 };
 
 interface ActiveSession {
@@ -49,12 +55,30 @@ interface ActiveSession {
 export function AttendanceScreen() {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
+  const { signOut } = useAuth();
   const queryClient = useQueryClient();
   const [position, setPosition] = useState<Location.LocationObject | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [startingEvent, setStartingEvent] = useState<AttendanceEventType | null>(null);
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
+  const [cooldownEndsAt, setCooldownEndsAt] = useState<number | null>(null);
+  const [cooldownSecondsLeft, setCooldownSecondsLeft] = useState(0);
   const watchSubscription = useRef<Location.LocationSubscription | null>(null);
+
+  // Mandatory 15s retry cooldown after a face-verification failure - the server independently
+  // enforces the same window (CreateSessionAsync rejects a new session within 15s of
+  // LastFaceFailureAtUtc), this is just the client-side countdown UI for it.
+  useEffect(() => {
+    if (!cooldownEndsAt) return;
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((cooldownEndsAt - Date.now()) / 1000));
+      setCooldownSecondsLeft(remaining);
+      if (remaining <= 0) setCooldownEndsAt(null);
+    };
+    tick();
+    const interval = setInterval(tick, 250);
+    return () => clearInterval(interval);
+  }, [cooldownEndsAt]);
 
   const { data: today, isLoading, refetch } = useQuery({
     queryKey: ['attendance', 'today'],
@@ -111,6 +135,17 @@ export function AttendanceScreen() {
       queryClient.invalidateQueries({ queryKey: ['attendance', 'today'] });
     },
     onError: (error: any) => {
+      if (error?.code === 'UNOFFICIAL_ACTIVITY_LOCKOUT') {
+        Alert.alert('Account locked', error?.message ?? 'Your account has been locked due to unofficial activity.', [
+          { text: 'OK', onPress: () => signOut() },
+        ]);
+        return;
+      }
+      if (FACE_FAILURE_CODES.has(error?.code)) {
+        Alert.alert('Face mismatch detected', error?.message ?? 'Please try again.');
+        setCooldownEndsAt(Date.now() + RETRY_COOLDOWN_SECONDS * 1000);
+        return;
+      }
       Toast.show({ type: 'error', text1: 'Could not mark attendance', text2: error?.message });
     },
         onSettled: () => {
@@ -135,16 +170,31 @@ export function AttendanceScreen() {
       const session = await attendanceApi.createSession({ eventType, latitude, longitude, accuracyMeters, deviceId, mocked });
       setActiveSession({ eventType, session, latitude, longitude, accuracyMeters, mocked });
     } catch (error: any) {
-      Toast.show({ type: 'error', text1: 'Could not start attendance', text2: error?.message });
+      if (error?.code === 'UNOFFICIAL_ACTIVITY_LOCKOUT') {
+        Alert.alert('Account locked', error?.message ?? 'Your account has been locked due to unofficial activity.', [
+          { text: 'OK', onPress: () => signOut() },
+        ]);
+      } else {
+        Toast.show({ type: 'error', text1: 'Could not start attendance', text2: error?.message });
+      }
     } finally {
       setStartingEvent(null);
     }
   };
 
-  const arrivalBlocked = (today?.arrivalBlockers.length ?? 0) > 0 || geofenceState === 'Outside' || geofenceState === null;
-  const departureBlocked = (today?.departureBlockers.length ?? 0) > 0 || geofenceState === 'Outside' || geofenceState === null;
-  const arrivalReason = today?.arrivalBlockers[0] ? blockerMessages[today.arrivalBlockers[0]] : null;
-  const departureReason = today?.departureBlockers[0] ? blockerMessages[today.departureBlockers[0]] : null;
+  const onCooldown = cooldownSecondsLeft > 0;
+  const arrivalBlocked = (today?.arrivalBlockers.length ?? 0) > 0 || geofenceState === 'Outside' || geofenceState === null || onCooldown;
+  const departureBlocked = (today?.departureBlockers.length ?? 0) > 0 || geofenceState === 'Outside' || geofenceState === null || onCooldown;
+  const arrivalReason = onCooldown
+    ? `Please wait ${cooldownSecondsLeft}s before trying again.`
+    : today?.arrivalBlockers[0]
+      ? blockerMessages[today.arrivalBlockers[0]]
+      : null;
+  const departureReason = onCooldown
+    ? `Please wait ${cooldownSecondsLeft}s before trying again.`
+    : today?.departureBlockers[0]
+      ? blockerMessages[today.departureBlockers[0]]
+      : null;
 
   if (isLoading || !today) {
     return (

@@ -10,6 +10,10 @@ namespace PIA.Infrastructure.Services.Organization;
 
 public sealed class DepartmentService(PiaDbContext db, IClock clock) : IDepartmentService
 {
+    /// <summary>Strict upper bound on attendance geofence radius. Admins may still tighten it below
+    /// this for a smaller facility footprint - this caps looseness, not precision.</summary>
+    private const int MaxGeofenceRadiusMeters = 100;
+
     public async Task<IReadOnlyList<DepartmentDto>> ListAsync(CancellationToken ct)
     {
         return await db.Departments.AsNoTracking()
@@ -45,6 +49,7 @@ public sealed class DepartmentService(PiaDbContext db, IClock clock) : IDepartme
 
     public async Task<DepartmentDto> CreateAsync(CreateDepartmentRequest request, CancellationToken ct)
     {
+        EnsureRadiusWithinLimit(request.GeofenceRadiusMeters);
         await EnsureUniqueAsync(request.Name, request.Code, null, ct);
 
         var department = new Department
@@ -67,6 +72,8 @@ public sealed class DepartmentService(PiaDbContext db, IClock clock) : IDepartme
 
     public async Task<DepartmentDto> UpdateAsync(int id, UpdateDepartmentRequest request, CancellationToken ct)
     {
+        EnsureRadiusWithinLimit(request.GeofenceRadiusMeters);
+
         var department = await db.Departments.FirstOrDefaultAsync(d => d.Id == id, ct)
             ?? throw new NotFoundException(nameof(Department), id);
 
@@ -81,6 +88,24 @@ public sealed class DepartmentService(PiaDbContext db, IClock clock) : IDepartme
         await db.SaveChangesAsync(ct);
 
         return await GetAsync(id, ct);
+    }
+
+    /// <summary>Hard delete. Users.DepartmentId is configured OnDelete(SetNull), so this cannot
+    /// leave a dangling FK even for historical/inactive users still pointing at this department -
+    /// only the "active" restriction the spec calls for is enforced here.</summary>
+    public async Task DeleteAsync(int id, CancellationToken ct)
+    {
+        var department = await db.Departments.FirstOrDefaultAsync(d => d.Id == id, ct)
+            ?? throw new NotFoundException(nameof(Department), id);
+
+        var hasActiveUsers = await db.Users.AnyAsync(u => u.DepartmentId == id && u.IsActive, ct);
+        if (hasActiveUsers)
+        {
+            throw new ConflictException("This department still has active mentors or interns. Reassign or deactivate them first.");
+        }
+
+        db.Departments.Remove(department);
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task DeactivateAsync(int id, CancellationToken ct)
@@ -105,6 +130,14 @@ public sealed class DepartmentService(PiaDbContext db, IClock clock) : IDepartme
 
         department.IsActive = true;
         await db.SaveChangesAsync(ct);
+    }
+
+    private static void EnsureRadiusWithinLimit(int geofenceRadiusMeters)
+    {
+        if (geofenceRadiusMeters > MaxGeofenceRadiusMeters)
+        {
+            throw new ValidationException("geofenceRadiusMeters", $"Geofence radius cannot exceed {MaxGeofenceRadiusMeters} meters.");
+        }
     }
 
     private async Task EnsureUniqueAsync(string name, string code, int? excludingId, CancellationToken ct)

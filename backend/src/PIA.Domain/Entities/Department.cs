@@ -8,7 +8,7 @@ public class Department
     public string? Description { get; set; }
     public decimal Latitude { get; set; }
     public decimal Longitude { get; set; }
-    public int GeofenceRadiusMeters { get; set; } = 150;
+    public int GeofenceRadiusMeters { get; set; } = 100;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? UpdatedAtUtc { get; set; }

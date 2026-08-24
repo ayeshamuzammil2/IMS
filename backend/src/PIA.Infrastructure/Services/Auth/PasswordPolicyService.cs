@@ -60,9 +60,8 @@ public sealed class PasswordPolicyService(IOptions<PasswordPolicyOptions> option
                 errors.Add("Password must not contain your email address.");
             }
 
-            var firstName = fullName?.Split(' ').FirstOrDefault();
-            if (!string.IsNullOrEmpty(firstName) && firstName.Length >= 3 &&
-                password.Contains(firstName, StringComparison.OrdinalIgnoreCase))
+            var nameParts = fullName?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [];
+            if (nameParts.Any(part => part.Length >= 3 && password.Contains(part, StringComparison.OrdinalIgnoreCase)))
             {
                 errors.Add("Password must not contain your name.");
             }

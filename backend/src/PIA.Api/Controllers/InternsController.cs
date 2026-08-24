@@ -53,9 +53,16 @@ public sealed class InternsController(IInternService interns, IFaceEnrollmentSer
     }
 
     [HttpPost("{id:int}/reset-password")]
-    public async Task<IActionResult> ResetPassword(int id, CancellationToken ct)
+    public async Task<IActionResult> ResetPassword(int id, [FromBody] ResetInternPasswordRequest request, CancellationToken ct)
     {
-        await interns.ResetPasswordAsync(id, ct);
+        await interns.ResetPasswordAsync(id, request, ct);
+        return NoContent();
+    }
+
+    [HttpPost("{id:int}/unlock")]
+    public async Task<IActionResult> UnlockAttendance(int id, CancellationToken ct)
+    {
+        await interns.UnlockAttendanceAsync(id, ct);
         return NoContent();
     }
 

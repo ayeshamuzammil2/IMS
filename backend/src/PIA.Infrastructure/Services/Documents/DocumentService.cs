@@ -33,15 +33,16 @@ public sealed class DocumentService(
             profile.UniversityName, profile.DegreeProgram,
             profile.VerificationStatus.ToString(), profile.ProfilePhotoStatus.ToString(), profile.ApprovedPhotoFileId,
             profile.Address, profile.EmergencyContactName, profile.EmergencyContactPhone, profile.BloodGroup,
-            profile.SelfDetailsSubmitted, profile.ProfileLocked,
+            profile.SelfDetailsSubmitted,
             latestPerType.Select(ToDto).ToList());
     }
 
     public async Task<DocumentDto> UploadAsync(UploadDocumentRequest request, CancellationToken ct)
     {
-        if (!Enum.TryParse<DocumentType>(request.DocumentType, true, out var documentType))
+        if (!Enum.TryParse<DocumentType>(request.DocumentType, true, out var documentType) || documentType == DocumentType.Cnic)
         {
-            throw new ValidationException("documentType", "Must be one of ProfilePhoto, Cnic, Resume, ReferenceLetter.");
+            throw new ValidationException("documentType",
+                "Must be one of ProfilePhoto, CnicFront, CnicBack, Resume, ReferenceLetter, ExtraDocument.");
         }
 
         var profile = await LoadOwnProfileAsync(ct);
@@ -90,13 +91,42 @@ public sealed class DocumentService(
         return ToDto(document);
     }
 
+    public async Task<DocumentDto> SubmitExtraLinkAsync(SubmitExtraDocumentLinkRequest request, CancellationToken ct)
+    {
+        var url = request.Url.Trim();
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed) || (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new ValidationException("url", "Must be a valid http(s) URL.");
+        }
+
+        var profile = await LoadOwnProfileAsync(ct);
+
+        var nextVersion = 1 + (await db.InternDocuments
+            .Where(d => d.InternProfileId == profile.Id && d.DocumentType == DocumentType.ExtraDocument)
+            .Select(d => (int?)d.Version).MaxAsync(ct) ?? 0);
+
+        var document = new InternDocument
+        {
+            InternProfileId = profile.Id,
+            DocumentType = DocumentType.ExtraDocument,
+            FileId = null,
+            ExternalLinkUrl = url,
+            Version = nextVersion,
+            Status = DocumentStatus.Pending,
+            UploadedAtUtc = clock.UtcNow,
+        };
+        db.InternDocuments.Add(document);
+        await db.SaveChangesAsync(ct);
+
+        return ToDto(document);
+    }
+
+    /// <summary>Address/EmergencyContact*/BloodGroup are the only fields an intern may edit about
+    /// themselves (core profile fields stay admin/mentor-only) - this is a repeatable update, not a
+    /// one-time submission gate, so ProfileLocked is intentionally never set here anymore.</summary>
     public async Task SubmitSelfDetailsAsync(SubmitSelfDetailsRequest request, CancellationToken ct)
     {
         var profile = await LoadOwnProfileAsync(ct);
-        if (profile.ProfileLocked)
-        {
-            throw new BusinessRuleException("PROFILE_LOCKED", "Your profile details have already been submitted and are now locked. Contact your mentor to make changes.");
-        }
 
         var tracked = await db.InternProfiles.FirstAsync(p => p.Id == profile.Id, ct);
         tracked.Address = request.Address;
@@ -105,7 +135,6 @@ public sealed class DocumentService(
         tracked.BloodGroup = request.BloodGroup;
         tracked.SelfDetailsSubmitted = true;
         tracked.SelfDetailsSubmittedAtUtc = clock.UtcNow;
-        tracked.ProfileLocked = true;
         await db.SaveChangesAsync(ct);
     }
 
@@ -122,13 +151,14 @@ public sealed class DocumentService(
     private static FileCategory CategoryFor(DocumentType type) => type switch
     {
         DocumentType.ProfilePhoto => FileCategory.ProfilePhoto,
-        DocumentType.Cnic => FileCategory.CnicScan,
+        DocumentType.Cnic or DocumentType.CnicFront or DocumentType.CnicBack => FileCategory.CnicScan,
         DocumentType.Resume => FileCategory.Resume,
         DocumentType.ReferenceLetter => FileCategory.ReferenceLetter,
+        DocumentType.ExtraDocument => FileCategory.ExtraDocument,
         _ => throw new ArgumentOutOfRangeException(nameof(type)),
     };
 
     private static DocumentDto ToDto(InternDocument d) => new(
-        d.Id, d.DocumentType.ToString(), d.FileId, d.Version, d.Status.ToString(), d.Remarks,
+        d.Id, d.DocumentType.ToString(), d.FileId, d.ExternalLinkUrl, d.Version, d.Status.ToString(), d.Remarks,
         d.UploadedAtUtc, d.ReviewedByUserId, d.ReviewedAtUtc);
 }

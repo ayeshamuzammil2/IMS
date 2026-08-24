@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { View, Pressable, ActivityIndicator } from 'react-native';
+import { View, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import * as Location from 'expo-location';
-import { Power, PowerOff } from 'lucide-react-native';
+import { Power, PowerOff, Trash2 } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
@@ -24,7 +24,11 @@ const schema = z.object({
   description: z.string().max(500).nullable(),
   latitude: z.coerce.number({ message: 'Latitude must be a number.' }).min(-90).max(90),
   longitude: z.coerce.number({ message: 'Longitude must be a number.' }).min(-180).max(180),
-  geofenceRadiusMeters: z.coerce.number({ message: 'Radius must be a number.' }).int().min(10).max(5000),
+  geofenceRadiusMeters: z.coerce
+    .number({ message: 'Radius must be a number.' })
+    .int()
+    .min(10, 'Radius must be at least 10 meters.')
+    .max(100, 'Radius cannot exceed 100 meters.'),
 });
 
 // z.coerce.number() accepts unknown as input and outputs number - useForm needs both shapes since
@@ -32,7 +36,7 @@ const schema = z.object({
 type FormInput = z.input<typeof schema>;
 type FormOutput = z.output<typeof schema>;
 
-const emptyValues: FormInput = { name: '', code: '', description: '', latitude: 24.8967, longitude: 67.1608, geofenceRadiusMeters: 150 };
+const emptyValues: FormInput = { name: '', code: '', description: '', latitude: 24.8967, longitude: 67.1608, geofenceRadiusMeters: 100 };
 
 export function DepartmentsScreen() {
   const s = useThemedStyles(makeStyles);
@@ -80,8 +84,37 @@ export function DepartmentsScreen() {
       Toast.show({ type: 'success', text1: 'Department updated' });
       invalidate();
     },
-    onError: (error: any) => Toast.show({ type: 'error', text1: 'Could not update department', text2: error?.message }),
+    onError: (error: any) =>
+      Toast.show({ type: 'error', text1: 'Could not update department', text2: error?.response?.data?.message ?? error?.message }),
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => departmentsApi.delete(id),
+    onSuccess: () => {
+      Toast.show({ type: 'success', text1: 'Department deleted' });
+      invalidate();
+    },
+    onError: (error: any) =>
+      Toast.show({ type: 'error', text1: 'Could not delete department', text2: error?.response?.data?.message ?? error?.message }),
+  });
+
+  const confirmToggleActive = (dept: DepartmentDto) => {
+    if (!dept.isActive) {
+      toggleActiveMutation.mutate(dept);
+      return;
+    }
+    Alert.alert('Deactivate department', `Deactivate "${dept.name}"? Mentors and interns already assigned will keep their access until reassigned.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Deactivate', style: 'destructive', onPress: () => toggleActiveMutation.mutate(dept) },
+    ]);
+  };
+
+  const confirmDelete = (dept: DepartmentDto) => {
+    Alert.alert('Delete department', `Permanently delete "${dept.name}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(dept.id) },
+    ]);
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -153,26 +186,39 @@ export function DepartmentsScreen() {
     {
       key: 'actions',
       label: 'Actions',
-      width: 60,
+      width: 90,
       render: (d) => {
-        const busy = toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === d.id;
+        const toggling = toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === d.id;
+        const deleting = deleteMutation.isPending && deleteMutation.variables === d.id;
         return (
-          <Pressable
-            hitSlop={8}
-            style={s.iconOnlyButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              toggleActiveMutation.mutate(d);
-            }}
-          >
-            {busy ? (
-              <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-            ) : d.isActive ? (
-              <PowerOff size={18} color={theme.colors.error} />
-            ) : (
-              <Power size={18} color={theme.colors.success} />
-            )}
-          </Pressable>
+          <View style={s.actionsRow}>
+            <Pressable
+              hitSlop={8}
+              style={s.iconOnlyButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                confirmToggleActive(d);
+              }}
+            >
+              {toggling ? (
+                <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+              ) : d.isActive ? (
+                <PowerOff size={18} color={theme.colors.error} />
+              ) : (
+                <Power size={18} color={theme.colors.success} />
+              )}
+            </Pressable>
+            <Pressable
+              hitSlop={8}
+              style={s.iconOnlyButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                confirmDelete(d);
+              }}
+            >
+              {deleting ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : <Trash2 size={18} color={theme.colors.error} />}
+            </Pressable>
+          </View>
         );
       },
     },
@@ -316,4 +362,5 @@ const makeStyles = (t: AppTheme) => ({
   locationFields: { flex: 1 },
   locationButton: { marginBottom: t.spacing.md, marginTop: -t.spacing.sm },
   iconOnlyButton: { paddingHorizontal: t.spacing.sm },
+  actionsRow: { flexDirection: 'row' as const },
 });

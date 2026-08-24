@@ -39,7 +39,7 @@ export function DataTable<T>({ columns, rows, keyExtractor, onRowPress, emptyLab
         <View style={s.headerRow}>
           {columns.map((col) => (
             <View key={col.key} style={[s.cell, col.width ? { width: col.width } : s.flexCell]}>
-              <Text variant="overline" tone="muted">
+              <Text variant="overline" tone="slate">
                 {col.label}
               </Text>
             </View>

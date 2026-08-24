@@ -13,7 +13,7 @@ namespace PIA.Infrastructure.Services.Organization;
 public sealed class MentorService(
     PiaDbContext db,
     IPasswordHasher hasher,
-    ITempPasswordGenerator tempPasswordGenerator,
+    IPasswordPolicyService passwordPolicy,
     INotificationService notifications,
     IUserSecurityService security,
     IClock clock) : IMentorService
@@ -74,7 +74,8 @@ public sealed class MentorService(
             throw new ConflictException("An account with this CNIC already exists.");
         }
 
-        var tempPassword = tempPasswordGenerator.Generate();
+        passwordPolicy.Validate(request.Password, email.Value, request.FullName);
+
         var mentor = new User
         {
             Role = UserRole.Mentor,
@@ -82,7 +83,7 @@ public sealed class MentorService(
             Email = email.Value,
             Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : PakistanPhone.Parse(request.Phone).Value,
             Cnic = cnic.Value,
-            PasswordHash = hasher.Hash(tempPassword),
+            PasswordHash = hasher.Hash(request.Password),
             MustResetPassword = true,
             DepartmentId = department.Id,
             IsActive = true,
@@ -95,7 +96,6 @@ public sealed class MentorService(
         {
             ["full_name"] = mentor.FullName,
             ["department_name"] = department.Name,
-            ["temp_password"] = tempPassword,
         }, ct);
 
         return ToDto(mentor, department.Name, 0);
@@ -108,10 +108,46 @@ public sealed class MentorService(
 
         mentor.FullName = request.FullName;
         mentor.Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : PakistanPhone.Parse(request.Phone).Value;
+
+        if (!string.IsNullOrWhiteSpace(request.Cnic))
+        {
+            var cnic = Cnic.Parse(request.Cnic);
+            if (await db.Users.AnyAsync(u => u.Cnic == cnic.Value && u.Id != id, ct))
+            {
+                throw new ConflictException("An account with this CNIC already exists.");
+            }
+            mentor.Cnic = cnic.Value;
+        }
+
         await db.SaveChangesAsync(ct);
 
         var internCount = await db.InternProfiles.CountAsync(p => p.MentorId == id, ct);
         return ToDto(mentor, internCount);
+    }
+
+    /// <summary>Hard delete. InternProfile.MentorId is configured OnDelete(Restrict), so deleting a
+    /// mentor who has EVER had an intern assigned (active or historical) would fail at the DB level
+    /// with a raw FK-constraint error - guard against that case explicitly with a clear message
+    /// instead of letting the DbUpdateException surface.</summary>
+    public async Task DeleteAsync(int id, CancellationToken ct)
+    {
+        var mentor = await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.Role == UserRole.Mentor, ct)
+            ?? throw new NotFoundException(nameof(User), id);
+
+        var hasAnyInterns = await db.InternProfiles.AnyAsync(p => p.MentorId == id, ct);
+        if (hasAnyInterns)
+        {
+            throw new ConflictException("This mentor has interns assigned (current or past). Reassign them to another mentor first.");
+        }
+
+        var hasChatHistory = await db.ChatMessages.AnyAsync(m => m.SenderUserId == id || m.RecipientUserId == id, ct);
+        if (hasChatHistory)
+        {
+            throw new ConflictException("This mentor has chat message history and cannot be deleted. Deactivate the account instead.");
+        }
+
+        db.Users.Remove(mentor);
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task DeactivateAsync(int id, CancellationToken ct)
@@ -144,13 +180,14 @@ public sealed class MentorService(
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task ResetPasswordAsync(int id, CancellationToken ct)
+    public async Task ResetPasswordAsync(int id, ResetMentorPasswordRequest request, CancellationToken ct)
     {
         var mentor = await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.Role == UserRole.Mentor, ct)
             ?? throw new NotFoundException(nameof(User), id);
 
-        var tempPassword = tempPasswordGenerator.Generate();
-        mentor.PasswordHash = hasher.Hash(tempPassword);
+        passwordPolicy.Validate(request.NewPassword, mentor.Email, mentor.FullName);
+
+        mentor.PasswordHash = hasher.Hash(request.NewPassword);
         mentor.MustResetPassword = true;
         mentor.SecurityStamp = Guid.NewGuid().ToString("N");
         await db.SaveChangesAsync(ct);
@@ -159,7 +196,6 @@ public sealed class MentorService(
         await notifications.NotifyUserAsync(id, NotificationTemplates.PasswordResetByAdmin, new Dictionary<string, object?>
         {
             ["full_name"] = mentor.FullName,
-            ["temp_password"] = tempPassword,
         }, ct);
     }
 

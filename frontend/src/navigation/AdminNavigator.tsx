@@ -1,6 +1,6 @@
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
-import { LayoutDashboard, Users, GraduationCap, CalendarCheck, ShieldAlert, History, FileCheck2, Building2, IdCard, Award } from 'lucide-react-native';
+import { LayoutDashboard, Users, GraduationCap, CalendarCheck, ShieldAlert, History, FileCheck2, Building2, IdCard, Award, MessageCircle } from 'lucide-react-native';
 import { useTheme } from '../providers/ThemeProvider';
 import { DrawerContent } from './DrawerContent';
 import { SharedModalStack } from './stacks/SharedModalStack';
@@ -15,6 +15,7 @@ import { AttendanceReviewScreen } from '../screens/shared/AttendanceReviewScreen
 import { AttendanceHistoryScreen } from '../screens/shared/AttendanceHistoryScreen';
 import { DocumentReviewScreen } from '../screens/shared/DocumentReviewScreen';
 import { DashboardScreen } from '../screens/shared/DashboardScreen';
+import { ChatScreen } from '../screens/shared/ChatScreen';
 import type { AdminDrawerParamList } from './types';
 
 const Drawer = createDrawerNavigator<AdminDrawerParamList & { Shared: undefined }>();
@@ -29,6 +30,7 @@ const DocumentsStack = makeSectionStack('Documents', 'Document Review', Document
 const DepartmentsStack = makeSectionStack('Departments', 'Departments', DepartmentsScreen);
 const IdCardsStack = makeSectionStack('IdCards', 'ID Cards', IdCardOversightScreen);
 const CertificatesStack = makeSectionStack('Certificates', 'Internship Certificates', CertificateOversightScreen);
+const MessagesStack = makeSectionStack('Messages', 'Messages', ChatScreen);
 
 export function AdminNavigator() {
   const theme = useTheme();
@@ -52,6 +54,7 @@ export function AdminNavigator() {
       <Drawer.Screen name="Departments" component={DepartmentsStack} options={{ drawerIcon: ({ color, size }) => <Building2 color={color} size={size} /> }} />
       <Drawer.Screen name="IdCards" component={IdCardsStack} options={{ title: 'ID Cards', drawerIcon: ({ color, size }) => <IdCard color={color} size={size} /> }} />
       <Drawer.Screen name="Certificates" component={CertificatesStack} options={{ title: 'Internship Certificates', drawerIcon: ({ color, size }) => <Award color={color} size={size} /> }} />
+      <Drawer.Screen name="Messages" component={MessagesStack} options={{ drawerIcon: ({ color, size }) => <MessageCircle color={color} size={size} /> }} />
       <Drawer.Screen name="Shared" component={SharedModalStack} options={{ drawerItemStyle: { display: 'none' } }} />
     </Drawer.Navigator>
   );

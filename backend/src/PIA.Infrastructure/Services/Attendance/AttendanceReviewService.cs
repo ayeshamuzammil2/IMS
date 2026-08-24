@@ -47,7 +47,9 @@ public sealed class AttendanceReviewService(
                 d.Id, d.InternProfileId, d.InternProfile.User.FullName, d.InternProfile.InternCode, d.WorkDate,
                 null, d.ArrivalAtUtc, null, d.DepartureAtUtc,
                 d.ArrivalDistanceM ?? d.DepartureDistanceM, (d.ArrivalGeofence ?? d.DepartureGeofence)?.ToString(),
-                flags);
+                flags,
+                d.InternProfile.ProfilePhotoStatus == ProfilePhotoStatus.Approved &&
+                d.InternProfile.FaceEnrollmentStatus == FaceEnrollmentStatus.Active);
         }).ToList();
     }
 

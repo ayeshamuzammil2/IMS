@@ -98,22 +98,10 @@ export function DashboardScreen() {
         SELF DETAILS
       </Text>
       <View style={s.card}>
-        {data.profileLocked ? (
-          <>
-            <Row label="Address" value={data.address} />
-            <Row label="Emergency Contact" value={data.emergencyContactName} />
-            <Row label="Emergency Phone" value={data.emergencyContactPhone} />
-            <Row label="Blood Group" value={data.bloodGroup} />
-            <Text variant="caption" tone="muted">
-              Submitted - contact your mentor to make changes.
-            </Text>
-          </>
-        ) : (
-          <SelfDetailsForm
-            initial={data}
-            onSubmitted={() => queryClient.invalidateQueries({ queryKey: ['documents', 'dashboard'] })}
-          />
-        )}
+        <SelfDetailsForm
+          initial={data}
+          onSubmitted={() => queryClient.invalidateQueries({ queryKey: ['documents', 'dashboard'] })}
+        />
       </View>
     </Screen>
   );
@@ -135,10 +123,10 @@ function SelfDetailsForm({ initial, onSubmitted }: { initial: InternDashboardDto
         emergencyContactPhone: emergencyPhone.trim() || null,
         bloodGroup: bloodGroup.trim() || null,
       });
-      Toast.show({ type: 'success', text1: 'Details submitted' });
+      Toast.show({ type: 'success', text1: 'Details saved' });
       onSubmitted();
     } catch (error: any) {
-      Toast.show({ type: 'error', text1: 'Could not submit details', text2: error?.message });
+      Toast.show({ type: 'error', text1: 'Could not save details', text2: error?.message });
     } finally {
       setSubmitting(false);
     }
@@ -150,7 +138,7 @@ function SelfDetailsForm({ initial, onSubmitted }: { initial: InternDashboardDto
       <Input label="Emergency Contact Name" value={emergencyName} onChangeText={setEmergencyName} />
       <Input label="Emergency Contact Phone" value={emergencyPhone} onChangeText={setEmergencyPhone} keyboardType="phone-pad" />
       <Input label="Blood Group" value={bloodGroup} onChangeText={setBloodGroup} placeholder="e.g. O+" />
-      <Button label="Submit Details" onPress={handleSubmit} loading={submitting} fullWidth />
+      <Button label="Save Details" onPress={handleSubmit} loading={submitting} fullWidth />
     </>
   );
 }

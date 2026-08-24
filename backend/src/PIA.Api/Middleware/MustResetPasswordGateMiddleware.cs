@@ -24,8 +24,7 @@ public sealed class MustResetPasswordGateMiddleware(RequestDelegate next)
                 var allowed = endpoint?.Metadata.GetMetadata<AllowPasswordResetScopeAttribute>() is not null;
                 if (!allowed)
                 {
-                    throw new BusinessRuleException(BusinessRuleCodes.PasswordResetRequired,
-                        "You must set a new password before using the app.");
+                    throw new PasswordResetRequiredException("You must set a new password before using the app.");
                 }
             }
         }

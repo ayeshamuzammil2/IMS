@@ -34,13 +34,13 @@ export function DrawerContent(props: DrawerContentComponentProps) {
       <View style={s.brandBlock}>
         <Image source={require('../../assets/pia-logo.png')} style={s.logo} resizeMode="contain" />
         <Text variant="bodyStrong" tone="brand">
-          PIA Internee Management
+          PIA Wings
         </Text>
       </View>
 
       <Pressable
         style={s.userCard}
-        onPress={() => props.navigation.navigate('Profile' as never)}
+        onPress={() => (props.navigation as any).navigate('Shared', { screen: 'Profile' })}
         accessibilityRole="button"
         accessibilityLabel={`${user?.fullName ?? 'Profile'}, ${user?.role ?? ''}`}
       >

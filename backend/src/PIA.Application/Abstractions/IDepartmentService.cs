@@ -9,6 +9,7 @@ public interface IDepartmentService
     Task<DepartmentDto> GetAsync(int id, CancellationToken ct);
     Task<DepartmentDto> CreateAsync(CreateDepartmentRequest request, CancellationToken ct);
     Task<DepartmentDto> UpdateAsync(int id, UpdateDepartmentRequest request, CancellationToken ct);
+    Task DeleteAsync(int id, CancellationToken ct);
     Task DeactivateAsync(int id, CancellationToken ct);
     Task ReactivateAsync(int id, CancellationToken ct);
 }

@@ -23,7 +23,10 @@ public class InternDocument
     public int InternProfileId { get; set; }
     public InternProfile InternProfile { get; set; } = null!;
     public DocumentType DocumentType { get; set; }
-    public Guid FileId { get; set; }
+    /// <summary>Null only for an ExtraDocument row submitted as a link - see ExternalLinkUrl. Every
+    /// other document type always has a file.</summary>
+    public Guid? FileId { get; set; }
+    public string? ExternalLinkUrl { get; set; }
     public int Version { get; set; } = 1;
     public DocumentStatus Status { get; set; } = DocumentStatus.Pending;
     public string? Remarks { get; set; }

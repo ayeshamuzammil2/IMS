@@ -20,6 +20,20 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
     }
 }
 
+public sealed class PushTokenConfiguration : IEntityTypeConfiguration<PushToken>
+{
+    public void Configure(EntityTypeBuilder<PushToken> b)
+    {
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ExpoPushToken).HasMaxLength(200).IsRequired();
+        b.Property(x => x.DeviceId).HasMaxLength(200);
+        b.HasOne(x => x.User).WithMany()
+            .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        b.HasIndex(x => x.ExpoPushToken).IsUnique();
+        b.HasIndex(x => new { x.UserId, x.IsActive });
+    }
+}
+
 public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 {
     public void Configure(EntityTypeBuilder<AuditLog> b)

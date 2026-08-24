@@ -9,13 +9,14 @@ import { ForceResetNavigator } from './ForceResetNavigator';
 import { AdminNavigator } from './AdminNavigator';
 import { MentorNavigator } from './MentorNavigator';
 import { InternNavigator } from './InternNavigator';
+import { navigationRef } from './navigationRef';
 
 export function RootNavigator() {
   const { status, user } = useAuth();
   const theme = useTheme();
 
   return (
-    <NavigationContainer theme={toNavigationTheme(theme)}>
+    <NavigationContainer ref={navigationRef} theme={toNavigationTheme(theme)}>
       {status === 'bootstrapping' ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background }}>
           <ActivityIndicator color={theme.colors.primary} size="large" />

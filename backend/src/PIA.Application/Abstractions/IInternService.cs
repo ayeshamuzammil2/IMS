@@ -11,5 +11,9 @@ public interface IInternService
     Task DeleteAsync(int internProfileId, CancellationToken ct);
     Task DeactivateAsync(int internProfileId, CancellationToken ct);
     Task ReactivateAsync(int internProfileId, CancellationToken ct);
-    Task ResetPasswordAsync(int internProfileId, CancellationToken ct);
+    Task ResetPasswordAsync(int internProfileId, ResetInternPasswordRequest request, CancellationToken ct);
+
+    /// <summary>Reverses AttendanceService's unofficial-activity lockout (5-strike or daily-limit
+    /// trigger): clears the login block and resets the face-failure counter to zero.</summary>
+    Task UnlockAttendanceAsync(int internProfileId, CancellationToken ct);
 }

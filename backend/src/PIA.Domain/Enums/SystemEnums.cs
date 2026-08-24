@@ -21,6 +21,7 @@ public enum FileCategory
     CertificateTemplate,
     GeneratedCertificate,
     GeneratedIdCard,
+    ExtraDocument,
 }
 
 public enum JobTrigger

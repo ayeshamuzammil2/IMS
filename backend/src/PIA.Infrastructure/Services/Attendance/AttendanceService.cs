@@ -29,12 +29,17 @@ public sealed class AttendanceService(
     IMoireDetector moireDetector,
     ICompressionForensicsDetector compressionDetector,
     IPlayIntegrityVerifier playIntegrityVerifier,
+    IUserSecurityService security,
     IOptions<AttendanceOptions> attendanceOptions,
     IOptions<FaceOptions> faceOptions,
     IOptions<PlayIntegrityOptions> playIntegrityOptions) : IAttendanceService
 {
     private AttendanceOptions Options => attendanceOptions.Value;
     private FaceOptions Face => faceOptions.Value;
+
+    private const int MaxConsecutiveFaceFailures = 5;
+    private const int MaxDailyAttemptsPerDirection = 10;
+    private const int RetryCooldownSeconds = 15;
 
     public async Task<AttendanceTodayResponse> GetTodayAsync(decimal? latitude, decimal? longitude, decimal? accuracyMeters, CancellationToken ct)
     {
@@ -84,6 +89,29 @@ public sealed class AttendanceService(
         {
             throw new BusinessRuleException(BusinessRuleCodes.OutsideGeofence,
                 $"You are {distance:F0} m from {department.Name}. Move within {department.GeofenceRadiusMeters} m to mark {eventType}.");
+        }
+
+        if (request.Mocked == true)
+        {
+            throw new BusinessRuleException(BusinessRuleCodes.MockLocationDetected, "Mock location detected. Attendance blocked.");
+        }
+
+        if (profile.LastFaceFailureAtUtc is { } lastFailure && (clock.UtcNow - lastFailure).TotalSeconds < RetryCooldownSeconds)
+        {
+            throw new BusinessRuleException(BusinessRuleCodes.RetryCooldownActive,
+                $"Please wait {RetryCooldownSeconds} seconds after a failed attempt before trying again.");
+        }
+
+        // "Camera launch" = a challenge session actually being issued - a geofence/cooldown
+        // rejection above never opens the camera, so it correctly doesn't count against this limit.
+        var attemptsToday = await db.AttendanceChallengeSessions.CountAsync(
+            s => s.InternProfileId == profile.Id && s.DatePk == todayPk && s.EventType == eventType, ct);
+        if (attemptsToday >= MaxDailyAttemptsPerDirection)
+        {
+            await TriggerUnofficialActivityLockAsync(profile.User,
+                $"Exceeded {MaxDailyAttemptsPerDirection} {eventType} attempts in one day.", ct);
+            throw new BusinessRuleException(BusinessRuleCodes.UnofficialActivityLockout,
+                "Your account has been locked due to unofficial activity. You have been signed out.");
         }
 
         var challenge = challengeGenerator.Generate();
@@ -172,14 +200,15 @@ public sealed class AttendanceService(
                 $"You are {distance:F0} m from {department.Name}. Move within {department.GeofenceRadiusMeters} m to mark {session.EventType}.");
         }
 
-        // Stage 4: location integrity - inconclusive signals go to review, never a hard fail.
+        // Stage 4: location integrity - an uncertain (low-accuracy) fix goes to review, never a
+        // hard fail, but a confirmed mock-location signal is a hard fail (spec-mandated override
+        // of this codebase's usual "never hard-fail on an inconclusive location signal" stance).
         var requiresReview = geofence == GeofenceState.Uncertain;
         if (geofence == GeofenceState.Uncertain) flags.Add("UncertainGeofence");
         if (request.Mocked == true)
         {
-            requiresReview = true;
-            flags.Add("MockLocation");
-            riskScore += 30;
+            await HardFailSessionAsync(session, ct);
+            throw new BusinessRuleException(BusinessRuleCodes.MockLocationDetected, "Mock location detected. Attendance blocked.");
         }
 
         // Stage 5: timing.
@@ -287,7 +316,7 @@ public sealed class AttendanceService(
             {
                 await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedReplayDetected, ct);
                 await HardFailSessionAsync(session, ct);
-                throw new BusinessRuleException(BusinessRuleCodes.SpoofDetected, "This does not appear to be a live, three-dimensional face.");
+                await ThrowFaceFailureAsync(profile, BusinessRuleCodes.SpoofDetected, "This does not appear to be a live, three-dimensional face.", ct);
             }
             AddSoftDetectorFlag(flags, ref riskScore, parallaxResult, weight: 0);
 
@@ -304,11 +333,8 @@ public sealed class AttendanceService(
 
             if (faceProvider.IsConfigured)
             {
-                if (profile.FaceEnrollmentStatus != FaceEnrollmentStatus.Active)
-                {
-                    await HardFailSessionAsync(session, ct);
-                    throw new BusinessRuleException(BusinessRuleCodes.FaceVerificationUnavailable, "Your face has not been enrolled yet. Please complete enrollment first.");
-                }
+                // FaceEnrollmentStatus is already gated earlier via ComputeBlockersAsync's
+                // FaceNotReady blocker (Stage 1 above), which throws before any of this code runs.
 
                 var padScores = new List<PadResult>();
                 foreach (var f in decodedFrames)
@@ -331,7 +357,7 @@ public sealed class AttendanceService(
                     {
                         await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedLiveness, ct);
                         await HardFailSessionAsync(session, ct);
-                        throw new BusinessRuleException(BusinessRuleCodes.LivenessFailed, "Liveness check failed. Please try again with a live camera.");
+                        await ThrowFaceFailureAsync(profile, BusinessRuleCodes.LivenessFailed, "Liveness check failed. Please try again with a live camera.", ct);
                     }
                     if (padLiveMean < (decimal)Face.PadLiveThreshold)
                     {
@@ -365,7 +391,8 @@ public sealed class AttendanceService(
                                 {
                                     await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedFaceMismatch, ct);
                                     await HardFailSessionAsync(session, ct);
-                                    throw new BusinessRuleException(BusinessRuleCodes.FaceMismatch, "Face not recognised.");
+                                    await ThrowFaceFailureAsync(profile, BusinessRuleCodes.FaceMismatch,
+                                        "Scanned face does not match your uploaded profile picture.", ct);
                                 }
                                 if (similarity < Face.MatchThreshold + 0.05)
                                 {
@@ -378,6 +405,11 @@ public sealed class AttendanceService(
                 }
 
                 verificationMode = VerificationMode.FullBiometric;
+                if (profile.ConsecutiveFaceFailures != 0)
+                {
+                    profile.ConsecutiveFaceFailures = 0;
+                    await db.SaveChangesAsync(ct);
+                }
             }
 
             // Stage 15: device attestation - graded Off/FlagOnly/Enforce so a real device
@@ -662,6 +694,14 @@ public sealed class AttendanceService(
         {
             AddBoth(AttendanceBlocker.NotVerified);
         }
+        // Dual-lock: only enforced when a real face provider is configured - without one, the
+        // system already degrades to geofence-only attendance for everyone (see README), and
+        // enrollment itself can't complete, so requiring it here would brick attendance entirely.
+        if (faceProvider.IsConfigured &&
+            (profile.ProfilePhotoStatus != ProfilePhotoStatus.Approved || profile.FaceEnrollmentStatus != FaceEnrollmentStatus.Active))
+        {
+            AddBoth(AttendanceBlocker.FaceNotReady);
+        }
         if (todayPk < profile.InternshipStartDate || todayPk > profile.InternshipEndDate)
         {
             AddBoth(AttendanceBlocker.OutsideInternshipPeriod);
@@ -713,6 +753,7 @@ public sealed class AttendanceService(
         nameof(AttendanceBlocker.DepartureAlreadyMarked) => "Departure has already been marked today.",
         nameof(AttendanceBlocker.ArrivalNotYetMarked) => "Mark arrival before departure.",
         nameof(AttendanceBlocker.ActiveSessionAlreadyOpen) => "You already have an attendance session in progress.",
+        nameof(AttendanceBlocker.FaceNotReady) => "Attendance locked. Pending Profile Picture approval or Face Enrollment.",
         _ => "You cannot mark attendance right now.",
     };
 
@@ -725,6 +766,38 @@ public sealed class AttendanceService(
     {
         session.State = ChallengeSessionState.HardFailed;
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Every face-verification rejection path (spoof, liveness, mismatch) routes through
+    /// here instead of throwing directly: it counts the strike and, at the 5th consecutive failure,
+    /// replaces the specific rejection with a full account lockout instead. Always throws - there is
+    /// no normal return.</summary>
+    private async Task ThrowFaceFailureAsync(InternProfile profile, string code, string message, CancellationToken ct)
+    {
+        profile.ConsecutiveFaceFailures++;
+        profile.LastFaceFailureAtUtc = clock.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        if (profile.ConsecutiveFaceFailures >= MaxConsecutiveFaceFailures)
+        {
+            await TriggerUnofficialActivityLockAsync(profile.User,
+                $"{MaxConsecutiveFaceFailures} consecutive failed face verification attempts.", ct);
+            throw new BusinessRuleException(BusinessRuleCodes.UnofficialActivityLockout,
+                "Your account has been locked due to unofficial activity. You have been signed out.");
+        }
+
+        throw new BusinessRuleException(code, message);
+    }
+
+    /// <summary>Locks login entirely (AuthService.LoginAsync checks IsLockedForUnofficialActivity)
+    /// and revokes any currently-issued tokens immediately, so "logs out the user" is not just a
+    /// client-side navigation but an actual server-enforced session kill.</summary>
+    private async Task TriggerUnofficialActivityLockAsync(User user, string reason, CancellationToken ct)
+    {
+        user.IsLockedForUnofficialActivity = true;
+        user.UnofficialActivityReason = reason;
+        await db.SaveChangesAsync(ct);
+        await security.InvalidateAsync(user.Id, reason, ct);
     }
 
     private async Task RecordRejectedEventAsync(

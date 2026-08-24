@@ -79,3 +79,14 @@ public sealed class BusinessRuleException : AppException
         ErrorCode = code;
     }
 }
+
+/// <summary>Distinct from the generic 422 BusinessRuleException: this is specifically the
+/// deny-by-default gate a scope=pwd_reset token trips (see MustResetPasswordGateMiddleware), and
+/// is required to answer as 403 Forbidden rather than 422.</summary>
+public sealed class PasswordResetRequiredException : AppException
+{
+    public override string ErrorCode => BusinessRuleCodes.PasswordResetRequired;
+    public override int StatusCode => 403;
+
+    public PasswordResetRequiredException(string message) : base(message) { }
+}

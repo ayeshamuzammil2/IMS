@@ -56,6 +56,12 @@ public sealed class IdCardService(
 
     public async Task<IdCardDto> SubmitAsync(int internProfileId, SubmitIdCardRequest request, CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(request.Designation))
+        {
+            throw new BusinessRuleException(BusinessRuleCodes.DesignationRequired,
+                "Designation is required before an ID card can be previewed or generated.");
+        }
+
         var profile = await LoadProfileWithScopeCheckAsync(internProfileId, ct);
 
         if (profile.ApprovedPhotoFileId is not { } photoFileId)
@@ -70,7 +76,8 @@ public sealed class IdCardService(
 
         var pdfBytes = renderer.Render(
             profile.User.FullName, profile.User.Department?.Name ?? string.Empty,
-            $"ID-{profile.InternCode}", profile.InternshipStartDate, profile.InternshipEndDate, photoBuffer.ToArray());
+            $"ID-{profile.InternCode}", profile.InternshipStartDate, profile.InternshipEndDate, photoBuffer.ToArray(),
+            request.Designation, profile.User.Email, profile.EmergencyContactPhone);
 
         var storedFile = await fileStorage.SaveAsync(new FileSaveRequest(
             new MemoryStream(pdfBytes), $"idcard-{profile.InternCode}.pdf", "application/pdf",
@@ -162,5 +169,7 @@ public sealed class IdCardService(
     private static IdCardDto ToDto(IdCard? c, InternProfile profile) => new(
         profile.Id, profile.User.FullName, profile.InternCode, profile.User.Department?.Name,
         c?.CardNumber, (c?.Status ?? IdCardStatus.Draft).ToString(),
-        c?.GeneratedFileId, c?.ValidUntil, c?.RejectionReason);
+        c?.GeneratedFileId, c?.ValidUntil, c?.RejectionReason,
+        c?.Designation, profile.User.Email, c?.EmergencyContactPhone ?? profile.EmergencyContactPhone,
+        profile.ApprovedPhotoFileId);
 }

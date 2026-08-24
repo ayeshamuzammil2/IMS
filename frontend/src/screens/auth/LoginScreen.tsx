@@ -31,6 +31,10 @@ export function LoginScreen() {
     try {
       await signIn(email.trim(), password);
     } catch (err: any) {
+      if (err?.code === 'UNOFFICIAL_ACTIVITY_LOCKOUT') {
+        navigation.navigate('LockedAccount', { message: err.message });
+        return;
+      }
       setError(err?.message ?? 'Incorrect email or password.');
     } finally {
       setSubmitting(false);
@@ -42,9 +46,19 @@ export function LoginScreen() {
       <View style={s.logoBlock}>
         <Image source={require('../../../assets/pia-logo.png')} style={s.logo} resizeMode="contain" />
         <Text variant="h2" style={s.appName}>
-          PIA Internee Management
+          PIA Wings
+        </Text>
+        <Text variant="caption" tone="secondary" style={s.appTagline}>
+          Intern Operations Portal
         </Text>
       </View>
+
+      <Text variant="h1" style={s.welcome}>
+        Welcome Back!
+      </Text>
+      <Text variant="body" tone="secondary" style={s.subtitle}>
+        Sign in to continue to your account
+      </Text>
 
       <Input
         label="Email"
@@ -83,9 +97,12 @@ export function LoginScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
-  logoBlock: { alignItems: 'center' as const, marginTop: t.spacing.xxl, marginBottom: t.spacing.xxl, gap: t.spacing.sm },
-  logo: { width: 200, height: 200 },
+  logoBlock: { alignItems: 'center' as const, marginTop: t.spacing.xxl, marginBottom: t.spacing.lg, gap: t.spacing.sm },
+  logo: { width: 140, height: 140 },
   appName: { textAlign: 'center' as const },
+  appTagline: { textAlign: 'center' as const, marginTop: -t.spacing.xs },
+  welcome: { marginBottom: t.spacing.xs },
+  subtitle: { marginBottom: t.spacing.lg },
   forgotLink: { alignSelf: 'flex-end' as const, marginBottom: t.spacing.lg },
   error: { marginBottom: t.spacing.md },
   submitButton: { marginTop: t.spacing.sm },

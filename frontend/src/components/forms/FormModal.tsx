@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, View, Pressable, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
 import { Text } from '../primitives/Text';
 import { useThemedStyles } from '../../theme/useThemedStyles';
@@ -17,10 +18,11 @@ interface Props {
 export function FormModal({ visible, title, onClose, children, footer }: Props) {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={s.backdrop}>
+      <View style={[s.backdrop, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <Pressable style={s.backdropTouchable} onPress={onClose} />
         <View style={s.card}>
           <View style={s.header}>

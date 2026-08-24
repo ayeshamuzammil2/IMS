@@ -9,6 +9,7 @@ using PIA.Infrastructure.Services.Attendance;
 using PIA.Infrastructure.Services.Attendance.VideoReplay;
 using PIA.Infrastructure.Services.Auth;
 using PIA.Infrastructure.Services.Certificates;
+using PIA.Infrastructure.Services.Chat;
 using PIA.Infrastructure.Services.Common;
 using PIA.Infrastructure.Services.Dashboard;
 using PIA.Infrastructure.Services.DeviceIntegrity;
@@ -95,6 +96,8 @@ public static class DependencyInjection
 
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<INotificationQueryService, NotificationQueryService>();
+        services.AddScoped<IPushTokenService, PushTokenService>();
+        services.AddHttpClient<IPushNotificationSender, ExpoPushClient>();
 
         services.AddScoped<IDepartmentService, DepartmentService>();
         services.AddScoped<IMentorService, MentorService>();
@@ -136,6 +139,8 @@ public static class DependencyInjection
         services.AddScoped<IIdCardService, IdCardService>();
 
         services.AddScoped<IDashboardService, DashboardService>();
+
+        services.AddScoped<IChatService, ChatService>();
 
         services.AddSingleton<IPlayIntegrityVerifier, GooglePlayIntegrityVerifier>();
 

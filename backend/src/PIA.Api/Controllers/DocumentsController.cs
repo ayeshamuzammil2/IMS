@@ -24,6 +24,10 @@ public sealed class DocumentsController(IDocumentService documentService) : Cont
         return Ok(await documentService.UploadAsync(request, ct));
     }
 
+    [HttpPost("extra-link")]
+    public async Task<IActionResult> SubmitExtraLink([FromBody] SubmitExtraDocumentLinkRequest request, CancellationToken ct) =>
+        Ok(await documentService.SubmitExtraLinkAsync(request, ct));
+
     [HttpPost("self-details")]
     public async Task<IActionResult> SubmitSelfDetails([FromBody] SubmitSelfDetailsRequest request, CancellationToken ct)
     {

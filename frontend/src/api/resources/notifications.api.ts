@@ -28,4 +28,7 @@ export const notificationsApi = {
   markRead: (id: number) => client.put(endpoints.notifications.markRead(id)),
 
   markAllRead: () => client.put(endpoints.notifications.markAllRead),
+
+  registerPushToken: (expoPushToken: string, deviceId: string | null) =>
+    client.post(endpoints.notifications.pushToken, { expoPushToken, deviceId }),
 };

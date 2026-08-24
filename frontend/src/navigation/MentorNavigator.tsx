@@ -1,6 +1,6 @@
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
-import { LayoutDashboard, GraduationCap, CalendarCheck, ShieldAlert, History, FileCheck2, Award, IdCard, GitBranch, ClipboardList } from 'lucide-react-native';
+import { LayoutDashboard, GraduationCap, CalendarCheck, ShieldAlert, History, FileCheck2, Award, IdCard, GitBranch, ClipboardList, MessageCircle } from 'lucide-react-native';
 import { useTheme } from '../providers/ThemeProvider';
 import { DrawerContent } from './DrawerContent';
 import { SharedModalStack } from './stacks/SharedModalStack';
@@ -15,6 +15,7 @@ import { AssignProjectScreen } from '../screens/shared/AssignProjectScreen';
 import { CertificateManagementScreen } from '../screens/shared/CertificateManagementScreen';
 import { IdCardManagementScreen } from '../screens/shared/IdCardManagementScreen';
 import { DashboardScreen } from '../screens/shared/DashboardScreen';
+import { ChatScreen } from '../screens/shared/ChatScreen';
 import type { MentorDrawerParamList } from './types';
 
 const Drawer = createDrawerNavigator<MentorDrawerParamList & { Shared: undefined }>();
@@ -29,6 +30,7 @@ const CertificateStack = makeSectionStack('Certificate', 'Certificate', Certific
 const IdCardStack = makeSectionStack('IdCard', 'ID Card', IdCardManagementScreen);
 const GithubStack = makeSectionStack('GithubRepo', 'GitHub Repo Link', GithubReviewScreen);
 const AssignProjectStack = makeSectionStack('AssignProject', 'Assign Project', AssignProjectScreen);
+const ContactAdminStack = makeSectionStack('ContactAdmin', 'Contact Admin', ChatScreen);
 
 export function MentorNavigator() {
   const theme = useTheme();
@@ -52,6 +54,7 @@ export function MentorNavigator() {
       <Drawer.Screen name="IdCard" component={IdCardStack} options={{ title: 'ID Card', drawerIcon: ({ color, size }) => <IdCard color={color} size={size} /> }} />
       <Drawer.Screen name="GithubRepo" component={GithubStack} options={{ title: 'GitHub Repo Link', drawerIcon: ({ color, size }) => <GitBranch color={color} size={size} /> }} />
       <Drawer.Screen name="AssignProject" component={AssignProjectStack} options={{ title: 'Assign Project', drawerIcon: ({ color, size }) => <ClipboardList color={color} size={size} /> }} />
+      <Drawer.Screen name="ContactAdmin" component={ContactAdminStack} options={{ title: 'Contact Admin', drawerIcon: ({ color, size }) => <MessageCircle color={color} size={size} /> }} />
       <Drawer.Screen name="Shared" component={SharedModalStack} options={{ drawerItemStyle: { display: 'none' } }} />
     </Drawer.Navigator>
   );

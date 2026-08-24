@@ -9,6 +9,8 @@ import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
 import { Button } from '../../components/primitives/Button';
+import { PasswordStrengthChecklist } from '../../components/forms/PasswordStrengthChecklist';
+import { passwordSchema } from '../../lib/passwordPolicy';
 import { useAuth } from '../../providers/AuthProvider';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import type { AppTheme } from '../../theme/types';
@@ -16,7 +18,7 @@ import type { AppTheme } from '../../theme/types';
 const schema = z
   .object({
     currentPassword: z.string().min(1, 'Current password is required.'),
-    newPassword: z.string().min(10, 'Password must be at least 10 characters.'),
+    newPassword: passwordSchema,
     confirmPassword: z.string().min(1, 'Please confirm your new password.'),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
@@ -28,14 +30,15 @@ type FormValues = z.infer<typeof schema>;
 
 export function ChangePasswordScreen() {
   const s = useThemedStyles(makeStyles);
-  const { changePassword } = useAuth();
+  const { user, changePassword } = useAuth();
   const navigation = useNavigation();
   const [submitting, setSubmitting] = useState(false);
 
-  const { control, handleSubmit, formState } = useForm<FormValues>({
+  const { control, handleSubmit, formState, watch } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
   });
+  const newPassword = watch('newPassword');
 
   const onSubmit = async (values: FormValues) => {
     setSubmitting(true);
@@ -56,7 +59,7 @@ export function ChangePasswordScreen() {
         Change Password
       </Text>
       <Text variant="body" tone="secondary" style={s.subtitle}>
-        Use at least 10 characters, with uppercase, lowercase, a digit, and a symbol.
+        Choose a strong new password.
       </Text>
 
       <Controller
@@ -85,6 +88,7 @@ export function ChangePasswordScreen() {
           />
         )}
       />
+      <PasswordStrengthChecklist password={newPassword} fullName={user?.fullName} />
       <Controller
         control={control}
         name="confirmPassword"

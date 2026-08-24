@@ -7,6 +7,8 @@ import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
 import { Button } from '../../components/primitives/Button';
+import { PasswordStrengthChecklist } from '../../components/forms/PasswordStrengthChecklist';
+import { passwordSchema } from '../../lib/passwordPolicy';
 import { useAuth } from '../../providers/AuthProvider';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import type { AppTheme } from '../../theme/types';
@@ -14,7 +16,7 @@ import type { AppTheme } from '../../theme/types';
 const schema = z
   .object({
     currentPassword: z.string().min(1, 'Enter the temporary password you were given.'),
-    newPassword: z.string().min(10, 'Password must be at least 10 characters.'),
+    newPassword: passwordSchema,
     confirmPassword: z.string().min(1, 'Please confirm your new password.'),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
@@ -27,14 +29,15 @@ type FormValues = z.infer<typeof schema>;
 /** Forced, non-dismissable first-login reset - the account cannot be used until this completes. */
 export function SetNewPasswordScreen() {
   const s = useThemedStyles(makeStyles);
-  const { changePassword } = useAuth();
+  const { user, changePassword } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const { control, handleSubmit, formState } = useForm<FormValues>({
+  const { control, handleSubmit, formState, watch } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
   });
+  const newPassword = watch('newPassword');
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
@@ -54,8 +57,7 @@ export function SetNewPasswordScreen() {
         Set a New Password
       </Text>
       <Text variant="body" tone="secondary" style={s.subtitle}>
-        For your security, you must set a new password before continuing. Use at least 10
-        characters, with uppercase, lowercase, a digit, and a symbol.
+        For your security, you must set a new password before continuing.
       </Text>
 
       <Controller
@@ -84,6 +86,7 @@ export function SetNewPasswordScreen() {
           />
         )}
       />
+      <PasswordStrengthChecklist password={newPassword} fullName={user?.fullName} />
       <Controller
         control={control}
         name="confirmPassword"

@@ -10,6 +10,8 @@ public interface IDocumentService
 
     Task<DocumentDto> UploadAsync(UploadDocumentRequest request, CancellationToken ct);
 
+    Task<DocumentDto> SubmitExtraLinkAsync(SubmitExtraDocumentLinkRequest request, CancellationToken ct);
+
     Task SubmitSelfDetailsAsync(SubmitSelfDetailsRequest request, CancellationToken ct);
 }
 

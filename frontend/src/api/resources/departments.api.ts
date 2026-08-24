@@ -42,6 +42,8 @@ export const departmentsApi = {
   update: (id: number, body: UpdateDepartmentRequest) =>
     client.put<DepartmentDto>(endpoints.departments.byId(id), body).then((r) => r.data),
 
+  delete: (id: number) => client.delete(endpoints.departments.byId(id)),
+
   deactivate: (id: number) => client.post(endpoints.departments.deactivate(id)),
 
   reactivate: (id: number) => client.post(endpoints.departments.reactivate(id)),

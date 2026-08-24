@@ -28,9 +28,15 @@ public enum FaceEnrollmentStatus
 public enum DocumentType
 {
     ProfilePhoto,
+    /// <summary>Deprecated - superseded by CnicFront/CnicBack. Kept so historically uploaded
+    /// documents under the old single combined slot still deserialize correctly.</summary>
     Cnic,
     Resume,
     ReferenceLetter,
+    CnicFront,
+    CnicBack,
+    /// <summary>The one optional 5th slot - either a file upload or a pasted link (InternDocument.ExternalLinkUrl).</summary>
+    ExtraDocument,
 }
 
 public enum DocumentStatus

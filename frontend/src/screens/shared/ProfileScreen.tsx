@@ -81,16 +81,6 @@ export function ProfileScreen() {
           </Pressable>
         ) : null}
       </View>
-
-      {__DEV__ ? (
-        <View style={s.card}>
-          <Pressable onPress={() => (navigation as any).navigate('ThemeGallery')}>
-            <Text variant="bodyStrong" tone="brand">
-              Theme Gallery (dev)
-            </Text>
-          </Pressable>
-        </View>
-      ) : null}
     </Screen>
   );
 }

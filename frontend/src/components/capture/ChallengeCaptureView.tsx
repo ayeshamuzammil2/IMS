@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, useCameraDevice, useCameraPermission, usePhotoOutput, type CameraRef } from 'react-native-vision-camera';
 import { useFaceDetectorOutput, type Face } from 'react-native-vision-camera-face-detector';
 import { Text } from '../primitives/Text';
@@ -82,6 +83,7 @@ interface Props {
 export function ChallengeCaptureView({ challenge, onComplete, onCancel, onTimeout }: Props) {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('front');
   const cameraRef = useRef<CameraRef>(null);
@@ -94,7 +96,9 @@ export function ChallengeCaptureView({ challenge, onComplete, onCancel, onTimeou
   const satisfiedSinceRef = useRef<number | null>(null);
   const capturingRef = useRef(false);
   const capturedRef = useRef<CapturedFrame[]>([]);
-  const stepStartedAtRef = useRef<number>(Date.now());
+  // null means "not started yet" - set lazily on the interval's first tick for this step rather
+  // than calling Date.now() during render (an impure call render must not make).
+  const stepStartedAtRef = useRef<number | null>(null);
   const timedOutRef = useRef(false);
 
   const faceDetectorOutput = useFaceDetectorOutput({
@@ -113,18 +117,18 @@ export function ChallengeCaptureView({ challenge, onComplete, onCancel, onTimeou
     if (!hasPermission) requestPermission();
   }, [hasPermission, requestPermission]);
 
-  // Reset the per-step clock every time we move to a new step.
-  useEffect(() => {
-    stepStartedAtRef.current = Date.now();
-    setSecondsLeft(Math.ceil(STEP_TIMEOUT_MS / 1000));
-  }, [stepIndex]);
-
   useEffect(() => {
     if (stepIndex >= challenge.steps.length) return undefined;
     const step = challenge.steps[stepIndex];
 
     const interval = setInterval(async () => {
       if (capturingRef.current || timedOutRef.current) return;
+
+      // Lazily mark this step's start on the first tick after it becomes current, instead of
+      // resetting it from a separate effect keyed on stepIndex (avoids a setState-in-effect-body).
+      if (stepStartedAtRef.current === null) {
+        stepStartedAtRef.current = Date.now();
+      }
 
       const elapsedSinceStepStart = Date.now() - stepStartedAtRef.current;
       const remainingMs = STEP_TIMEOUT_MS - elapsedSinceStepStart;
@@ -179,6 +183,7 @@ export function ChallengeCaptureView({ challenge, onComplete, onCancel, onTimeou
           onComplete(capturedRef.current);
         } else {
           satisfiedSinceRef.current = null;
+          stepStartedAtRef.current = null;
           setHolding(false);
           setStepIndex((i) => i + 1);
         }
@@ -216,29 +221,34 @@ export function ChallengeCaptureView({ challenge, onComplete, onCancel, onTimeou
   const currentStep = challenge.steps[stepIndex];
 
   return (
-    <View style={s.fill}>
-      <Camera
-        ref={cameraRef}
-        style={s.fill}
-        device={device}
-        isActive={true}
-        outputs={[photoOutput, faceDetectorOutput]}
-      />
-      <View style={s.overlay}>
-        <View style={s.progressRow}>
-          {challenge.steps.map((_, i) => (
-            <View key={i} style={[s.progressDot, i < stepIndex && s.progressDotDone, i === stepIndex && s.progressDotActive]} />
-          ))}
+    <View style={[s.backdrop, { paddingTop: insets.top + theme.spacing.lg, paddingBottom: insets.bottom + theme.spacing.lg }]}>
+      <View style={s.card}>
+        <Camera
+          ref={cameraRef}
+          style={s.fill}
+          device={device}
+          isActive={true}
+          outputs={[photoOutput, faceDetectorOutput]}
+        />
+        <View style={s.guideWrap} pointerEvents="none">
+          <View style={[s.ovalGuide, holding ? s.ovalGuideHolding : null]} />
         </View>
-        <Text variant="h2" tone="inverse" style={s.instruction}>
-          {currentStep ? describeAction(currentStep.action) : 'Hold still...'}
-        </Text>
-        <Text variant="caption" tone="inverse" style={s.timer}>
-          {secondsLeft}s
-        </Text>
-        {holding ? <ActivityIndicator color={theme.colors.textOnDark} /> : null}
-        <Button label="Cancel" variant="ghost" onPress={onCancel} style={s.cancelButton} />
+        <View style={s.overlay}>
+          <View style={s.progressRow}>
+            {challenge.steps.map((_, i) => (
+              <View key={i} style={[s.progressDot, i < stepIndex && s.progressDotDone, i === stepIndex && s.progressDotActive]} />
+            ))}
+          </View>
+          <Text variant="h2" tone="inverse" style={s.instruction}>
+            {currentStep ? describeAction(currentStep.action) : 'Hold still...'}
+          </Text>
+          <Text variant="caption" tone="inverse" style={s.timer}>
+            {secondsLeft}s
+          </Text>
+          {holding ? <ActivityIndicator color={theme.colors.textOnDark} /> : null}
+        </View>
       </View>
+      <Button label="Cancel" variant="ghost" onPress={onCancel} style={s.cancelButton} />
     </View>
   );
 }
@@ -262,11 +272,49 @@ function describeAction(action: ChallengeSpec['steps'][number]['action']): strin
   }
 }
 
+const CARD_WIDTH = 300;
+const CARD_HEIGHT = 420;
+const GUIDE_WIDTH = 220;
+const GUIDE_HEIGHT = 290;
+
 const makeStyles = (t: AppTheme) => ({
   fill: { flex: 1 },
   center: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const, gap: t.spacing.md, padding: t.spacing.lg },
   centerText: { textAlign: 'center' as const },
   cancelSpacing: { marginTop: t.spacing.sm },
+  // Floating card, not a full-screen camera: the backdrop is the only full-screen element, and it
+  // is a plain dim scrim, not the camera itself.
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(8,12,10,0.92)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  card: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    borderRadius: 16,
+    overflow: 'hidden' as const,
+    backgroundColor: t.colors.shadowColor,
+    ...t.shadows.lg,
+  },
+  guideWrap: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  ovalGuide: {
+    width: GUIDE_WIDTH,
+    height: GUIDE_HEIGHT,
+    borderRadius: GUIDE_WIDTH / 2,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.75)',
+  },
+  ovalGuideHolding: { borderColor: t.colors.success },
   overlay: {
     position: 'absolute' as const,
     left: 0,
@@ -274,7 +322,7 @@ const makeStyles = (t: AppTheme) => ({
     bottom: 0,
     padding: t.spacing.lg,
     alignItems: 'center' as const,
-    gap: t.spacing.md,
+    gap: t.spacing.sm,
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   progressRow: { flexDirection: 'row' as const, gap: t.spacing.sm },
@@ -283,5 +331,5 @@ const makeStyles = (t: AppTheme) => ({
   progressDotDone: { backgroundColor: t.colors.success },
   instruction: { textAlign: 'center' as const },
   timer: { opacity: 0.85 },
-  cancelButton: { marginTop: t.spacing.xs },
+  cancelButton: { marginTop: t.spacing.lg },
 });

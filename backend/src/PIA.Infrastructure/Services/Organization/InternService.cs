@@ -14,7 +14,7 @@ public sealed class InternService(
     PiaDbContext db,
     ICurrentUser currentUser,
     IPasswordHasher hasher,
-    ITempPasswordGenerator tempPasswordGenerator,
+    IPasswordPolicyService passwordPolicy,
     IInternCodeGenerator codeGenerator,
     INotificationService notifications,
     IUserSecurityService security,
@@ -84,7 +84,7 @@ public sealed class InternService(
         }
 
         var internCode = await codeGenerator.GenerateAsync(department.Id, department.Code, ct);
-        var tempPassword = tempPasswordGenerator.Generate();
+        passwordPolicy.Validate(request.Password, email.Value, request.FullName);
 
         var user = new User
         {
@@ -93,7 +93,7 @@ public sealed class InternService(
             Email = email.Value,
             Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : PakistanPhone.Parse(request.Phone).Value,
             Cnic = cnic.Value,
-            PasswordHash = hasher.Hash(tempPassword),
+            PasswordHash = hasher.Hash(request.Password),
             MustResetPassword = true,
             DepartmentId = department.Id,
             IsActive = true,
@@ -128,7 +128,6 @@ public sealed class InternService(
             ["end_date"] = request.InternshipEndDate.ToString("d MMM yyyy"),
             ["daily_start_time"] = request.DailyStartTime.ToString("h:mm tt"),
             ["daily_end_time"] = request.DailyEndTime.ToString("h:mm tt"),
-            ["temp_password"] = tempPassword,
         }, ct);
 
         profile.User = user;
@@ -151,6 +150,10 @@ public sealed class InternService(
         profile.DailyEndTime = request.DailyEndTime;
         profile.UniversityName = request.UniversityName;
         profile.DegreeProgram = request.DegreeProgram;
+        profile.Address = request.Address;
+        profile.EmergencyContactName = request.EmergencyContactName;
+        profile.EmergencyContactPhone = request.EmergencyContactPhone;
+        profile.BloodGroup = request.BloodGroup;
 
         if (currentUser.Role == UserRole.Admin && request.MentorId is { } newMentorId && newMentorId != profile.MentorId)
         {
@@ -179,7 +182,8 @@ public sealed class InternService(
             await db.InternDocuments.AnyAsync(d => d.InternProfileId == internProfileId, ct) ||
             await db.FaceTemplates.AnyAsync(f => f.InternProfileId == internProfileId, ct) ||
             await db.GithubSubmissions.AnyAsync(g => g.InternProfileId == internProfileId, ct) ||
-            await db.ProjectAssignments.AnyAsync(a => a.InternProfileId == internProfileId, ct);
+            await db.ProjectAssignments.AnyAsync(a => a.InternProfileId == internProfileId, ct) ||
+            await db.ChatMessages.AnyAsync(m => m.SenderUserId == profile.UserId || m.RecipientUserId == profile.UserId, ct);
 
         if (hasActivity)
         {
@@ -215,13 +219,14 @@ public sealed class InternService(
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task ResetPasswordAsync(int internProfileId, CancellationToken ct)
+    public async Task ResetPasswordAsync(int internProfileId, ResetInternPasswordRequest request, CancellationToken ct)
     {
         var profile = await FindProfileAsync(internProfileId, ct);
         EnsureMentorCanAccess(profile);
 
-        var tempPassword = tempPasswordGenerator.Generate();
-        profile.User.PasswordHash = hasher.Hash(tempPassword);
+        passwordPolicy.Validate(request.NewPassword, profile.User.Email, profile.User.FullName);
+
+        profile.User.PasswordHash = hasher.Hash(request.NewPassword);
         profile.User.MustResetPassword = true;
         profile.User.SecurityStamp = Guid.NewGuid().ToString("N");
         await db.SaveChangesAsync(ct);
@@ -230,8 +235,19 @@ public sealed class InternService(
         await notifications.NotifyUserAsync(profile.UserId, NotificationTemplates.PasswordResetByAdmin, new Dictionary<string, object?>
         {
             ["full_name"] = profile.User.FullName,
-            ["temp_password"] = tempPassword,
         }, ct);
+    }
+
+    public async Task UnlockAttendanceAsync(int internProfileId, CancellationToken ct)
+    {
+        var profile = await FindProfileAsync(internProfileId, ct);
+        EnsureMentorCanAccess(profile);
+
+        profile.ConsecutiveFaceFailures = 0;
+        profile.LastFaceFailureAtUtc = null;
+        profile.User.IsLockedForUnofficialActivity = false;
+        profile.User.UnofficialActivityReason = null;
+        await db.SaveChangesAsync(ct);
     }
 
     private async Task<User> ResolveEffectiveMentorAsync(int? requestedMentorId, CancellationToken ct)
@@ -270,5 +286,8 @@ public sealed class InternService(
         p.MentorId, p.Mentor.FullName,
         p.InternshipStartDate, p.InternshipEndDate, p.DailyStartTime, p.DailyEndTime,
         p.UniversityName, p.DegreeProgram,
-        p.VerificationStatus.ToString(), p.User.IsActive);
+        p.VerificationStatus.ToString(), p.User.IsActive,
+        p.Address, p.EmergencyContactName, p.EmergencyContactPhone, p.BloodGroup,
+        p.ProfilePhotoStatus == ProfilePhotoStatus.Approved && p.FaceEnrollmentStatus == FaceEnrollmentStatus.Active,
+        p.User.IsLockedForUnofficialActivity);
 }

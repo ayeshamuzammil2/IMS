@@ -29,9 +29,13 @@ public static class BusinessRuleCodes
     public const string AttemptLimitReached = "ATTEMPT_LIMIT_REACHED";
     public const string FaceVerificationUnavailable = "FACE_VERIFICATION_UNAVAILABLE";
     public const string AttestationFailed = "ATTESTATION_FAILED";
+    public const string MockLocationDetected = "MOCK_LOCATION_DETECTED";
+    public const string RetryCooldownActive = "RETRY_COOLDOWN_ACTIVE";
+    public const string UnofficialActivityLockout = "UNOFFICIAL_ACTIVITY_LOCKOUT";
 
     public const string CertificateNotEligible = "CERTIFICATE_NOT_ELIGIBLE";
     public const string IdCardNoPhoto = "IDCARD_NO_PHOTO";
+    public const string DesignationRequired = "DESIGNATION_REQUIRED";
     public const string TemplateUnknownMergeFields = "TEMPLATE_UNKNOWN_MERGE_FIELDS";
 
     public const string InvalidFileType = "INVALID_FILE_TYPE";

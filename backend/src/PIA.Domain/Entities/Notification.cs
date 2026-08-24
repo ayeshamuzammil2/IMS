@@ -18,3 +18,17 @@ public class Notification
     public DateTime? ReadAtUtc { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 }
+
+/// <summary>An Expo push token registered by a device - a user can have more than one (multiple
+/// devices), so notifications fan out to every active token on file for them.</summary>
+public class PushToken
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public User User { get; set; } = null!;
+    public required string ExpoPushToken { get; set; }
+    public string? DeviceId { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime LastUsedAtUtc { get; set; }
+}

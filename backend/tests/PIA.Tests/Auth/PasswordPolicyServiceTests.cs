@@ -31,7 +31,7 @@ public sealed class PasswordPolicyServiceTests
     public void Validate_TooShort_Throws()
     {
         var act = () => _service.Validate("Sh0rt!a");
-        act.Should().Throw<ValidationException>().WithMessage("*at least 10 characters*");
+        act.Should().Throw<ValidationException>().WithMessage("*at least 8 characters*");
     }
 
     [Fact]
@@ -73,6 +73,13 @@ public sealed class PasswordPolicyServiceTests
     public void Validate_ContainsFirstName_Throws()
     {
         var act = () => _service.Validate("Mohammad123!", fullName: "Mohammad Khan");
+        act.Should().Throw<ValidationException>().WithMessage("*name*");
+    }
+
+    [Fact]
+    public void Validate_ContainsLastName_Throws()
+    {
+        var act = () => _service.Validate("MyKhan123!", fullName: "Mohammad Khan");
         act.Should().Throw<ValidationException>().WithMessage("*name*");
     }
 

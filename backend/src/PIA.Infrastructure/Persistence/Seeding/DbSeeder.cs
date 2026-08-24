@@ -47,10 +47,10 @@ public static class DbSeeder
         // Real PIA Head Office coordinates, Karachi (Jinnah International Airport area) - replace
         // per-department in the Admin UI once actual office locations are known.
         db.Departments.AddRange(
-            new Department { Name = "ERP Department", Code = "ERP", Description = "PIA ERP / Systems department", Latitude = 24.8967m, Longitude = 67.1608m, GeofenceRadiusMeters = 150, IsActive = true, CreatedAtUtc = clock.UtcNow },
-            new Department { Name = "Human Resources", Code = "HR", Description = "PIA HR department", Latitude = 24.8967m, Longitude = 67.1608m, GeofenceRadiusMeters = 150, IsActive = true, CreatedAtUtc = clock.UtcNow },
-            new Department { Name = "Investor Relations", Code = "IR", Description = "PIA Investor Relations department", Latitude = 24.8967m, Longitude = 67.1608m, GeofenceRadiusMeters = 150, IsActive = true, CreatedAtUtc = clock.UtcNow },
-            new Department { Name = "Supply Chain Management", Code = "SCM", Description = "PIA Supply Chain Management department", Latitude = 24.8967m, Longitude = 67.1608m, GeofenceRadiusMeters = 150, IsActive = true, CreatedAtUtc = clock.UtcNow }
+            new Department { Name = "ERP Department", Code = "ERP", Description = "PIA ERP / Systems department", Latitude = 24.8967m, Longitude = 67.1608m, GeofenceRadiusMeters = 100, IsActive = true, CreatedAtUtc = clock.UtcNow },
+            new Department { Name = "Human Resources", Code = "HR", Description = "PIA HR department", Latitude = 24.8967m, Longitude = 67.1608m, GeofenceRadiusMeters = 100, IsActive = true, CreatedAtUtc = clock.UtcNow },
+            new Department { Name = "Investor Relations", Code = "IR", Description = "PIA Investor Relations department", Latitude = 24.8967m, Longitude = 67.1608m, GeofenceRadiusMeters = 100, IsActive = true, CreatedAtUtc = clock.UtcNow },
+            new Department { Name = "Supply Chain Management", Code = "SCM", Description = "PIA Supply Chain Management department", Latitude = 24.8967m, Longitude = 67.1608m, GeofenceRadiusMeters = 100, IsActive = true, CreatedAtUtc = clock.UtcNow }
         );
         await db.SaveChangesAsync(ct);
     }

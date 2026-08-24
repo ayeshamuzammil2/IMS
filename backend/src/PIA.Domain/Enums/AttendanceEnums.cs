@@ -78,6 +78,9 @@ public enum AttendanceBlocker
     ArrivalNotYetMarked,
     ActiveSessionAlreadyOpen,
     NotVerified,
+    /// <summary>Phase 5 dual-lock: both an Admin/Mentor-approved profile photo AND a completed
+    /// face enrollment are required before the camera may even open, not just before submit.</summary>
+    FaceNotReady,
 }
 
 /// <summary>Actions the server can request during a challenge sequence (Phase 5). MLKit reports the

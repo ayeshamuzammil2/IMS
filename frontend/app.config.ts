@@ -4,9 +4,9 @@ const VARIANT = process.env.APP_VARIANT ?? 'development';
 const IS_DEV = VARIANT === 'development';
 
 const NAME: Record<string, string> = {
-  development: 'PIA IMS',
-  staging: 'PIA IMS (Stg)',
-  production: 'PIA Internee Management',
+  development: 'PIA Wings (Dev)',
+  staging: 'PIA Wings (Stg)',
+  production: 'PIA Wings - Intern Operations Portal',
 };
 
 const PACKAGE: Record<string, string> = {
@@ -72,7 +72,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-splash-screen',
       {
-        image: './assets/splash-icon.png',
+        image: './assets/pia-logo.png',
         resizeMode: 'contain',
         backgroundColor: '#F4F9F5', // Soft Light Greenish-White
         dark: { backgroundColor: '#0B1F16' }, // Dark mode option

@@ -19,11 +19,13 @@ export interface CreateMentorRequest {
   cnic: string;
   phone: string | null;
   departmentId: number;
+  password: string;
 }
 
 export interface UpdateMentorRequest {
   fullName: string;
   phone: string | null;
+  cnic: string | null;
 }
 
 export interface MentorListParams {
@@ -41,11 +43,13 @@ export const mentorsApi = {
 
   update: (id: number, body: UpdateMentorRequest) => client.put<MentorDto>(endpoints.mentors.byId(id), body).then((r) => r.data),
 
-  deactivate: (id: number) => client.delete(endpoints.mentors.deactivate(id)),
+  delete: (id: number) => client.delete(endpoints.mentors.byId(id)),
+
+  deactivate: (id: number) => client.post(endpoints.mentors.deactivate(id)),
 
   reactivate: (id: number) => client.post(endpoints.mentors.reactivate(id)),
 
-  resetPassword: (id: number) => client.post(endpoints.mentors.resetPassword(id)),
+  resetPassword: (id: number, newPassword: string) => client.post(endpoints.mentors.resetPassword(id), { newPassword }),
 
   transfer: (id: number, newDepartmentId: number) =>
     client.post(endpoints.mentors.transfer(id), { newDepartmentId }),

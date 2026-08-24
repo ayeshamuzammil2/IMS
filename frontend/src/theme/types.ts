@@ -31,6 +31,8 @@ export interface ThemeColors {
   info: string;
   infoBg: string;
   gold: string;
+  slate: string;
+  slateLight: string;
 
   overlay: string;
   shadowColor: string;

@@ -15,9 +15,12 @@ public sealed record CreateInternRequest(
     TimeOnly DailyStartTime,
     TimeOnly DailyEndTime,
     string? UniversityName,
-    string? DegreeProgram);
+    string? DegreeProgram,
+    string Password);
 
-/// <summary>MentorId is honored only when the caller is an Admin; a Mentor cannot reassign a mentee to someone else.</summary>
+/// <summary>MentorId is honored only when the caller is an Admin; a Mentor cannot reassign a mentee to someone else.
+/// Address/EmergencyContactName/EmergencyContactPhone/BloodGroup are otherwise intern-self-edit-only fields
+/// (see DocumentService.SubmitSelfDetailsAsync) - exposed here too so Admin/Mentor can also correct them.</summary>
 public sealed record UpdateInternRequest(
     string FullName,
     string? Phone,
@@ -27,7 +30,13 @@ public sealed record UpdateInternRequest(
     TimeOnly DailyEndTime,
     string? UniversityName,
     string? DegreeProgram,
-    int? MentorId);
+    int? MentorId,
+    string? Address,
+    string? EmergencyContactName,
+    string? EmergencyContactPhone,
+    string? BloodGroup);
+
+public sealed record ResetInternPasswordRequest(string NewPassword);
 
 public sealed record InternDto(
     int Id,
@@ -48,4 +57,10 @@ public sealed record InternDto(
     string? UniversityName,
     string? DegreeProgram,
     string VerificationStatus,
-    bool IsActive);
+    bool IsActive,
+    string? Address,
+    string? EmergencyContactName,
+    string? EmergencyContactPhone,
+    string? BloodGroup,
+    bool AttendanceReady,
+    bool IsLockedForUnofficialActivity);

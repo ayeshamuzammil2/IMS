@@ -25,6 +25,12 @@ public class User
     public DateTime? LockoutEndUtc { get; set; }
     public DateTime? LastLoginAtUtc { get; set; }
 
+    /// <summary>Distinct from the password-attempt lockout above: set by AttendanceService when an
+    /// intern hits the 5-strike face-verification limit or exceeds the daily attempt cap. Blocks
+    /// login entirely (see AuthService.LoginAsync) until a mentor/admin unlocks the account.</summary>
+    public bool IsLockedForUnofficialActivity { get; set; }
+    public string? UnofficialActivityReason { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? UpdatedAtUtc { get; set; }
 

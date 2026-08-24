@@ -40,11 +40,17 @@ public class InternProfile
 
     public bool SelfDetailsSubmitted { get; set; }
     public DateTime? SelfDetailsSubmittedAtUtc { get; set; }
-    public bool ProfileLocked { get; set; }
 
     public AttendanceAccommodation AttendanceAccommodation { get; set; } = AttendanceAccommodation.None;
     public string? AttendanceAccommodationReason { get; set; }
     public DateOnly? AttendanceAccommodationExpiresOn { get; set; }
+
+    /// <summary>Resets to 0 on a successful face match; at 5, AttendanceService locks the account
+    /// for unofficial activity (see User.IsLockedForUnofficialActivity).</summary>
+    public int ConsecutiveFaceFailures { get; set; }
+    /// <summary>Drives the mandatory 15-second retry cooldown, enforced server-side in
+    /// CreateSessionAsync so a client can't bypass it by simply re-requesting.</summary>
+    public DateTime? LastFaceFailureAtUtc { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? UpdatedAtUtc { get; set; }

@@ -22,20 +22,20 @@ public static class NotificationTemplates
 {
     public static readonly NotificationTemplate AccountCreatedMentor = new(
         "account.created.mentor",
-        "Welcome to PIA Internee Management",
-        "Your mentor account has been created for the {{ department_name }} department. Check your email for your one-time password.",
+        "Welcome to PIA Wings",
+        "Your mentor account has been created for the {{ department_name }} department. Sign in with the password your administrator gave you - you'll be asked to set a new one immediately.",
         NotificationType.Success, NotificationCategory.Account, null, "mentor-welcome");
 
     public static readonly NotificationTemplate AccountCreatedIntern = new(
         "account.created.intern",
-        "Welcome to PIA",
-        "Your internship account has been created. Check your email for your one-time password.",
+        "Welcome to PIA Wings",
+        "Your internship account has been created. Sign in with the password your admin or mentor gave you - you'll be asked to set a new one immediately.",
         NotificationType.Success, NotificationCategory.Account, null, "intern-welcome");
 
     public static readonly NotificationTemplate PasswordResetByAdmin = new(
         "account.password_reset_by_admin",
         "Your password was reset",
-        "An administrator or mentor reset your password. Check your email for the new one-time password.",
+        "An administrator or mentor reset your password. Sign in with the new password they gave you - you'll be asked to set a new one immediately.",
         NotificationType.Warning, NotificationCategory.Account, null, "password-reset-by-admin");
 
     public static readonly NotificationTemplate PasswordChanged = new(

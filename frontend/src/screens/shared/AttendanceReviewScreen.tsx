@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { ShieldAlert, ClipboardList } from 'lucide-react-native';
+import { ShieldAlert, ClipboardList, Lock } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
@@ -153,6 +153,14 @@ export function AttendanceReviewScreen() {
                 {item.flags.join(', ')}
               </Text>
             ) : null}
+            {!item.attendanceReady ? (
+              <View style={s.row}>
+                <Lock size={14} color={theme.colors.error} />
+                <Text variant="caption" tone="error">
+                  Profile Picture approval or Face Enrollment is no longer verified for this intern - review is locked.
+                </Text>
+              </View>
+            ) : null}
             <View style={s.actionsRow}>
               <Button
                 label="Reject"
@@ -162,7 +170,7 @@ export function AttendanceReviewScreen() {
                   setNote('');
                   setNoteModal({ dayId: item.attendanceDayId, kind: 'review' });
                 }}
-                disabled={busyId === item.attendanceDayId}
+                disabled={busyId === item.attendanceDayId || !item.attendanceReady}
                 style={s.actionButton}
               />
               <Button
@@ -171,6 +179,7 @@ export function AttendanceReviewScreen() {
                 size="sm"
                 onPress={() => handleApproveReview(item)}
                 loading={busyId === item.attendanceDayId}
+                disabled={!item.attendanceReady}
                 style={s.actionButton}
               />
             </View>

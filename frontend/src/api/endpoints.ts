@@ -21,7 +21,7 @@ export const endpoints = {
   mentors: {
     list: '/mentors',
     byId: (id: number) => `/mentors/${id}`,
-    deactivate: (id: number) => `/mentors/${id}`,
+    deactivate: (id: number) => `/mentors/${id}/deactivate`,
     reactivate: (id: number) => `/mentors/${id}/reactivate`,
     resetPassword: (id: number) => `/mentors/${id}/reset-password`,
     transfer: (id: number) => `/mentors/${id}/transfer`,
@@ -32,12 +32,14 @@ export const endpoints = {
     deactivate: (id: number) => `/interns/${id}/deactivate`,
     reactivate: (id: number) => `/interns/${id}/reactivate`,
     resetPassword: (id: number) => `/interns/${id}/reset-password`,
+    unlock: (id: number) => `/interns/${id}/unlock`,
   },
   notifications: {
     list: '/notifications',
     unreadCount: '/notifications/unread-count',
     markRead: (id: number) => `/notifications/${id}/read`,
     markAllRead: '/notifications/read-all',
+    pushToken: '/notifications/push-token',
   },
   attendance: {
     today: '/attendance/today',
@@ -60,11 +62,16 @@ export const endpoints = {
   documents: {
     dashboard: '/documents/dashboard',
     upload: '/documents',
+    extraLink: '/documents/extra-link',
     selfDetails: '/documents/self-details',
     review: {
       queue: '/documents/review/queue',
       decide: (documentId: number) => `/documents/review/${documentId}/decide`,
     },
+  },
+  chat: {
+    contacts: '/chat/contacts',
+    messages: (otherUserId: number) => `/chat/${otherUserId}/messages`,
   },
   github: {
     status: '/github/status',

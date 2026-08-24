@@ -9,6 +9,7 @@ import { Button } from '../../components/primitives/Button';
 import { SelectField } from '../../components/forms/SelectField';
 import { internsApi } from '../../api/resources/interns.api';
 import { idCardsApi } from '../../api/resources/idcards.api';
+import { IdCardPreview } from '../../components/media/IdCardPreview';
 import { apiBaseUrl } from '../../api/client';
 import { downloadAndShare } from '../../lib/downloadAndShare';
 import { useThemedStyles } from '../../theme/useThemedStyles';
@@ -29,8 +30,8 @@ export function IdCardManagementScreen() {
   const isAdmin = user?.role === 'Admin';
   const queryClient = useQueryClient();
 
-  const [internProfileId, setInternProfileId] = useState<number | null>(null);
-  const [designation, setDesignation] = useState('');
+  const [internProfileId, setInternProfileIdState] = useState<number | null>(null);
+  const [designationOverride, setDesignationOverride] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -45,15 +46,22 @@ export function IdCardManagementScreen() {
 
   const invalidateCard = () => queryClient.invalidateQueries({ queryKey: ['idcards', 'intern', internProfileId] });
 
+  const designation = designationOverride ?? cardQuery.data?.designation ?? '';
+
+  const setInternProfileId = (id: number | null) => {
+    setInternProfileIdState(id);
+    setDesignationOverride(null);
+  };
+
   const handleSubmit = async () => {
-    if (!internProfileId) return;
+    if (!internProfileId || !designation.trim()) return;
     setBusy(true);
     try {
-      await idCardsApi.submit(internProfileId, designation.trim() || null);
+      await idCardsApi.submit(internProfileId, designation.trim());
       Toast.show({ type: 'success', text1: 'ID card generated' });
       invalidateCard();
     } catch (error: any) {
-      Toast.show({ type: 'error', text1: 'Could not generate ID card', text2: error?.message });
+      Toast.show({ type: 'error', text1: 'Could not generate ID card', text2: error?.response?.data?.message ?? error?.message });
     } finally {
       setBusy(false);
     }
@@ -105,8 +113,28 @@ export function IdCardManagementScreen() {
 
       {internProfileId ? (
         <View style={s.card}>
-          <Input label="Designation" placeholder="e.g. ERP Intern" value={designation} onChangeText={setDesignation} />
-          <Button label="Generate ID Card" onPress={handleSubmit} loading={busy} fullWidth />
+          <Input
+            label="Designation"
+            required
+            placeholder="e.g. ERP Intern"
+            value={designation}
+            onChangeText={setDesignationOverride}
+            error={!designation.trim() ? 'Designation is required before a card can be previewed or generated.' : undefined}
+          />
+
+          {designation.trim() ? (
+            <IdCardPreview
+              fullName={interns.find((i) => i.id === internProfileId)?.fullName ?? ''}
+              designation={designation.trim()}
+              email={cardQuery.data?.email ?? interns.find((i) => i.id === internProfileId)?.email ?? null}
+              departmentName={cardQuery.data?.departmentName ?? null}
+              cardNumber={cardQuery.data?.cardNumber ?? null}
+              emergencyContactPhone={cardQuery.data?.emergencyContactPhone ?? null}
+              photoFileId={cardQuery.data?.photoFileId ?? null}
+            />
+          ) : null}
+
+          <Button label="Generate ID Card" onPress={handleSubmit} loading={busy} disabled={!designation.trim()} fullWidth />
 
           {cardQuery.data ? (
             <>

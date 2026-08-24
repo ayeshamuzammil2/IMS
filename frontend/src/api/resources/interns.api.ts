@@ -21,6 +21,12 @@ export interface InternDto {
   degreeProgram: string | null;
   verificationStatus: string;
   isActive: boolean;
+  address: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  bloodGroup: string | null;
+  attendanceReady: boolean;
+  isLockedForUnofficialActivity: boolean;
 }
 
 /** mentorId is required only when an Admin creates the intern - a Mentor creating their own intern omits it. */
@@ -36,6 +42,7 @@ export interface CreateInternRequest {
   dailyEndTime: string;
   universityName: string | null;
   degreeProgram: string | null;
+  password: string;
 }
 
 export interface UpdateInternRequest {
@@ -48,6 +55,10 @@ export interface UpdateInternRequest {
   universityName: string | null;
   degreeProgram: string | null;
   mentorId: number | null;
+  address: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  bloodGroup: string | null;
 }
 
 export interface InternListParams {
@@ -73,5 +84,7 @@ export const internsApi = {
 
   reactivate: (id: number) => client.post(endpoints.interns.reactivate(id)),
 
-  resetPassword: (id: number) => client.post(endpoints.interns.resetPassword(id)),
+  resetPassword: (id: number, newPassword: string) => client.post(endpoints.interns.resetPassword(id), { newPassword }),
+
+  unlockAttendance: (id: number) => client.post(endpoints.interns.unlock(id)),
 };

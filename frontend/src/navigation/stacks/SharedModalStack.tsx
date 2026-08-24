@@ -4,11 +4,10 @@ import { AppHeader } from '../AppHeader';
 import { NotificationsScreen } from '../../screens/shared/NotificationsScreen';
 import { ProfileScreen } from '../../screens/shared/ProfileScreen';
 import { ChangePasswordScreen } from '../../screens/shared/ChangePasswordScreen';
-import { ThemeGalleryScreen } from '../../screens/shared/ThemeGalleryScreen';
 import { FaceEnrollmentScreen } from '../../screens/intern/FaceEnrollmentScreen';
 import type { SharedStackParamList } from '../types';
 
-const Stack = createNativeStackNavigator<SharedStackParamList & { ThemeGallery: undefined }>();
+const Stack = createNativeStackNavigator<SharedStackParamList>();
 
 /** Registered as a hidden drawer screen (display:'none') in every role drawer - reachable from the header, absent from the drawer list. */
 export function SharedModalStack() {
@@ -18,9 +17,6 @@ export function SharedModalStack() {
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Change Password' }} />
       <Stack.Screen name="FaceEnrollment" component={FaceEnrollmentScreen} options={{ title: 'Face Enrollment' }} />
-      {__DEV__ ? (
-        <Stack.Screen name="ThemeGallery" component={ThemeGalleryScreen} options={{ title: 'Theme Gallery' }} />
-      ) : null}
     </Stack.Navigator>
   );
 }

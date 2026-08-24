@@ -191,6 +191,7 @@ export interface ReviewQueueItemDto {
   distanceM: number | null;
   geofenceState: string | null;
   flags: string[];
+  attendanceReady: boolean;
 }
 
 export interface AttendanceOverrideDto {

@@ -23,11 +23,19 @@ public sealed class AuthService(
     public async Task<LoginResponse> LoginAsync(LoginRequest request, string? ip, CancellationToken ct)
     {
         var email = request.Email.Trim().ToLowerInvariant();
-        var user = await db.Users.Include(u => u.InternProfile).FirstOrDefaultAsync(u => u.Email == email, ct);
+        var user = await db.Users.Include(u => u.InternProfile).ThenInclude(p => p!.Mentor)
+            .FirstOrDefaultAsync(u => u.Email == email, ct);
 
         if (user is null)
         {
             throw new BusinessRuleException(BusinessRuleCodes.InvalidCredentials, "Incorrect email or password.");
+        }
+
+        if (user.IsLockedForUnofficialActivity)
+        {
+            var mentorEmail = user.InternProfile?.Mentor?.Email ?? "your administrator";
+            throw new BusinessRuleException(BusinessRuleCodes.UnofficialActivityLockout,
+                $"Your account has been locked due to unofficial activity. Kindly contact your mentor at {mentorEmail} or meet your mentor in person to unlock your account.");
         }
 
         if (await lockout.IsLockedOutAsync(user.Id, ct))
@@ -111,7 +119,7 @@ public sealed class AuthService(
             <p>Please sign in with this password - you will be asked to set a new one immediately.</p>
             <p>If you did not request this, contact your administrator right away.</p>
             """;
-        await emailQueue.EnqueueAsync(user.Email, user.FullName, "Your PIA Internee Management password", html, "password-reset-by-request", ct);
+        await emailQueue.EnqueueAsync(user.Email, user.FullName, "Your PIA Wings password", html, "password-reset-by-request", ct);
         await auditLogger.LogAsync("Auth.ForgotPasswordReset", nameof(User), user.Id.ToString(), null, ct);
     }
 

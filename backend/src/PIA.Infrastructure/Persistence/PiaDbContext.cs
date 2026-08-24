@@ -30,6 +30,8 @@ public class PiaDbContext(DbContextOptions<PiaDbContext> options) : DbContext(op
     public DbSet<IdCard> IdCards => Set<IdCard>();
 
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<PushToken> PushTokens => Set<PushToken>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<EmailOutboxMessage> EmailOutboxMessages => Set<EmailOutboxMessage>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();

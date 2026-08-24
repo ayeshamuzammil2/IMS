@@ -3,7 +3,7 @@ import { Text as RNText, type TextProps as RNTextProps } from 'react-native';
 import { useTheme } from '../../providers/ThemeProvider';
 
 export type TextVariant = 'h1' | 'h2' | 'h3' | 'body' | 'bodyStrong' | 'caption' | 'overline';
-export type TextTone = 'primary' | 'secondary' | 'muted' | 'inverse' | 'success' | 'warning' | 'error' | 'brand';
+export type TextTone = 'primary' | 'secondary' | 'muted' | 'inverse' | 'success' | 'warning' | 'error' | 'brand' | 'slate';
 
 interface Props extends RNTextProps {
   variant?: TextVariant;
@@ -21,6 +21,7 @@ export function Text({ variant = 'body', tone = 'primary', style, ...rest }: Pro
     warning: theme.colors.warning,
     error: theme.colors.error,
     brand: theme.colors.primary,
+    slate: theme.colors.slate,
   };
 
   return <RNText style={[theme.typography[variant], { color: toneColor[tone] }, style]} {...rest} />;

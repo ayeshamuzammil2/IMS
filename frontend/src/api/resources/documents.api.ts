@@ -1,12 +1,13 @@
 import { client } from '../client';
 import { endpoints } from '../endpoints';
 
-export type DocumentTypeKey = 'ProfilePhoto' | 'Cnic' | 'Resume' | 'ReferenceLetter';
+export type DocumentTypeKey = 'ProfilePhoto' | 'CnicFront' | 'CnicBack' | 'Resume' | 'ReferenceLetter' | 'ExtraDocument';
 
 export interface DocumentDto {
   id: number;
   documentType: DocumentTypeKey;
-  fileId: string;
+  fileId: string | null;
+  externalLinkUrl: string | null;
   version: number;
   status: 'Pending' | 'Approved' | 'Rejected';
   remarks: string | null;
@@ -38,7 +39,6 @@ export interface InternDashboardDto {
   emergencyContactPhone: string | null;
   bloodGroup: string | null;
   selfDetailsSubmitted: boolean;
-  profileLocked: boolean;
   documents: DocumentDto[];
 }
 
@@ -55,7 +55,9 @@ export interface DocumentReviewQueueItemDto {
   internFullName: string;
   internCode: string;
   documentType: DocumentTypeKey;
-  fileId: string;
+  fileId: string | null;
+  contentType: string | null;
+  externalLinkUrl: string | null;
   version: number;
   uploadedAtUtc: string;
 }
@@ -86,6 +88,8 @@ export const documentsApi = {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       .then((r) => r.data),
+
+  submitExtraLink: (url: string) => client.post<DocumentDto>(endpoints.documents.extraLink, { url }).then((r) => r.data),
 
   submitSelfDetails: (body: SubmitSelfDetailsRequest) => client.post(endpoints.documents.selfDetails, body),
 
