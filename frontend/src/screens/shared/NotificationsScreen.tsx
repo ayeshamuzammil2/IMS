@@ -66,7 +66,7 @@ export function NotificationsScreen() {
   return (
     <Screen scroll={false}>
       <View style={s.headerRow}>
-        <Text variant="h2">Notifications</Text>
+     
         {hasUnread ? (
           <Button label="Mark all read" size="sm" variant="ghost" onPress={() => markAllReadMutation.mutate()} loading={markAllReadMutation.isPending} />
         ) : null}

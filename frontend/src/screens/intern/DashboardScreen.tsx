@@ -60,7 +60,7 @@ export function DashboardScreen() {
     <Screen scroll>
       <View style={s.photoWrap}>
         {data.approvedPhotoFileId ? (
-          <AuthImage fileId={data.approvedPhotoFileId} size={110} style={s.photo} />
+          <AuthImage fileId={data.approvedPhotoFileId} size={130} style={s.photo} />
         ) : (
           <RoleAvatar name={data.fullName} size={110} />
         )}
@@ -157,18 +157,54 @@ function Row({ label, value }: { label: string; value?: string | null }) {
 }
 
 const makeStyles = (t: AppTheme) => ({
-  photoWrap: { alignSelf: 'center' as const, marginBottom: t.spacing.sm, position: 'relative' as const },
-  photo: { borderRadius: t.radii.full },
+photoWrap: {
+    alignSelf: 'center' as const,
+    marginBottom: t.spacing.md,
+    position: 'relative' as const,
+    // Outer Container & Soft Elevation Shadow
+    borderRadius: t.radii.lg,
+    padding: 3, // Ring effect ke liye halka gap
+    backgroundColor: t.colors.surface,
+    borderWidth: 1.5,
+    borderColor: t.colors.border, // Clean muted ring
+    // Soft Modern Shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  photo: {
+    width: 110,
+    height: 140, // Standard aspect ratio (Passport ID card look)
+    borderRadius: t.radii.md,
+    borderWidth: 1,
+    borderColor: t.colors.primary, // Sleek primary accent border
+  },
   editButton: {
     position: 'absolute' as const,
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
+    bottom: -4,
+    right: -4,
+    width: 34,
+    height: 34,
     borderRadius: t.radii.full,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+    borderWidth: 2,
+    borderColor: t.colors.surface, // Background separation ring
+    zIndex: 2,
+    // Button Shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
   },
+
+
+
+
+  
   name: { textAlign: 'center' as const, marginTop: t.spacing.xs },
   internCode: { textAlign: 'center' as const, marginBottom: t.spacing.lg },
   sectionLabel: { marginTop: t.spacing.sm, marginBottom: t.spacing.xs, marginLeft: t.spacing.xs },

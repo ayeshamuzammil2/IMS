@@ -1,18 +1,19 @@
 import React, { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { View, Pressable } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
+import { ChevronRight, Clock, Calendar } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
 import { DateField } from '../../components/forms/DateField';
 import { SelectField } from '../../components/forms/SelectField';
-import { DataTable, type DataTableColumn } from '../../components/data/DataTable';
 import { attendanceApi, type AttendanceHistoryRowDto } from '../../api/resources/attendance.api';
 import { departmentsApi } from '../../api/resources/departments.api';
 import { toCsv } from '../../lib/csv';
 import { writeTextAndShare } from '../../lib/downloadAndShare';
 import { useThemedStyles } from '../../theme/useThemedStyles';
+import { useTheme } from '../../providers/ThemeProvider';
 import { useAuth } from '../../providers/AuthProvider';
 import type { AppTheme } from '../../theme/types';
 
@@ -22,7 +23,15 @@ function isoDaysAgo(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-const STATUS_TONE: Record<string, 'muted' | 'success' | 'warning' | 'error'> = {
+const STATUS_BG: Record<string, 'successBg' | 'warningBg' | 'errorBg' | 'surfaceSunken'> = {
+  Present: 'successBg',
+  Late: 'warningBg',
+  Absent: 'errorBg',
+  Leave: 'surfaceSunken',
+  Holiday: 'surfaceSunken',
+};
+
+const STATUS_TONE: Record<string, 'success' | 'warning' | 'error' | 'muted'> = {
   Present: 'success',
   Late: 'warning',
   Absent: 'error',
@@ -32,6 +41,7 @@ const STATUS_TONE: Record<string, 'muted' | 'success' | 'warning' | 'error'> = {
 
 export function AttendanceHistoryScreen() {
   const s = useThemedStyles(makeStyles);
+  const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'Admin';
 
@@ -64,11 +74,7 @@ export function AttendanceHistoryScreen() {
         { header: 'Work Date', value: (r) => r.workDate },
         { header: 'Status', value: (r) => r.status },
         { header: 'Arrival Time', value: (r) => (r.arrivalAtUtc ? new Date(r.arrivalAtUtc).toLocaleTimeString() : '') },
-        { header: 'Arrival Late', value: (r) => (r.arrivalIsLate ? 'Yes' : 'No') },
-        { header: 'Arrival Source', value: (r) => r.arrivalSource ?? '' },
         { header: 'Departure Time', value: (r) => (r.departureAtUtc ? new Date(r.departureAtUtc).toLocaleTimeString() : '') },
-        { header: 'Departure Early', value: (r) => (r.departureIsEarly ? 'Yes' : 'No') },
-        { header: 'Departure Source', value: (r) => r.departureSource ?? '' },
       ]);
       await writeTextAndShare(csv, `attendance-${startDate}-to-${endDate}.csv`, 'text/csv');
     } catch (error: any) {
@@ -78,55 +84,8 @@ export function AttendanceHistoryScreen() {
     }
   };
 
-  const columns: DataTableColumn<AttendanceHistoryRowDto>[] = [
-    { key: 'name', label: 'Name', width: 160, render: (r) => <Text variant="bodyStrong">{r.internFullName}</Text> },
-    { key: 'code', label: 'Code', width: 140, render: (r) => <Text variant="body">{r.internCode}</Text> },
-    { key: 'department', label: 'Department', width: 130, render: (r) => <Text variant="body">{r.departmentName}</Text> },
-    { key: 'date', label: 'Date', width: 100, render: (r) => <Text variant="body">{new Date(r.workDate).toLocaleDateString()}</Text> },
-    {
-      key: 'status',
-      label: 'Status',
-      width: 90,
-      render: (r) => (
-        <Text variant="caption" tone={STATUS_TONE[r.status] ?? 'muted'}>
-          {r.status}
-        </Text>
-      ),
-    },
-    {
-      key: 'arrival',
-      label: 'Arrival',
-      width: 150,
-      render: (r) => (
-        <View>
-          <Text variant="body">{r.arrivalAtUtc ? new Date(r.arrivalAtUtc).toLocaleTimeString() : '-'}</Text>
-          {r.arrivalSource ? (
-            <Text variant="caption" tone="muted">
-              {r.arrivalSource}
-            </Text>
-          ) : null}
-        </View>
-      ),
-    },
-    {
-      key: 'departure',
-      label: 'Departure',
-      width: 150,
-      render: (r) => (
-        <View>
-          <Text variant="body">{r.departureAtUtc ? new Date(r.departureAtUtc).toLocaleTimeString() : '-'}</Text>
-          {r.departureSource ? (
-            <Text variant="caption" tone="muted">
-              {r.departureSource}
-            </Text>
-          ) : null}
-        </View>
-      ),
-    },
-  ];
-
   return (
-    <Screen scroll={false}>
+    <Screen scroll>
       <View style={s.filterRow}>
         <View style={s.dateField}>
           <DateField label="From" value={startDate} onChange={(v) => v && setStartDate(v)} />
@@ -152,16 +111,141 @@ export function AttendanceHistoryScreen() {
         <Text variant="body" tone="muted">
           Loading...
         </Text>
+      ) : rows.length === 0 ? (
+        <View style={s.emptyContainer}>
+          <Text variant="body" tone="muted">
+            No attendance records in this range.
+          </Text>
+        </View>
       ) : (
-        <DataTable columns={columns} rows={rows} keyExtractor={(r) => `${r.internProfileId}-${r.workDate}`} emptyLabel="No attendance records in this range." />
+        rows.map((row) => (
+          <View key={`${row.internProfileId}-${row.workDate}`} style={s.card}>
+            <View style={s.cardMain}>
+              <View style={s.cardInfo}>
+                <Text variant="bodyStrong" style={s.nameText}>
+                  {row.internFullName}
+                </Text>
+                <Text variant="caption" tone="muted">
+                  {row.internCode}
+                </Text>
+                <Text variant="caption" tone="secondary" style={s.deptText}>
+                  {row.departmentName}
+                </Text>
+              </View>
+              <ChevronRight size={18} color={theme.colors.textMuted} />
+            </View>
+
+            <View style={s.badgeRow}>
+              <View style={[s.badge, { backgroundColor: theme.colors[STATUS_BG[row.status] ?? 'surfaceSunken'] }]}>
+                <Text variant="caption" tone={STATUS_TONE[row.status] ?? 'muted'}>
+                  {row.status}
+                </Text>
+              </View>
+              {row.arrivalIsLate ? (
+                <View style={[s.badge, { backgroundColor: theme.colors.warningBg }]}>
+                  <Text variant="caption" tone="warning">
+                    Late Arrival
+                  </Text>
+                </View>
+              ) : null}
+              {row.departureIsEarly ? (
+                <View style={[s.badge, { backgroundColor: theme.colors.warningBg }]}>
+                  <Text variant="caption" tone="warning">
+                    Early Departure
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            <View style={s.divider} />
+
+            <View style={s.cardFooter}>
+              <View style={s.footerItem}>
+                <Calendar size={14} color={theme.colors.textMuted} />
+                <Text variant="caption" tone="muted">
+                  {new Date(row.workDate).toLocaleDateString()}
+                </Text>
+              </View>
+              <View style={s.footerItem}>
+                <Clock size={14} color={theme.colors.textMuted} />
+                <Text variant="caption" tone="muted">
+                  In: {row.arrivalAtUtc ? new Date(row.arrivalAtUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                </Text>
+              </View>
+              <View style={s.footerItem}>
+                <Clock size={14} color={theme.colors.textMuted} />
+                <Text variant="caption" tone="muted">
+                  Out: {row.departureAtUtc ? new Date(row.departureAtUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ))
       )}
     </Screen>
   );
 }
 
 const makeStyles = (t: AppTheme) => ({
-  filterRow: { flexDirection: 'row' as const, gap: t.spacing.sm, marginBottom: t.spacing.sm, flexWrap: 'wrap' as const },
+  filterRow: {
+    flexDirection: 'row' as const,
+    gap: t.spacing.sm,
+    marginBottom: t.spacing.sm,
+    flexWrap: 'wrap' as const,
+  },
   dateField: { flex: 1, minWidth: 130 },
   deptField: { flex: 1, minWidth: 150 },
-  headerRow: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const, marginBottom: t.spacing.md },
+  headerRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: t.spacing.md,
+  },
+  emptyContainer: {
+    alignItems: 'center' as const,
+    padding: t.spacing.xl,
+  },
+  card: {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.lg,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    padding: t.spacing.lg,
+    marginBottom: t.spacing.md,
+    ...t.shadows.sm,
+  },
+  cardMain: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'flex-start' as const,
+  },
+  cardInfo: { flex: 1 },
+  nameText: { fontSize: 16, fontWeight: '600' as const },
+  deptText: { marginTop: 2 },
+  badgeRow: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: t.spacing.xs,
+    marginTop: t.spacing.sm,
+  },
+  badge: {
+    paddingHorizontal: t.spacing.sm,
+    paddingVertical: 3,
+    borderRadius: t.radii.full,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: t.colors.border,
+    marginVertical: t.spacing.md,
+  },
+  cardFooter: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+  },
+  footerItem: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+  },
 });

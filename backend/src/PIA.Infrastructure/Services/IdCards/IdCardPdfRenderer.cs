@@ -25,7 +25,7 @@ public sealed class IdCardPdfRenderer : IIdCardPdfRenderer
     private const string MediumGreen = "#66BB6A";
     private const string LightGreen = "#A5D6A7";
     private const string PaleGreen = "#E8F5E9";
-    private static readonly SKColor LightGreenSk = new(0xA5, 0xD6, 0xA7);
+    private static readonly SKColor PrimaryGreenSk = new(0x1B, 0x5E, 0x20);
 
     private static readonly byte[]? LogoBytes = LoadLogo();
 
@@ -34,7 +34,9 @@ public sealed class IdCardPdfRenderer : IIdCardPdfRenderer
         byte[] photoBytes, string designation, string? email, string? emergencyContactPhone)
     {
         QuestPDF.Settings.License = LicenseType.Community;
-        var roundedPhoto = RoundedSquareCrop(photoBytes, size: 200, cornerRadius: 28, borderColor: LightGreenSk, borderWidth: 4);
+        // Passport-style portrait crop (matches the app preview's 100x128 / ~0.78 aspect ratio)
+        // instead of a square, with a bolder primary-green border for a professional ID-card look.
+        var roundedPhoto = RoundedRectCrop(photoBytes, width: 200, height: 258, cornerRadius: 20, borderColor: PrimaryGreenSk, borderWidth: 6);
 
         var document = Document.Create(container =>
         {
@@ -51,13 +53,13 @@ public sealed class IdCardPdfRenderer : IIdCardPdfRenderer
                     if (LogoBytes is not null)
                     {
                         col.Item().AlignCenter().Height(16).Image(LogoBytes).FitHeight();
-                        col.Item().Height(3);
+                        col.Item().Height(2);
                     }
 
-                    col.Item().AlignCenter().Text("PIA").FontSize(12).Bold().FontColor(PrimaryGreen);
+                    col.Item().AlignCenter().Text("PIA Wings").FontSize(13).Bold().FontColor(PrimaryGreen);
                     col.Item().AlignCenter().Text("Internee ID Card").FontSize(7).FontColor(MediumGreen);
 
-                    col.Item().PaddingTop(6).AlignCenter().Height(25).Width(25).Image(roundedPhoto).FitArea();
+                    col.Item().PaddingTop(6).AlignCenter().Height(30).Width(23).Image(roundedPhoto).FitArea();
 
                     col.Item().PaddingTop(6).AlignCenter().Text(fullName).FontSize(9).Bold();
                     col.Item().AlignCenter().Text(designation).FontSize(7).Italic().FontColor(MediumGreen);
@@ -82,8 +84,9 @@ public sealed class IdCardPdfRenderer : IIdCardPdfRenderer
     /// <summary>QuestPDF 2024.10.2 has no public rounded-image-clip API (verified against the
     /// installed package - only rectangular ClipOverflowArea/ClipRectangle exist internally), so the
     /// rounding is done here with SkiaSharp before the bytes ever reach QuestPDF: center-crop to a
-    /// square, clip to a rounded-rect path, draw the source bitmap, then stroke a border on top.</summary>
-    private static byte[] RoundedSquareCrop(byte[] sourceBytes, int size, float cornerRadius, SKColor borderColor, float borderWidth)
+    /// passport-style portrait rectangle (matching the target width:height ratio, not forced to
+    /// square), clip to a rounded-rect path, draw the source bitmap, then stroke a border on top.</summary>
+    private static byte[] RoundedRectCrop(byte[] sourceBytes, int width, int height, float cornerRadius, SKColor borderColor, float borderWidth)
     {
         using var source = SKBitmap.Decode(sourceBytes);
         if (source is null)
@@ -91,16 +94,30 @@ public sealed class IdCardPdfRenderer : IIdCardPdfRenderer
             return sourceBytes;
         }
 
-        var cropSize = Math.Min(source.Width, source.Height);
-        var srcRect = new SKRect(
-            (source.Width - cropSize) / 2f, (source.Height - cropSize) / 2f,
-            (source.Width - cropSize) / 2f + cropSize, (source.Height - cropSize) / 2f + cropSize);
+        var targetAspect = (float)width / height;
+        var sourceAspect = (float)source.Width / source.Height;
 
-        using var surface = SKSurface.Create(new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Premul));
+        float cropWidth, cropHeight;
+        if (sourceAspect > targetAspect)
+        {
+            cropHeight = source.Height;
+            cropWidth = cropHeight * targetAspect;
+        }
+        else
+        {
+            cropWidth = source.Width;
+            cropHeight = cropWidth / targetAspect;
+        }
+
+        var srcRect = new SKRect(
+            (source.Width - cropWidth) / 2f, (source.Height - cropHeight) / 2f,
+            (source.Width - cropWidth) / 2f + cropWidth, (source.Height - cropHeight) / 2f + cropHeight);
+
+        using var surface = SKSurface.Create(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul));
         var canvas = surface.Canvas;
         canvas.Clear(SKColors.Transparent);
 
-        var bounds = new SKRect(0, 0, size, size);
+        var bounds = new SKRect(0, 0, width, height);
         using (var clipPath = new SKPath())
         {
             clipPath.AddRoundRect(bounds, cornerRadius, cornerRadius);
@@ -111,11 +128,14 @@ public sealed class IdCardPdfRenderer : IIdCardPdfRenderer
             canvas.Restore();
         }
 
+        // Inset the stroke by half its width so the border renders fully inside the canvas
+        // bounds instead of being clipped at the edges.
+        var borderRect = new SKRect(borderWidth / 2f, borderWidth / 2f, width - borderWidth / 2f, height - borderWidth / 2f);
         using var borderPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = borderWidth, IsAntialias = true,
         };
-        canvas.DrawRoundRect(new SKRoundRect(bounds, cornerRadius, cornerRadius), borderPaint);
+        canvas.DrawRoundRect(new SKRoundRect(borderRect, cornerRadius, cornerRadius), borderPaint);
 
         using var image = surface.Snapshot();
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);

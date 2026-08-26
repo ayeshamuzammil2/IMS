@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { View, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Pressable, ActivityIndicator, Alert, FlatList } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { Power, PowerOff, KeyRound, ArrowRightLeft, Trash2 } from 'lucide-react-native';
+import { Power, PowerOff, KeyRound, ArrowRightLeft, Trash2, ChevronRight } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
@@ -14,7 +14,6 @@ import { FormModal } from '../../components/forms/FormModal';
 import { SelectField } from '../../components/forms/SelectField';
 import { PasswordStrengthChecklist } from '../../components/forms/PasswordStrengthChecklist';
 import { passwordSchema } from '../../lib/passwordPolicy';
-import { DataTable, type DataTableColumn } from '../../components/data/DataTable';
 import { departmentsApi } from '../../api/resources/departments.api';
 import { mentorsApi, type MentorDto } from '../../api/resources/mentors.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
@@ -48,8 +47,6 @@ const updateSchema = z.object({
 });
 const resetPasswordSchema = withPasswordMatch(z.object(passwordFields));
 
-// departmentId is z.coerce.number(), which accepts unknown as input - useForm needs the raw input
-// shape for on-screen field values and the coerced output shape for what actually gets submitted.
 type CreateInput = z.input<typeof createSchema>;
 type CreateOutput = z.output<typeof createSchema>;
 type UpdateValues = z.infer<typeof updateSchema>;
@@ -201,77 +198,89 @@ export function MentorsScreen() {
     setTransferOpen(true);
   };
 
-  const columns: DataTableColumn<MentorDto>[] = [
-    { key: 'fullName', label: 'Name', width: 170, render: (m) => <Text variant="bodyStrong">{m.fullName}</Text> },
-    { key: 'email', label: 'Email', width: 200, render: (m) => <Text variant="body">{m.email}</Text> },
-    { key: 'department', label: 'Department', width: 140, render: (m) => <Text variant="body">{m.departmentName}</Text> },
-    { key: 'interns', label: 'Interns', width: 70, render: (m) => <Text variant="body">{m.internCount}</Text> },
-    {
-      key: 'status',
-      label: 'Status',
-      width: 90,
-      render: (m) => (
-        <Text variant="caption" tone={m.isActive ? 'success' : 'error'}>
-          {m.isActive ? 'Active' : 'Inactive'}
-        </Text>
-      ),
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      width: 160,
-      render: (m) => {
-        const busyToggle = toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === m.id;
-        const busyDelete = deleteMutation.isPending && deleteMutation.variables === m.id;
-        return (
-          <View style={s.actionsRow}>
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                openTransfer(m);
-              }}
-            >
-              <ArrowRightLeft size={18} color={theme.colors.textSecondary} />
-            </Pressable>
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                openResetPassword(m);
-              }}
-            >
-              <KeyRound size={18} color={theme.colors.textSecondary} />
-            </Pressable>
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                confirmToggleActive(m);
-              }}
-            >
-              {busyToggle ? (
-                <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-              ) : m.isActive ? (
-                <PowerOff size={18} color={theme.colors.error} />
-              ) : (
-                <Power size={18} color={theme.colors.success} />
-              )}
-            </Pressable>
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                confirmDelete(m);
-              }}
-            >
-              {busyDelete ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : <Trash2 size={18} color={theme.colors.error} />}
-            </Pressable>
+  const renderCard = ({ item: m }: { item: MentorDto }) => {
+    const busyToggle = toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === m.id;
+    const busyDelete = deleteMutation.isPending && deleteMutation.variables === m.id;
+
+    return (
+      <Pressable style={s.card} onPress={() => openEdit(m)}>
+        <View style={s.cardHeader}>
+          <View style={s.cardHeaderText}>
+            <Text variant="bodyStrong" numberOfLines={1}>
+              {m.fullName}
+            </Text>
+            <Text variant="caption" tone="muted">
+              {m.email}
+            </Text>
           </View>
-        );
-      },
-    },
-  ];
+          <ChevronRight size={18} color={theme.colors.textMuted} />
+        </View>
+
+        <Text variant="caption" tone="secondary" numberOfLines={1} style={s.cardSubline}>
+          {m.departmentName} · {m.internCount} Interns
+        </Text>
+
+        <View style={s.badgeRow}>
+          <View style={[s.badge, { backgroundColor: m.isActive ? theme.colors.successBg : theme.colors.errorBg }]}>
+            <Text variant="caption" tone={m.isActive ? 'success' : 'error'}>
+              {m.isActive ? 'Active' : 'Inactive'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={s.divider} />
+
+        <View style={s.actionsRow}>
+          <Pressable
+            hitSlop={8}
+            style={s.actionIcon}
+            onPress={(e) => {
+              e.stopPropagation();
+              openTransfer(m);
+            }}
+          >
+            <ArrowRightLeft size={18} color={theme.colors.textSecondary} />
+          </Pressable>
+          <Pressable
+            hitSlop={8}
+            style={s.actionIcon}
+            onPress={(e) => {
+              e.stopPropagation();
+              openResetPassword(m);
+            }}
+          >
+            <KeyRound size={18} color={theme.colors.textSecondary} />
+          </Pressable>
+          <Pressable
+            hitSlop={8}
+            style={s.actionIcon}
+            onPress={(e) => {
+              e.stopPropagation();
+              confirmToggleActive(m);
+            }}
+          >
+            {busyToggle ? (
+              <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+            ) : m.isActive ? (
+              <PowerOff size={18} color={theme.colors.error} />
+            ) : (
+              <Power size={18} color={theme.colors.success} />
+            )}
+          </Pressable>
+          <Pressable
+            hitSlop={8}
+            style={s.actionIcon}
+            onPress={(e) => {
+              e.stopPropagation();
+              confirmDelete(m);
+            }}
+          >
+            {busyDelete ? <ActivityIndicator size="small" color={theme.colors.error} /> : <Trash2 size={18} color={theme.colors.error} />}
+          </Pressable>
+        </View>
+      </Pressable>
+    );
+  };
 
   return (
     <Screen scroll={false}>
@@ -287,12 +296,17 @@ export function MentorsScreen() {
           Loading...
         </Text>
       ) : (
-        <DataTable
-          columns={columns}
-          rows={mentors}
+        <FlatList
+          data={mentors}
           keyExtractor={(m) => String(m.id)}
-          onRowPress={openEdit}
-          emptyLabel="No mentors yet. Add one to get started."
+          renderItem={renderCard}
+          style={s.list}
+          contentContainerStyle={mentors.length === 0 ? s.emptyListContent : s.listContent}
+          ListEmptyComponent={
+            <Text variant="body" tone="muted">
+              No mentors yet. Add one to get started.
+            </Text>
+          }
         />
       )}
 
@@ -528,6 +542,24 @@ const makeStyles = (t: AppTheme) => ({
     alignItems: 'center' as const,
     marginBottom: t.spacing.md,
   },
-  actionsRow: { flexDirection: 'row' as const, gap: t.spacing.md },
+  list: { flex: 1 },
+  listContent: { gap: t.spacing.sm, paddingBottom: t.spacing.lg },
+  emptyListContent: { flexGrow: 1, alignItems: 'center' as const, justifyContent: 'center' as const },
+  card: {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.lg,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    padding: t.spacing.lg,
+    ...t.shadows.sm,
+  },
+  cardHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, gap: t.spacing.sm },
+  cardHeaderText: { flex: 1 },
+  cardSubline: { marginTop: 2 },
+  badgeRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: t.spacing.xs, marginTop: t.spacing.sm },
+  badge: { paddingHorizontal: t.spacing.sm, paddingVertical: 3, borderRadius: t.radii.full },
+  divider: { height: 1, backgroundColor: t.colors.border, marginTop: t.spacing.md, marginBottom: t.spacing.sm },
+  actionsRow: { flexDirection: 'row' as const, gap: t.spacing.lg, justifyContent: 'flex-end' as const },
+  actionIcon: { padding: t.spacing.xs },
   transferHint: { marginBottom: t.spacing.md },
 });

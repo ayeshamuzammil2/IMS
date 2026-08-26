@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import Toast from 'react-native-toast-message';
+import { ChevronRight } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
@@ -13,6 +14,7 @@ import { certificatesApi } from '../../api/resources/certificates.api';
 import { apiBaseUrl } from '../../api/client';
 import { downloadAndShare } from '../../lib/downloadAndShare';
 import { useThemedStyles } from '../../theme/useThemedStyles';
+import { useTheme } from '../../providers/ThemeProvider';
 import { useAuth } from '../../providers/AuthProvider';
 import type { AppTheme } from '../../theme/types';
 
@@ -24,8 +26,17 @@ const CERT_STATUS_TONE: Record<string, 'muted' | 'success' | 'warning' | 'error'
   Rejected: 'error',
 };
 
+const CERT_STATUS_BG: Record<string, 'surfaceSunken' | 'warningBg' | 'successBg' | 'errorBg'> = {
+  Locked: 'surfaceSunken',
+  PendingApproval: 'warningBg',
+  Approved: 'warningBg',
+  Issued: 'successBg',
+  Rejected: 'errorBg',
+};
+
 export function CertificateManagementScreen() {
   const s = useThemedStyles(makeStyles);
+  const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'Admin';
   const queryClient = useQueryClient();
@@ -133,8 +144,8 @@ export function CertificateManagementScreen() {
 
   return (
     <Screen scroll>
-      <Text variant="overline" tone="muted" style={s.sectionLabel}>
-        CERTIFICATE TEMPLATES
+      <Text variant="caption" tone="muted" style={s.sectionTitle}>
+        UPLOAD TEMPLATE
       </Text>
       <View style={s.card}>
         <Input label="Template Name" value={templateName} onChangeText={setTemplateName} />
@@ -143,12 +154,12 @@ export function CertificateManagementScreen() {
           variant="outline"
           size="sm"
           onPress={handlePickTemplateFile}
-          style={s.attachButton}
+          style={{ alignSelf: 'flex-start' }}
         />
         <Button label="Upload Template" onPress={handleUploadTemplate} loading={busy} disabled={!templateName.trim() || !pickedFile} fullWidth />
       </View>
 
-      <Text variant="overline" tone="muted" style={s.sectionLabel}>
+      <Text variant="caption" tone="muted" style={[s.sectionTitle, { marginTop: theme.spacing.lg }]}>
         GENERATE FOR INTERN
       </Text>
       <View style={s.card}>
@@ -158,16 +169,37 @@ export function CertificateManagementScreen() {
 
         {certQuery.data ? (
           <>
-            <Text variant="bodyStrong" tone={CERT_STATUS_TONE[certQuery.data.status]}>
-              Status: {certQuery.data.status}
-              {certQuery.data.certificateNumber ? ` - ${certQuery.data.certificateNumber}` : ''}
-            </Text>
+            <View style={s.divider} />
+            <View style={s.cardMain}>
+              <View>
+                <Text variant="bodyStrong" style={{ fontSize: 16 }}>
+                  Certificate Details
+                </Text>
+                {certQuery.data.certificateNumber ? (
+                  <Text variant="caption" tone="muted">
+                    {certQuery.data.certificateNumber}
+                  </Text>
+                ) : null}
+              </View>
+              <ChevronRight size={18} color={theme.colors.textMuted} />
+            </View>
+
+            <View style={{ flexDirection: 'row', marginTop: theme.spacing.xs }}>
+              <View style={[s.badge, { backgroundColor: theme.colors[CERT_STATUS_BG[certQuery.data.status] ?? 'surfaceSunken'] }]}>
+                <Text variant="caption" tone={CERT_STATUS_TONE[certQuery.data.status] ?? 'muted'}>
+                  {certQuery.data.status}
+                </Text>
+              </View>
+            </View>
+
             {isAdmin && certQuery.data.status === 'PendingApproval' ? (
-              <Button label="Approve" onPress={handleApprove} loading={busy} fullWidth />
+              <Button label="Approve Certificate" onPress={handleApprove} loading={busy} fullWidth style={{ marginTop: theme.spacing.md }} />
             ) : null}
-            {isAdmin && certQuery.data.status === 'Approved' ? <Button label="Issue" onPress={handleIssue} loading={busy} fullWidth /> : null}
+            {isAdmin && certQuery.data.status === 'Approved' ? (
+              <Button label="Issue Certificate" onPress={handleIssue} loading={busy} fullWidth style={{ marginTop: theme.spacing.md }} />
+            ) : null}
             {certQuery.data.status === 'Issued' && certQuery.data.generatedFileId ? (
-              <Button label="Download" variant="outline" onPress={handleDownload} loading={downloading} fullWidth />
+              <Button label="Download Certificate" variant="outline" onPress={handleDownload} loading={downloading} fullWidth style={{ marginTop: theme.spacing.md }} />
             ) : null}
           </>
         ) : null}
@@ -177,7 +209,11 @@ export function CertificateManagementScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
-  sectionLabel: { marginBottom: t.spacing.xs, marginLeft: t.spacing.xs, marginTop: t.spacing.sm },
+  sectionTitle: {
+    marginBottom: t.spacing.sm,
+    fontWeight: '700' as const,
+    letterSpacing: 0.5,
+  },
   card: {
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
@@ -185,7 +221,21 @@ const makeStyles = (t: AppTheme) => ({
     borderColor: t.colors.border,
     padding: t.spacing.lg,
     gap: t.spacing.md,
-    marginBottom: t.spacing.lg,
+    ...t.shadows.sm,
   },
-  attachButton: { alignSelf: 'flex-start' as const },
+  cardMain: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: t.colors.border,
+    marginTop: t.spacing.xs,
+  },
+  badge: {
+    paddingHorizontal: t.spacing.sm,
+    paddingVertical: 3,
+    borderRadius: t.radii.full,
+  },
 });

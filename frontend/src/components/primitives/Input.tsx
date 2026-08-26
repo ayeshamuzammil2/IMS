@@ -18,7 +18,7 @@ export function Input({ label, error, helper, required, secureToggle, secureText
   const theme = useTheme();
   const s = useThemedStyles(makeStyles);
   const [focused, setFocused] = useState(false);
-  const [hidden, setHidden] = useState(!!secureTextEntry);
+  const [hidden, setHidden] = useState(!!secureTextEntry || !!secureToggle);
 
   return (
     <View style={s.container}>

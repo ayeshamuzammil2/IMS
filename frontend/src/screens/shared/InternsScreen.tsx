@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { View, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Pressable, ActivityIndicator, Alert, FlatList } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { Power, PowerOff, KeyRound, Trash2, Unlock } from 'lucide-react-native';
+import { Power, PowerOff, KeyRound, Trash2, Unlock, ChevronRight } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
@@ -16,7 +16,6 @@ import { DateField } from '../../components/forms/DateField';
 import { TimeField } from '../../components/forms/TimeField';
 import { PasswordStrengthChecklist } from '../../components/forms/PasswordStrengthChecklist';
 import { passwordSchema } from '../../lib/passwordPolicy';
-import { DataTable, type DataTableColumn } from '../../components/data/DataTable';
 import { mentorsApi } from '../../api/resources/mentors.api';
 import { internsApi, type InternDto } from '../../api/resources/interns.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
@@ -96,6 +95,13 @@ const statusTone: Record<string, 'muted' | 'success' | 'warning' | 'error'> = {
   PendingReview: 'warning',
   Verified: 'success',
   Rejected: 'error',
+};
+
+const statusBgKey: Record<string, 'surfaceSunken' | 'warningBg' | 'successBg' | 'errorBg'> = {
+  PendingSubmission: 'surfaceSunken',
+  PendingReview: 'warningBg',
+  Verified: 'successBg',
+  Rejected: 'errorBg',
 };
 
 /** Shared between Admin and Mentor navigators - the backend already scopes the list/actions to a
@@ -284,97 +290,104 @@ export function InternsScreen() {
     createMutation.mutate(values);
   };
 
-  const columns: DataTableColumn<InternDto>[] = [
-    { key: 'fullName', label: 'Name', width: 170, render: (i) => <Text variant="bodyStrong">{i.fullName}</Text> },
-    { key: 'code', label: 'Intern Code', width: 150, render: (i) => <Text variant="body">{i.internCode}</Text> },
-    { key: 'mentor', label: 'Mentor', width: 150, render: (i) => <Text variant="body">{i.mentorName}</Text> },
-    { key: 'department', label: 'Department', width: 130, render: (i) => <Text variant="body">{i.departmentName}</Text> },
-    {
-      key: 'verification',
-      label: 'Verification',
-      width: 120,
-      render: (i) => (
-        <Text variant="caption" tone={statusTone[i.verificationStatus] ?? 'muted'}>
-          {i.verificationStatus}
-        </Text>
-      ),
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      width: 90,
-      render: (i) => (
-        <View>
-          <Text variant="caption" tone={i.isActive ? 'success' : 'error'}>
-            {i.isActive ? 'Active' : 'Inactive'}
-          </Text>
-          {i.isLockedForUnofficialActivity ? (
-            <Text variant="caption" tone="error">
-              Locked
+  const renderIntern = ({ item: i }: { item: InternDto }) => {
+    const busyToggle = toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === i.id;
+    const busyDelete = deleteMutation.isPending && deleteMutation.variables === i.id;
+    const busyUnlock = unlockMutation.isPending && unlockMutation.variables === i.id;
+
+    return (
+      <Pressable style={s.card} onPress={() => openEdit(i)}>
+        <View style={s.cardHeader}>
+          <View style={s.cardHeaderText}>
+            <Text variant="bodyStrong" numberOfLines={1}>
+              {i.fullName}
             </Text>
+            <Text variant="caption" tone="muted">
+              {i.internCode}
+            </Text>
+          </View>
+          <ChevronRight size={18} color={theme.colors.textMuted} />
+        </View>
+
+        <Text variant="caption" tone="secondary" numberOfLines={1} style={s.cardSubline}>
+          {i.mentorName} · {i.departmentName}
+        </Text>
+
+        <View style={s.badgeRow}>
+          <View style={[s.badge, { backgroundColor: theme.colors[statusBgKey[i.verificationStatus] ?? 'surfaceSunken'] }]}>
+            <Text variant="caption" tone={statusTone[i.verificationStatus] ?? 'muted'}>
+              {i.verificationStatus}
+            </Text>
+          </View>
+          <View style={[s.badge, { backgroundColor: i.isActive ? theme.colors.successBg : theme.colors.errorBg }]}>
+            <Text variant="caption" tone={i.isActive ? 'success' : 'error'}>
+              {i.isActive ? 'Active' : 'Inactive'}
+            </Text>
+          </View>
+          {i.isLockedForUnofficialActivity ? (
+            <View style={[s.badge, { backgroundColor: theme.colors.errorBg }]}>
+              <Text variant="caption" tone="error">
+                Locked
+              </Text>
+            </View>
           ) : null}
         </View>
-      ),
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      width: 160,
-      render: (i) => {
-        const busyToggle = toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === i.id;
-        const busyDelete = deleteMutation.isPending && deleteMutation.variables === i.id;
-        const busyUnlock = unlockMutation.isPending && unlockMutation.variables === i.id;
-        return (
-          <View style={s.actionsRow}>
-            {i.isLockedForUnofficialActivity ? (
-              <Pressable
-                hitSlop={8}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  confirmUnlock(i);
-                }}
-              >
-                {busyUnlock ? <ActivityIndicator size="small" color={theme.colors.success} /> : <Unlock size={18} color={theme.colors.success} />}
-              </Pressable>
-            ) : null}
+
+        <View style={s.divider} />
+
+        <View style={s.actionsRow}>
+          {i.isLockedForUnofficialActivity ? (
             <Pressable
               hitSlop={8}
+              style={s.actionIcon}
               onPress={(e) => {
                 e.stopPropagation();
-                openResetPassword(i);
+                confirmUnlock(i);
               }}
             >
-              <KeyRound size={18} color={theme.colors.textSecondary} />
+              {busyUnlock ? <ActivityIndicator size="small" color={theme.colors.success} /> : <Unlock size={18} color={theme.colors.success} />}
             </Pressable>
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                confirmToggleActive(i);
-              }}
-            >
-              {busyToggle ? (
-                <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-              ) : i.isActive ? (
-                <PowerOff size={18} color={theme.colors.error} />
-              ) : (
-                <Power size={18} color={theme.colors.success} />
-              )}
-            </Pressable>
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                confirmDelete(i);
-              }}
-            >
-              {busyDelete ? <ActivityIndicator size="small" color={theme.colors.error} /> : <Trash2 size={18} color={theme.colors.error} />}
-            </Pressable>
-          </View>
-        );
-      },
-    },
-  ];
+          ) : null}
+          <Pressable
+            hitSlop={8}
+            style={s.actionIcon}
+            onPress={(e) => {
+              e.stopPropagation();
+              openResetPassword(i);
+            }}
+          >
+            <KeyRound size={18} color={theme.colors.textSecondary} />
+          </Pressable>
+          <Pressable
+            hitSlop={8}
+            style={s.actionIcon}
+            onPress={(e) => {
+              e.stopPropagation();
+              confirmToggleActive(i);
+            }}
+          >
+            {busyToggle ? (
+              <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+            ) : i.isActive ? (
+              <PowerOff size={18} color={theme.colors.error} />
+            ) : (
+              <Power size={18} color={theme.colors.success} />
+            )}
+          </Pressable>
+          <Pressable
+            hitSlop={8}
+            style={s.actionIcon}
+            onPress={(e) => {
+              e.stopPropagation();
+              confirmDelete(i);
+            }}
+          >
+            {busyDelete ? <ActivityIndicator size="small" color={theme.colors.error} /> : <Trash2 size={18} color={theme.colors.error} />}
+          </Pressable>
+        </View>
+      </Pressable>
+    );
+  };
 
   return (
     <Screen scroll={false}>
@@ -390,12 +403,17 @@ export function InternsScreen() {
           Loading...
         </Text>
       ) : (
-        <DataTable
-          columns={columns}
-          rows={interns}
+        <FlatList
+          data={interns}
           keyExtractor={(i) => String(i.id)}
-          onRowPress={openEdit}
-          emptyLabel="No interns yet. Add one to get started."
+          renderItem={renderIntern}
+          style={s.list}
+          contentContainerStyle={interns.length === 0 ? s.emptyListContent : s.listContent}
+          ListEmptyComponent={
+            <Text variant="body" tone="muted">
+              No interns yet. Add one to get started.
+            </Text>
+          }
         />
       )}
 
@@ -693,6 +711,24 @@ const makeStyles = (t: AppTheme) => ({
     alignItems: 'center' as const,
     marginBottom: t.spacing.md,
   },
-  actionsRow: { flexDirection: 'row' as const, gap: t.spacing.md },
+  list: { flex: 1 },
+  listContent: { gap: t.spacing.sm, paddingBottom: t.spacing.lg },
+  emptyListContent: { flexGrow: 1, alignItems: 'center' as const, justifyContent: 'center' as const },
+  card: {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.lg,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    padding: t.spacing.lg,
+    ...t.shadows.sm,
+  },
+  cardHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, gap: t.spacing.sm },
+  cardHeaderText: { flex: 1 },
+  cardSubline: { marginTop: 2 },
+  badgeRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: t.spacing.xs, marginTop: t.spacing.sm },
+  badge: { paddingHorizontal: t.spacing.sm, paddingVertical: 3, borderRadius: t.radii.full },
+  divider: { height: 1, backgroundColor: t.colors.border, marginTop: t.spacing.md, marginBottom: t.spacing.sm },
+  actionsRow: { flexDirection: 'row' as const, gap: t.spacing.lg, justifyContent: 'flex-end' as const },
+  actionIcon: { padding: t.spacing.xs },
   resetHint: { marginBottom: t.spacing.md },
 });

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, ScrollView, TextInput, Pressable, Linking } from 'react-native';
+import { View, ScrollView, TextInput, Pressable, Linking, KeyboardAvoidingView, Platform } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Send, Mail, ChevronLeft, MessageCircle } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
@@ -95,56 +95,68 @@ export function ChatScreen() {
 
   return (
     <Screen scroll={false} padded={false}>
-      <View style={s.header}>
-        {contacts.length > 1 ? (
-          <Pressable onPress={() => setSelected(null)} hitSlop={8} style={s.headerIcon}>
-            <ChevronLeft size={22} color={theme.colors.textPrimary} />
-          </Pressable>
-        ) : null}
-        <Text variant="bodyStrong" style={s.headerName}>
-          {selected.fullName}
-        </Text>
-        <Pressable onPress={() => Linking.openURL(`mailto:${selected.email}`)} hitSlop={8} style={s.headerIcon}>
-          <Mail size={20} color={theme.colors.primary} />
-        </Pressable>
-      </View>
-
-      <ScrollView
-        ref={scrollRef}
-        style={s.thread}
-        contentContainerStyle={s.threadContent}
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+      <KeyboardAvoidingView
+        style={s.flexFill}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        {messages.map((m) => (
-          <View key={m.id} style={[s.bubble, m.isMine ? s.bubbleMine : s.bubbleTheirs, { backgroundColor: m.isMine ? theme.colors.primary : theme.colors.surfaceSunken }]}>
-            <Text variant="body" style={{ color: m.isMine ? theme.colors.onPrimary : theme.colors.textPrimary }}>
-              {m.body}
-            </Text>
-            <Text variant="overline" style={{ color: m.isMine ? theme.colors.textOnDarkMuted : theme.colors.textMuted }}>
-              {new Date(m.sentAtUtc).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-            </Text>
-          </View>
-        ))}
-      </ScrollView>
+        <View style={s.header}>
+          {contacts.length > 1 ? (
+            <Pressable onPress={() => setSelected(null)} hitSlop={8} style={s.headerIcon}>
+              <ChevronLeft size={22} color={theme.colors.textPrimary} />
+            </Pressable>
+          ) : null}
+          <Text variant="bodyStrong" style={s.headerName}>
+            {selected.fullName}
+          </Text>
+          <Pressable onPress={() => Linking.openURL(`mailto:${selected.email}`)} hitSlop={8} style={s.headerIcon}>
+            <Mail size={20} color={theme.colors.primary} />
+          </Pressable>
+        </View>
 
-      <View style={s.composerRow}>
-        <TextInput
-          style={s.composerInput}
-          value={draft}
-          onChangeText={setDraft}
-          placeholder="Type a message..."
-          placeholderTextColor={theme.colors.textMuted}
-          multiline
-        />
-        <Pressable onPress={handleSend} disabled={!draft.trim() || sendMutation.isPending} style={s.sendButton} hitSlop={8}>
-          <Send size={20} color={draft.trim() ? theme.colors.primary : theme.colors.textMuted} />
-        </Pressable>
-      </View>
+        <ScrollView
+          ref={scrollRef}
+          style={s.thread}
+          contentContainerStyle={s.threadContent}
+          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+        >
+          {messages.map((m) => (
+            <View key={m.id} style={[s.bubble, m.isMine ? s.bubbleMine : s.bubbleTheirs, { backgroundColor: m.isMine ? theme.colors.primary : theme.colors.surfaceSunken }]}>
+              <Text variant="body" style={{ color: m.isMine ? theme.colors.onPrimary : theme.colors.textPrimary }}>
+                {m.body}
+              </Text>
+              <Text variant="overline" style={{ color: m.isMine ? theme.colors.textOnDarkMuted : theme.colors.textMuted }}>
+                {new Date(m.sentAtUtc).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              </Text>
+            </View>
+          ))}
+        </ScrollView>
+
+        <View style={s.composerRow}>
+          <TextInput
+            style={s.composerInput}
+            value={draft}
+            onChangeText={setDraft}
+            placeholder="Type a message..."
+            placeholderTextColor={theme.colors.textMuted}
+            multiline
+          />
+          <Pressable
+            onPress={handleSend}
+            disabled={!draft.trim() || sendMutation.isPending}
+            style={[s.sendButton, { backgroundColor: draft.trim() ? theme.colors.primary : theme.colors.surfaceSunken }]}
+            hitSlop={8}
+          >
+            <Send size={22} color={draft.trim() ? theme.colors.onPrimary : theme.colors.textMuted} />
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
     </Screen>
   );
 }
 
 const makeStyles = (t: AppTheme) => ({
+  flexFill: { flex: 1 },
   emptyContainer: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const, gap: t.spacing.sm, padding: t.spacing.xl },
   emptyText: { textAlign: 'center' as const },
   contactRow: {
@@ -176,20 +188,30 @@ const makeStyles = (t: AppTheme) => ({
     flexDirection: 'row' as const,
     alignItems: 'flex-end' as const,
     gap: t.spacing.sm,
-    padding: t.spacing.sm,
+    paddingHorizontal: t.spacing.md,
+    paddingTop: t.spacing.md,
+    paddingBottom: t.spacing.lg,
     borderTopWidth: 1,
     borderTopColor: t.colors.border,
   },
   composerInput: {
     flex: 1,
-    maxHeight: 100,
+    minHeight: 44,
+    maxHeight: 120,
     borderWidth: 1,
     borderColor: t.colors.border,
     borderRadius: t.radii.lg,
     paddingHorizontal: t.spacing.md,
     paddingVertical: t.spacing.sm,
+    fontSize: 15,
     color: t.colors.textPrimary,
     backgroundColor: t.colors.surfaceSunken,
   },
-  sendButton: { padding: t.spacing.sm },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: t.radii.full,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
 });

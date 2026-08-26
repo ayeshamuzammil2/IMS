@@ -13,9 +13,12 @@ interface Props {
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** Set false when children already manage their own scrolling (e.g. a FlatList), to avoid
+   * nesting a VirtualizedList inside this modal's ScrollView. Defaults to true. */
+  scrollable?: boolean;
 }
 
-export function FormModal({ visible, title, onClose, children, footer }: Props) {
+export function FormModal({ visible, title, onClose, children, footer, scrollable = true }: Props) {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -33,9 +36,13 @@ export function FormModal({ visible, title, onClose, children, footer }: Props) 
               <X size={22} color={theme.colors.textSecondary} />
             </Pressable>
           </View>
-          <ScrollView style={s.body} keyboardShouldPersistTaps="handled">
-            {children}
-          </ScrollView>
+          {scrollable ? (
+            <ScrollView style={s.body} keyboardShouldPersistTaps="handled">
+              {children}
+            </ScrollView>
+          ) : (
+            <View style={s.body}>{children}</View>
+          )}
           {footer ? <View style={s.footer}>{footer}</View> : null}
         </View>
       </View>

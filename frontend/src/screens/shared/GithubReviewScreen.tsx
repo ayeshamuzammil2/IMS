@@ -1,9 +1,9 @@
 import React, { useCallback, useState } from 'react';
-import { View } from 'react-native';
+import { View, Pressable } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { GitBranch } from 'lucide-react-native';
+import { GitBranch, ChevronRight, Check, X, RotateCcw } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
@@ -50,11 +50,6 @@ export function GithubReviewScreen() {
     }
   };
 
-  const openReasonModal = (item: GithubReviewQueueItemDto, action: ReasonAction) => {
-    setReason('');
-    setReasonModal({ item, action });
-  };
-
   const handleConfirmReason = async () => {
     if (!reasonModal) return;
     setBusyId(reasonModal.item.submissionId);
@@ -72,9 +67,11 @@ export function GithubReviewScreen() {
 
   return (
     <Screen scroll>
-      <Text variant="body" tone="secondary" style={s.headerCount}>
-        {queue.length} submission{queue.length === 1 ? '' : 's'} awaiting review
-      </Text>
+      <View style={s.headerRow}>
+        <Text variant="body" tone="secondary">
+          {queue.length} submission{queue.length === 1 ? '' : 's'} awaiting review
+        </Text>
+      </View>
 
       {isLoading ? (
         <Text variant="body" tone="muted">
@@ -83,27 +80,64 @@ export function GithubReviewScreen() {
       ) : queue.length === 0 ? (
         <View style={s.emptyContainer}>
           <GitBranch size={32} color={theme.colors.textMuted} />
-          <Text variant="body" tone="muted" style={s.emptyText}>
+          <Text variant="body" tone="muted">
             Nothing to review right now.
           </Text>
         </View>
       ) : (
         queue.map((item) => (
           <View key={item.submissionId} style={s.card}>
-            <Text variant="bodyStrong">{item.internFullName}</Text>
-            <Text variant="caption" tone="muted">
-              {item.internCode} - v{item.version}
-            </Text>
-            <Text variant="body" tone="brand" numberOfLines={1}>
-              {item.repositoryUrl}
-            </Text>
-            <Text variant="caption" tone="muted">
-              {new Date(item.submittedAtUtc).toLocaleString()}
-            </Text>
-            <View style={s.actionsRow}>
-              <Button label="Reject" variant="danger" size="sm" onPress={() => openReasonModal(item, 'Rejected')} disabled={busyId === item.submissionId} style={s.actionButton} />
-              <Button label="Resubmit" variant="outline" size="sm" onPress={() => openReasonModal(item, 'ResubmitRequested')} disabled={busyId === item.submissionId} style={s.actionButton} />
-              <Button label="Approve" variant="primary" size="sm" onPress={() => handleApprove(item)} loading={busyId === item.submissionId} style={s.actionButton} />
+            <View style={s.cardMain}>
+              <View style={{ flex: 1 }}>
+                <Text variant="bodyStrong" style={s.nameText}>
+                  {item.internFullName}
+                </Text>
+                <Text variant="caption" tone="muted">
+                  {item.internCode} · v{item.version}
+                </Text>
+                <Text variant="body" tone="brand" numberOfLines={1} style={{ marginTop: theme.spacing.xs }}>
+                  {item.repositoryUrl}
+                </Text>
+              </View>
+              <ChevronRight size={18} color={theme.colors.textMuted} />
+            </View>
+
+            <View style={s.badgeRow}>
+              <View style={[s.badge, { backgroundColor: theme.colors.warningBg }]}>
+                <Text variant="caption" tone="warning">
+                  Pending Review
+                </Text>
+              </View>
+            </View>
+
+            <View style={s.divider} />
+
+            <View style={s.iconActionRow}>
+              <Pressable
+                onPress={() => {
+                  setReason('');
+                  setReasonModal({ item, action: 'Rejected' });
+                }}
+                disabled={busyId === item.submissionId}
+                style={s.iconBtn}
+              >
+                <X size={20} color={theme.colors.error} />
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  setReason('');
+                  setReasonModal({ item, action: 'ResubmitRequested' });
+                }}
+                disabled={busyId === item.submissionId}
+                style={s.iconBtn}
+              >
+                <RotateCcw size={18} color={theme.colors.textSecondary} />
+              </Pressable>
+
+              <Pressable onPress={() => handleApprove(item)} disabled={busyId === item.submissionId} style={s.iconBtn}>
+                <Check size={20} color={theme.colors.primary} />
+              </Pressable>
             </View>
           </View>
         ))
@@ -111,16 +145,16 @@ export function GithubReviewScreen() {
 
       <FormModal
         visible={reasonModal !== null}
-        title={reasonModal?.action === 'Rejected' ? 'Reject repository' : 'Request resubmission'}
+        title={reasonModal?.action === 'Rejected' ? 'Reject Repository' : 'Request Resubmission'}
         onClose={() => setReasonModal(null)}
         footer={
           <>
-            <Button label="Cancel" variant="ghost" size="sm" onPress={() => setReasonModal(null)} />
-            <Button label="Confirm" variant="danger" size="sm" onPress={handleConfirmReason} loading={busyId === reasonModal?.item.submissionId} />
+            <Button label="Cancel" variant="ghost" onPress={() => setReasonModal(null)} />
+            <Button label="Confirm" variant="danger" onPress={handleConfirmReason} loading={busyId === reasonModal?.item.submissionId} />
           </>
         }
       >
-        <Text variant="body" tone="secondary" style={s.modalHint}>
+        <Text variant="body" tone="secondary" style={{ marginBottom: theme.spacing.md }}>
           Let {reasonModal?.item.internFullName} know why.
         </Text>
         <Input label="Reason" value={reason} onChangeText={setReason} multiline required />
@@ -130,9 +164,17 @@ export function GithubReviewScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
-  headerCount: { marginBottom: t.spacing.md },
-  emptyContainer: { alignItems: 'center' as const, padding: t.spacing.xl, gap: t.spacing.sm },
-  emptyText: {},
+  headerRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: t.spacing.md,
+  },
+  emptyContainer: {
+    alignItems: 'center' as const,
+    padding: t.spacing.xl,
+    gap: t.spacing.sm,
+  },
   card: {
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
@@ -140,9 +182,33 @@ const makeStyles = (t: AppTheme) => ({
     borderColor: t.colors.border,
     padding: t.spacing.lg,
     marginBottom: t.spacing.md,
-    gap: t.spacing.xs,
+    ...t.shadows.sm,
   },
-  actionsRow: { flexDirection: 'row' as const, gap: t.spacing.sm, marginTop: t.spacing.sm },
-  actionButton: { flex: 1 },
-  modalHint: { marginBottom: t.spacing.md },
+  cardMain: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'flex-start' as const,
+  },
+  nameText: { fontSize: 16, fontWeight: '600' as const },
+  badgeRow: {
+    flexDirection: 'row' as const,
+    marginTop: t.spacing.sm,
+  },
+  badge: {
+    paddingHorizontal: t.spacing.sm,
+    paddingVertical: 3,
+    borderRadius: t.radii.full,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: t.colors.border,
+    marginTop: t.spacing.md,
+    marginBottom: t.spacing.sm,
+  },
+  iconActionRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'flex-end' as const,
+    gap: t.spacing.lg,
+  },
+  iconBtn: { padding: 4 },
 });

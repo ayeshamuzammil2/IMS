@@ -42,7 +42,7 @@ export function DashboardScreen() {
   return (
     <Screen scroll>
       <View style={s.heroCard}>
-        <Text variant="caption" tone="muted">
+        <Text variant="overline" tone="muted" style={s.heroLabel}>
           {isAdmin ? 'TOTAL INTERNS (ORG-WIDE)' : 'MY INTERNS'}
         </Text>
         <Text variant="h1" style={s.heroNumber}>
@@ -50,7 +50,7 @@ export function DashboardScreen() {
         </Text>
       </View>
 
-      <View style={s.tileRow}>
+      <View style={s.tileGrid}>
         <KpiTile label="Present Today" value={data.presentTodayCount} tone="success" />
         <KpiTile label="Late Today" value={data.lateTodayCount} tone="warning" />
         <KpiTile label="Absent Today" value={data.absentTodayCount} tone="error" />
@@ -58,7 +58,7 @@ export function DashboardScreen() {
       </View>
 
       {isAdmin ? (
-        <View style={s.tileRow}>
+        <View style={s.tileGrid}>
           <KpiTile label="Mentors" value={data.totalMentors} tone="primary" />
           <KpiTile label="Departments" value={data.totalDepartments} tone="primary" />
         </View>
@@ -132,15 +132,20 @@ export function DashboardScreen() {
                   text: String(v.count),
                 }))}
                 donut
-                radius={70}
-                innerRadius={45}
+                radius={64}
+                innerRadius={42}
                 innerCircleColor={theme.colors.surface}
               />
               <View style={s.legendCol}>
                 {data.verificationBreakdown.map((v, i) => (
                   <View key={v.status} style={s.legendRow}>
                     <View style={[s.legendDot, { backgroundColor: theme.charts.categorical[i % theme.charts.categorical.length] }]} />
-                    <Text variant="caption">{v.status}</Text>
+                    <Text variant="caption" style={s.legendText} numberOfLines={1}>
+                      {v.status}
+                    </Text>
+                    <Text variant="caption" tone="muted">
+                      {v.count}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -230,10 +235,12 @@ function DepartmentTable({ data }: { data: DashboardSummaryDto['internsByDepartm
     <View>
       {data.map((d) => (
         <View key={d.departmentName} style={s.tableRow}>
-          <Text variant="caption" style={s.tableCellWide}>
+          <Text variant="caption" style={s.tableCellWide} numberOfLines={1}>
             {d.departmentName}
           </Text>
-          <Text variant="caption">{d.count}</Text>
+          <Text variant="bodyStrong" style={s.tableCellNumber}>
+            {d.count}
+          </Text>
         </View>
       ))}
     </View>
@@ -247,10 +254,12 @@ function VerificationTable({ data }: { data: DashboardSummaryDto['verificationBr
     <View>
       {data.map((v) => (
         <View key={v.status} style={s.tableRow}>
-          <Text variant="caption" style={s.tableCellWide}>
+          <Text variant="caption" style={s.tableCellWide} numberOfLines={1}>
             {v.status}
           </Text>
-          <Text variant="caption">{v.count}</Text>
+          <Text variant="bodyStrong" style={s.tableCellNumber}>
+            {v.count}
+          </Text>
         </View>
       ))}
     </View>
@@ -261,20 +270,32 @@ const makeStyles = (t: AppTheme) => ({
   heroCard: {
     backgroundColor: t.colors.primaryContainer,
     borderRadius: t.radii.lg,
-    padding: t.spacing.lg,
+    paddingVertical: t.spacing.xl,
+    paddingHorizontal: t.spacing.lg,
     alignItems: 'center' as const,
+    marginBottom: t.spacing.lg,
+    ...t.shadows.sm,
+  },
+  heroLabel: { letterSpacing: 0.6, marginBottom: t.spacing.xs },
+  heroNumber: { color: t.colors.onPrimaryContainer },
+  tileGrid: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: t.spacing.sm,
     marginBottom: t.spacing.md,
   },
-  heroNumber: { color: t.colors.onPrimaryContainer },
-  tileRow: { flexDirection: 'row' as const, gap: t.spacing.sm, marginBottom: t.spacing.md },
   tile: {
-    flex: 1,
+    flexBasis: '48%' as const,
+    flexGrow: 1,
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.md,
     borderWidth: 1,
     borderColor: t.colors.border,
-    padding: t.spacing.md,
+    paddingVertical: t.spacing.md,
+    paddingHorizontal: t.spacing.sm,
     alignItems: 'center' as const,
+    gap: 2,
+    ...t.shadows.sm,
   },
   section: {
     backgroundColor: t.colors.surface,
@@ -282,14 +303,35 @@ const makeStyles = (t: AppTheme) => ({
     borderWidth: 1,
     borderColor: t.colors.border,
     padding: t.spacing.lg,
+    marginBottom: t.spacing.lg,
+    ...t.shadows.sm,
+  },
+  sectionHeader: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
     marginBottom: t.spacing.md,
   },
-  sectionHeader: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const, marginBottom: t.spacing.md },
-  donutRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: t.spacing.lg },
-  legendCol: { gap: t.spacing.xs },
+  donutRow: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    alignItems: 'center' as const,
+    gap: t.spacing.lg,
+  },
+  legendCol: { gap: t.spacing.sm, flexShrink: 1, minWidth: 120 },
   legendRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: t.spacing.xs },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
-  tableRow: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, paddingVertical: t.spacing.xs, borderBottomWidth: 1, borderBottomColor: t.colors.border },
+  legendText: { flex: 1 },
+  tableRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    paddingVertical: t.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: t.colors.border,
+    gap: t.spacing.sm,
+  },
   tableCell: { minWidth: 60 },
   tableCellWide: { flex: 1 },
+  tableCellNumber: { minWidth: 28, textAlign: 'right' as const },
 });

@@ -62,7 +62,7 @@ export function SelectField<T extends string | number>({
         </Text>
       ) : null}
 
-      <FormModal visible={open} title={label ?? 'Select'} onClose={() => setOpen(false)}>
+      <FormModal visible={open} title={label ?? 'Select'} onClose={() => setOpen(false)} scrollable={false}>
         <FlatList
           data={options}
           keyExtractor={(o) => String(o.value)}

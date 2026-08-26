@@ -1,9 +1,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { View, Pressable } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { ShieldAlert, ClipboardList, Lock } from 'lucide-react-native';
+import { ShieldAlert, ClipboardList, Lock, ChevronRight, Check, X } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
@@ -111,12 +111,12 @@ export function AttendanceReviewScreen() {
     <Screen scroll>
       <View style={s.headerRow}>
         <Text variant="body" tone="secondary">
-          {queue.length} attendance review{queue.length === 1 ? '' : 's'}, {overrides.length} override{overrides.length === 1 ? '' : 's'}
+          {queue.length} review{queue.length === 1 ? '' : 's'} · {overrides.length} override{overrides.length === 1 ? '' : 's'}
         </Text>
         <Button label="Request Override" size="sm" onPress={() => setRequestModalOpen(true)} />
       </View>
 
-      <Text variant="overline" tone="muted" style={s.sectionLabel}>
+      <Text variant="caption" tone="muted" style={s.sectionTitle}>
         FLAGGED ATTENDANCE
       </Text>
       {queueLoading ? (
@@ -133,61 +133,74 @@ export function AttendanceReviewScreen() {
       ) : (
         queue.map((item) => (
           <View key={item.attendanceDayId} style={s.card}>
-            <View style={s.row}>
-              {item.arrivalSelfieFileId ? <AuthImage fileId={item.arrivalSelfieFileId} size={48} /> : null}
-              {item.departureSelfieFileId ? <AuthImage fileId={item.departureSelfieFileId} size={48} /> : null}
-              <View style={s.infoCol}>
-                <Text variant="bodyStrong">{item.internFullName}</Text>
+            <View style={s.cardHeader}>
+              <View style={s.imageGroup}>
+                {item.arrivalSelfieFileId ? <AuthImage fileId={item.arrivalSelfieFileId} size={42} /> : null}
+                {item.departureSelfieFileId ? <AuthImage fileId={item.departureSelfieFileId} size={42} /> : null}
+              </View>
+              <View style={s.cardHeaderText}>
+                <Text variant="bodyStrong" style={s.nameText}>
+                  {item.internFullName}
+                </Text>
                 <Text variant="caption" tone="muted">
-                  {item.internCode} - {new Date(item.workDate).toLocaleDateString()}
+                  {item.internCode} · {new Date(item.workDate).toLocaleDateString()}
                 </Text>
                 {item.distanceM !== null ? (
-                  <Text variant="caption" tone="muted">
-                    {item.distanceM.toFixed(0)}m - {item.geofenceState}
+                  <Text variant="caption" tone="secondary">
+                    {item.distanceM.toFixed(0)}m · {item.geofenceState}
                   </Text>
                 ) : null}
               </View>
+              <ChevronRight size={18} color={theme.colors.textMuted} />
             </View>
+
             {item.flags.length > 0 ? (
-              <Text variant="caption" tone="warning">
-                {item.flags.join(', ')}
-              </Text>
+              <View style={s.badgeRow}>
+                {item.flags.map((flag, idx) => (
+                  <View key={idx} style={[s.badge, { backgroundColor: theme.colors.warningBg }]}>
+                    <Text variant="caption" tone="warning">
+                      {flag}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             ) : null}
+
             {!item.attendanceReady ? (
-              <View style={s.row}>
+              <View style={s.lockRow}>
                 <Lock size={14} color={theme.colors.error} />
-                <Text variant="caption" tone="error">
-                  Profile Picture approval or Face Enrollment is no longer verified for this intern - review is locked.
+                <Text variant="caption" tone="error" style={{ flex: 1 }}>
+                  Verification pending - review locked.
                 </Text>
               </View>
             ) : null}
-            <View style={s.actionsRow}>
-              <Button
-                label="Reject"
-                variant="danger"
-                size="sm"
+
+            <View style={s.divider} />
+
+            <View style={s.iconActionRow}>
+              <Pressable
                 onPress={() => {
                   setNote('');
                   setNoteModal({ dayId: item.attendanceDayId, kind: 'review' });
                 }}
                 disabled={busyId === item.attendanceDayId || !item.attendanceReady}
-                style={s.actionButton}
-              />
-              <Button
-                label="Approve"
-                variant="primary"
-                size="sm"
+                style={s.iconBtn}
+              >
+                <X size={20} color={theme.colors.error} />
+              </Pressable>
+              <Pressable
                 onPress={() => handleApproveReview(item)}
-                loading={busyId === item.attendanceDayId}
-                disabled={!item.attendanceReady}
-                style={s.actionButton}
-              />
+                disabled={busyId === item.attendanceDayId || !item.attendanceReady}
+                style={s.iconBtn}
+              >
+                <Check size={20} color={theme.colors.primary} />
+              </Pressable>
             </View>
           </View>
         ))
       )}
 
-      <Text variant="overline" tone="muted" style={s.sectionLabel}>
+      <Text variant="caption" tone="muted" style={[s.sectionTitle, { marginTop: theme.spacing.lg }]}>
         PENDING OVERRIDES
       </Text>
       {overridesLoading ? (
@@ -204,63 +217,65 @@ export function AttendanceReviewScreen() {
       ) : (
         overrides.map((item) => (
           <View key={item.id} style={s.card}>
-            <Text variant="bodyStrong">{item.internFullName}</Text>
-            <Text variant="caption" tone="muted">
-              {item.eventType} - {item.reasonCode}
-              {item.quotaExceeded ? ' - quota exceeded' : ''}
-            </Text>
-            <Text variant="body" tone="secondary">
+            <View style={s.cardHeader}>
+              <View style={s.cardHeaderText}>
+                <Text variant="bodyStrong" style={s.nameText}>
+                  {item.internFullName}
+                </Text>
+                <Text variant="caption" tone="muted">
+                  {item.eventType} · {item.reasonCode}
+                </Text>
+              </View>
+              <ChevronRight size={18} color={theme.colors.textMuted} />
+            </View>
+
+            <Text variant="body" tone="secondary" style={{ marginTop: theme.spacing.xs }}>
               {item.justification}
             </Text>
-            <Text variant="caption" tone="muted">
-              Requested: {new Date(item.requestedAtUtc).toLocaleString()}
-            </Text>
+
             {isAdmin ? (
-              <View style={s.actionsRow}>
-                <Button
-                  label="Reject"
-                  variant="danger"
-                  size="sm"
-                  onPress={() => {
-                    setNote('');
-                    setNoteModal({ overrideId: item.id, kind: 'override' });
-                  }}
-                  disabled={busyId === item.id}
-                  style={s.actionButton}
-                />
-                <Button
-                  label="Approve"
-                  variant="primary"
-                  size="sm"
-                  onPress={() => handleApproveOverride(item)}
-                  loading={busyId === item.id}
-                  style={s.actionButton}
-                />
-              </View>
-            ) : (
-              <Text variant="caption" tone="muted">
-                Awaiting admin countersignature.
-              </Text>
-            )}
+              <>
+                <View style={s.divider} />
+                <View style={s.iconActionRow}>
+                  <Pressable
+                    onPress={() => {
+                      setNote('');
+                      setNoteModal({ overrideId: item.id, kind: 'override' });
+                    }}
+                    disabled={busyId === item.id}
+                    style={s.iconBtn}
+                  >
+                    <X size={20} color={theme.colors.error} />
+                  </Pressable>
+                  <Pressable onPress={() => handleApproveOverride(item)} disabled={busyId === item.id} style={s.iconBtn}>
+                    <Check size={20} color={theme.colors.primary} />
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
           </View>
         ))
       )}
 
       <FormModal
         visible={noteModal !== null}
-        title="Reject"
+        title="Reject Request"
         onClose={() => setNoteModal(null)}
         footer={
           <>
-            <Button label="Cancel" variant="ghost" size="sm" onPress={() => setNoteModal(null)} />
-            <Button label="Confirm Reject" variant="danger" size="sm" onPress={handleConfirmReject} loading={busyId !== null} />
+            <Button label="Cancel" variant="ghost" onPress={() => setNoteModal(null)} />
+            <Button label="Reject" variant="danger" onPress={handleConfirmReject} loading={busyId !== null} />
           </>
         }
       >
         <Input label="Note" value={note} onChangeText={setNote} multiline placeholder="Optional note" />
       </FormModal>
 
-      <RequestOverrideModal visible={requestModalOpen} onClose={() => setRequestModalOpen(false)} onRequested={() => queryClient.invalidateQueries({ queryKey: ['attendance', 'review', 'overrides'] })} />
+      <RequestOverrideModal
+        visible={requestModalOpen}
+        onClose={() => setRequestModalOpen(false)}
+        onRequested={() => queryClient.invalidateQueries({ queryKey: ['attendance', 'review', 'overrides'] })}
+      />
     </Screen>
   );
 }
@@ -321,8 +336,8 @@ function RequestOverrideModal({ visible, onClose, onRequested }: { visible: bool
       onClose={onClose}
       footer={
         <>
-          <Button label="Cancel" variant="ghost" size="sm" onPress={onClose} />
-          <Button label="Submit" size="sm" onPress={handleSubmit} loading={submitting} disabled={!canSubmit} />
+          <Button label="Cancel" variant="ghost" onPress={onClose} />
+          <Button label="Submit" onPress={handleSubmit} loading={submitting} disabled={!canSubmit} />
         </>
       }
     >
@@ -331,22 +346,28 @@ function RequestOverrideModal({ visible, onClose, onRequested }: { visible: bool
       <SelectField label="Reason" required placeholder="Select a reason" value={reasonCode} options={REASON_OPTIONS} onChange={setReasonCode} />
       <DateField label="Work Date" required value={workDate} onChange={setWorkDate} />
       <TimeField label="Marked At (local)" required value={markedTime} onChange={setMarkedTime} />
-      <Input
-        label="Justification"
-        required
-        multiline
-        value={justification}
-        onChangeText={setJustification}
-        helper="At least 20 characters."
-      />
+      <Input label="Justification" required multiline value={justification} onChangeText={setJustification} helper="At least 20 characters." />
     </FormModal>
   );
 }
 
 const makeStyles = (t: AppTheme) => ({
-  headerRow: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const, marginBottom: t.spacing.md, gap: t.spacing.md },
-  sectionLabel: { marginTop: t.spacing.md, marginBottom: t.spacing.xs, marginLeft: t.spacing.xs },
-  emptyContainer: { alignItems: 'center' as const, padding: t.spacing.lg, gap: t.spacing.sm },
+  headerRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: t.spacing.md,
+  },
+  sectionTitle: {
+    marginBottom: t.spacing.sm,
+    fontWeight: '700' as const,
+    letterSpacing: 0.5,
+  },
+  emptyContainer: {
+    alignItems: 'center' as const,
+    padding: t.spacing.xl,
+    gap: t.spacing.sm,
+  },
   card: {
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
@@ -354,10 +375,43 @@ const makeStyles = (t: AppTheme) => ({
     borderColor: t.colors.border,
     padding: t.spacing.lg,
     marginBottom: t.spacing.md,
-    gap: t.spacing.xs,
+    ...t.shadows.sm,
   },
-  row: { flexDirection: 'row' as const, gap: t.spacing.sm, alignItems: 'center' as const },
-  infoCol: { flex: 1, gap: 2 },
-  actionsRow: { flexDirection: 'row' as const, gap: t.spacing.sm, marginTop: t.spacing.sm },
-  actionButton: { flex: 1 },
+  cardHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: t.spacing.sm,
+  },
+  imageGroup: { flexDirection: 'row' as const, gap: 4 },
+  cardHeaderText: { flex: 1 },
+  nameText: { fontSize: 16, fontWeight: '600' as const },
+  badgeRow: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: t.spacing.xs,
+    marginTop: t.spacing.sm,
+  },
+  badge: {
+    paddingHorizontal: t.spacing.sm,
+    paddingVertical: 3,
+    borderRadius: t.radii.full,
+  },
+  lockRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: t.spacing.xs,
+    marginTop: t.spacing.xs,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: t.colors.border,
+    marginTop: t.spacing.md,
+    marginBottom: t.spacing.sm,
+  },
+  iconActionRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'flex-end' as const,
+    gap: t.spacing.lg,
+  },
+  iconBtn: { padding: 4 },
 });

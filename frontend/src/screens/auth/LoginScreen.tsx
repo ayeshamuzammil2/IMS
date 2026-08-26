@@ -42,9 +42,13 @@ export function LoginScreen() {
   };
 
   return (
-    <Screen scroll>
+    <Screen scroll style={s.screen}>
       <View style={s.logoBlock}>
-        <Image source={require('../../../assets/pia-logo.png')} style={s.logo} resizeMode="contain" />
+        <Image
+          source={require('../../../assets/pia-logo.png')}
+          style={s.logo}
+          resizeMode="contain"
+        />
         <Text variant="h2" style={s.appName}>
           PIA Wings
         </Text>
@@ -53,12 +57,9 @@ export function LoginScreen() {
         </Text>
       </View>
 
-      <Text variant="h1" style={s.welcome}>
-        Welcome Back!
-      </Text>
-      <Text variant="body" tone="secondary" style={s.subtitle}>
-        Sign in to continue to your account
-      </Text>
+      <View style={s.subtitleBlock}>
+        <Text style={s.subtitle}>Sign in to continue</Text>
+      </View>
 
       <Input
         label="Email"
@@ -91,19 +92,63 @@ export function LoginScreen() {
         </Text>
       ) : null}
 
-      <Button label="Sign In" onPress={onSubmit} loading={submitting} fullWidth style={s.submitButton} />
+      <Button
+        label="Sign In"
+        onPress={onSubmit}
+        loading={submitting}
+        fullWidth
+        style={s.submitButton}
+      />
     </Screen>
   );
 }
 
 const makeStyles = (t: AppTheme) => ({
-  logoBlock: { alignItems: 'center' as const, marginTop: t.spacing.xxl, marginBottom: t.spacing.lg, gap: t.spacing.sm },
-  logo: { width: 140, height: 140 },
-  appName: { textAlign: 'center' as const },
-  appTagline: { textAlign: 'center' as const, marginTop: -t.spacing.xs },
-  welcome: { marginBottom: t.spacing.xs },
-  subtitle: { marginBottom: t.spacing.lg },
-  forgotLink: { alignSelf: 'flex-end' as const, marginBottom: t.spacing.lg },
-  error: { marginBottom: t.spacing.md },
-  submitButton: { marginTop: t.spacing.sm },
+  screen: {
+    paddingHorizontal: t.spacing.xl,
+  },
+
+  logoBlock: {
+    alignItems: 'center' as const,
+    marginTop: t.spacing.xl,
+    marginBottom: t.spacing.lg,
+    gap: 2,
+  },
+  logo: {
+    width: 170,
+    height: 170,
+    marginBottom: -8,
+  },
+
+  appName: {
+    textAlign: 'center' as const,
+    fontSize: 28,
+    fontWeight: '700' as const,
+    lineHeight: 36,
+  },
+  appTagline: {
+    textAlign: 'center' as const,
+    marginTop: 2,
+  },
+
+  subtitleBlock: {
+    alignItems: 'center' as const,
+    marginBottom: t.spacing.lg,
+  },
+  subtitle: {
+    fontSize: 13,
+    fontWeight: '500' as const,
+    color: t.colors.textSecondary,
+  },
+
+  forgotLink: {
+    alignSelf: 'flex-end' as const,
+    marginBottom: t.spacing.lg,
+  },
+  error: {
+    marginBottom: t.spacing.md,
+  },
+  submitButton: {
+    marginTop: t.spacing.sm,
+  },
 });

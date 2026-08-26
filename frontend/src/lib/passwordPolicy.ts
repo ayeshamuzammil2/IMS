@@ -6,15 +6,22 @@ export const PASSWORD_MIN_LENGTH = 8;
 export interface PasswordRule {
   key: string;
   label: string;
+  /** Short form used in the concise one-line hint, e.g. "Add: 8+ characters, uppercase". */
+  shortLabel: string;
   test: (password: string) => boolean;
 }
 
 export const PASSWORD_RULES: PasswordRule[] = [
-  { key: 'length', label: `At least ${PASSWORD_MIN_LENGTH} characters`, test: (pw) => pw.length >= PASSWORD_MIN_LENGTH },
-  { key: 'upper', label: 'One uppercase letter', test: (pw) => /[A-Z]/.test(pw) },
-  { key: 'lower', label: 'One lowercase letter', test: (pw) => /[a-z]/.test(pw) },
-  { key: 'digit', label: 'One number', test: (pw) => /[0-9]/.test(pw) },
-  { key: 'symbol', label: 'One special character', test: (pw) => /[^A-Za-z0-9]/.test(pw) },
+  {
+    key: 'length',
+    label: `At least ${PASSWORD_MIN_LENGTH} characters`,
+    shortLabel: `${PASSWORD_MIN_LENGTH}+ characters`,
+    test: (pw) => pw.length >= PASSWORD_MIN_LENGTH,
+  },
+  { key: 'upper', label: 'One uppercase letter', shortLabel: 'uppercase', test: (pw) => /[A-Z]/.test(pw) },
+  { key: 'lower', label: 'One lowercase letter', shortLabel: 'lowercase', test: (pw) => /[a-z]/.test(pw) },
+  { key: 'digit', label: 'One number', shortLabel: 'a number', test: (pw) => /[0-9]/.test(pw) },
+  { key: 'symbol', label: 'One special character', shortLabel: 'a symbol', test: (pw) => /[^A-Za-z0-9]/.test(pw) },
 ];
 
 /** Mirrors the "must not contain name" check in PasswordPolicyService.cs - any name part 3+ chars. */

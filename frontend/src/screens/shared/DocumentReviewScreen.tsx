@@ -3,7 +3,7 @@ import { View, Pressable, Linking } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { ExternalLink, FileText } from 'lucide-react-native';
+import { ExternalLink, FileText, ChevronRight, Check, X } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
@@ -66,11 +66,6 @@ export function DocumentReviewScreen() {
     }
   };
 
-  const openReject = (item: DocumentReviewQueueItemDto) => {
-    setRemarks('');
-    setRejectTarget(item);
-  };
-
   const handleConfirmReject = async () => {
     if (!rejectTarget) return;
     setBusyId(rejectTarget.documentId);
@@ -98,9 +93,11 @@ export function DocumentReviewScreen() {
 
   return (
     <Screen scroll>
-      <Text variant="body" tone="secondary" style={s.headerCount}>
-        {queue.length} document{queue.length === 1 ? '' : 's'} awaiting review
-      </Text>
+      <View style={s.headerRow}>
+        <Text variant="body" tone="secondary">
+          {queue.length} document{queue.length === 1 ? '' : 's'} awaiting review
+        </Text>
+      </View>
 
       {isLoading ? (
         <Text variant="body" tone="muted">
@@ -115,38 +112,53 @@ export function DocumentReviewScreen() {
       ) : (
         queue.map((item) => (
           <View key={item.documentId} style={s.card}>
-            <View style={s.row}>
+            <View style={s.cardHeader}>
               {item.externalLinkUrl ? (
                 <Pressable onPress={() => handleThumbnailPress(item)} style={[s.thumbIcon, { backgroundColor: theme.colors.surfaceSunken }]}>
                   <ExternalLink size={24} color={theme.colors.primary} />
                 </Pressable>
               ) : isImage(item) && item.fileId ? (
-                <AuthImage fileId={item.fileId} size={56} onPress={() => handleThumbnailPress(item)} />
+                <AuthImage fileId={item.fileId} size={48} onPress={() => handleThumbnailPress(item)} />
               ) : (
                 <Pressable onPress={() => handleThumbnailPress(item)} style={[s.thumbIcon, { backgroundColor: theme.colors.surfaceSunken }]}>
                   <FileText size={24} color={theme.colors.textSecondary} />
                 </Pressable>
               )}
-              <View style={s.infoCol}>
-                <Text variant="bodyStrong">{item.internFullName}</Text>
-                <Text variant="caption" tone="muted">
-                  {item.internCode} - {TYPE_LABELS[item.documentType] ?? item.documentType} (v{item.version})
+              <View style={s.cardHeaderText}>
+                <Text variant="bodyStrong" style={s.nameText} numberOfLines={1}>
+                  {item.internFullName}
                 </Text>
                 <Text variant="caption" tone="muted">
-                  {new Date(item.uploadedAtUtc).toLocaleString()}
+                  {item.internCode} · {TYPE_LABELS[item.documentType] ?? item.documentType} (v{item.version})
                 </Text>
-                {!isImage(item) ? (
-                  <Pressable onPress={() => handleThumbnailPress(item)}>
-                    <Text variant="caption" tone="brand">
-                      {item.externalLinkUrl ? 'Open link' : 'Open document'}
-                    </Text>
-                  </Pressable>
-                ) : null}
+              </View>
+              <ChevronRight size={18} color={theme.colors.textMuted} />
+            </View>
+
+            <View style={s.badgeRow}>
+              <View style={[s.badge, { backgroundColor: theme.colors.warningBg }]}>
+                <Text variant="caption" tone="warning">
+                  Pending Review
+                </Text>
               </View>
             </View>
-            <View style={s.actionsRow}>
-              <Button label="Reject" variant="danger" size="sm" onPress={() => openReject(item)} disabled={busyId === item.documentId} style={s.actionButton} />
-              <Button label="Approve" variant="primary" size="sm" onPress={() => handleApprove(item)} loading={busyId === item.documentId} style={s.actionButton} />
+
+            <View style={s.divider} />
+
+            <View style={s.iconActionRow}>
+              <Pressable
+                onPress={() => {
+                  setRemarks('');
+                  setRejectTarget(item);
+                }}
+                disabled={busyId === item.documentId}
+                style={s.iconBtn}
+              >
+                <X size={20} color={theme.colors.error} />
+              </Pressable>
+              <Pressable onPress={() => handleApprove(item)} disabled={busyId === item.documentId} style={s.iconBtn}>
+                <Check size={20} color={theme.colors.primary} />
+              </Pressable>
             </View>
           </View>
         ))
@@ -154,31 +166,39 @@ export function DocumentReviewScreen() {
 
       <FormModal
         visible={rejectTarget !== null}
-        title="Reject document"
+        title="Reject Document"
         onClose={() => setRejectTarget(null)}
         footer={
           <>
-            <Button label="Cancel" variant="ghost" size="sm" onPress={() => setRejectTarget(null)} />
-            <Button label="Confirm Reject" variant="danger" size="sm" onPress={handleConfirmReject} loading={busyId === rejectTarget?.documentId} />
+            <Button label="Cancel" variant="ghost" onPress={() => setRejectTarget(null)} />
+            <Button label="Reject" variant="danger" onPress={handleConfirmReject} loading={busyId === rejectTarget?.documentId} />
           </>
         }
       >
-        <Text variant="body" tone="secondary" style={s.modalHint}>
+        <Text variant="body" tone="secondary" style={{ marginBottom: theme.spacing.md }}>
           Let {rejectTarget?.internFullName} know why this document was rejected.
         </Text>
-        <Input label="Remarks" value={remarks} onChangeText={setRemarks} multiline placeholder="e.g. Please upload a clearer scan." />
+        <Input label="Remarks (Optional)" value={remarks} onChangeText={setRemarks} multiline placeholder="e.g. Please upload a clearer scan." />
       </FormModal>
 
-      <FormModal visible={previewItem !== null} title="Document preview" onClose={() => setPreviewItem(null)}>
-        {previewItem?.fileId ? <AuthImage fileId={previewItem.fileId} size={280} style={s.previewImage} /> : null}
+      <FormModal visible={previewItem !== null} title="Document Preview" onClose={() => setPreviewItem(null)}>
+        {previewItem?.fileId ? <AuthImage fileId={previewItem.fileId} style={s.previewImage} contentFit="contain" /> : null}
       </FormModal>
     </Screen>
   );
 }
 
 const makeStyles = (t: AppTheme) => ({
-  headerCount: { marginBottom: t.spacing.md },
-  emptyContainer: { padding: t.spacing.xl, alignItems: 'center' as const },
+  headerRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: t.spacing.md,
+  },
+  emptyContainer: {
+    alignItems: 'center' as const,
+    padding: t.spacing.xl,
+  },
   card: {
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
@@ -186,13 +206,50 @@ const makeStyles = (t: AppTheme) => ({
     borderColor: t.colors.border,
     padding: t.spacing.lg,
     marginBottom: t.spacing.md,
+    ...t.shadows.sm,
+  },
+  cardHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: t.spacing.md,
   },
-  row: { flexDirection: 'row' as const, gap: t.spacing.md, alignItems: 'center' as const },
-  thumbIcon: { width: 56, height: 56, borderRadius: 6, alignItems: 'center' as const, justifyContent: 'center' as const },
-  infoCol: { flex: 1, gap: 2 },
-  actionsRow: { flexDirection: 'row' as const, gap: t.spacing.sm, justifyContent: 'flex-end' as const },
-  actionButton: { flex: 1 },
-  modalHint: { marginBottom: t.spacing.md },
-  previewImage: { alignSelf: 'center' as const, borderRadius: t.radii.md },
+  cardHeaderText: { flex: 1 },
+  nameText: { fontSize: 16, fontWeight: '600' as const },
+  thumbIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: t.radii.md,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  badgeRow: {
+    flexDirection: 'row' as const,
+    marginTop: t.spacing.sm,
+  },
+  badge: {
+    paddingHorizontal: t.spacing.sm,
+    paddingVertical: 3,
+    borderRadius: t.radii.full,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: t.colors.border,
+    marginTop: t.spacing.md,
+    marginBottom: t.spacing.sm,
+  },
+  iconActionRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'flex-end' as const,
+    gap: t.spacing.lg,
+  },
+  iconBtn: { padding: 4 },
+  previewImage: {
+    alignSelf: 'center' as const,
+    width: '100%' as const,
+    height: 220,
+    borderRadius: t.radii.md,
+    marginTop: t.spacing.sm,
+    marginBottom: t.spacing.md,
+    backgroundColor: t.colors.surface,
+  },
 });

@@ -61,7 +61,7 @@ export function TimeField({ label, value, onChange, error, required, stepMinutes
         </Text>
       ) : null}
 
-      <FormModal visible={open} title={label ?? 'Select time'} onClose={() => setOpen(false)}>
+      <FormModal visible={open} title={label ?? 'Select time'} onClose={() => setOpen(false)} scrollable={false}>
         <FlatList
           data={slots}
           keyExtractor={(slot) => slot}

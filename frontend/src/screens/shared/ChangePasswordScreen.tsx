@@ -55,9 +55,7 @@ export function ChangePasswordScreen() {
 
   return (
     <Screen scroll>
-      <Text variant="h2" style={s.title}>
-        Change Password
-      </Text>
+      
       <Text variant="body" tone="secondary" style={s.subtitle}>
         Choose a strong new password.
       </Text>

@@ -58,26 +58,46 @@ export function FaceEnrollmentScreen() {
   return (
     <Screen scroll>
       <View style={s.header}>
-        <ShieldCheck size={40} color={theme.colors.primary} />
-        <Text variant="h2" style={s.title}>
-          Face Enrollment
+        <ShieldCheck size={48} color={theme.colors.primary} />
+        <Text variant="caption" tone="muted" style={s.title}>
+          Biometric Security Verification
         </Text>
       </View>
 
-      <Text variant="body" tone="secondary" style={s.paragraph}>
-        This captures a short, live sequence of your face - not a photo upload - to create the
-        biometric reference used to verify your identity every time you mark attendance. It is
-        matched against your mentor-approved profile photo before it is stored.
-      </Text>
-      <Text variant="body" tone="secondary" style={s.paragraph}>
-        Your face data is stored only as a mathematical representation (an embedding), never as a
-        viewable image, and is used solely for attendance verification. You can refresh your
-        enrollment later (for example, after a haircut or growing a beard) once every 30 days.
-      </Text>
+      {/* Card Box for Instructions */}
+      <View style={s.cardContainer}>
+        <Text variant="bodyStrong" style={s.cardTitle}>
+          Important Guidelines
+        </Text>
+
+        <View style={s.bulletItem}>
+          <Text style={s.bulletPoint}>•</Text>
+          <Text variant="body" tone="secondary" style={s.bulletText}>
+            <Text variant="bodyStrong">Real-time Capture: </Text>
+            A quick live motion sequence is captured to verify your identity against your mentor-approved record.
+          </Text>
+        </View>
+
+        <View style={s.bulletItem}>
+          <Text style={s.bulletPoint}>•</Text>
+          <Text variant="body" tone="secondary" style={s.bulletText}>
+            <Text variant="bodyStrong">Data Protection: </Text>
+            Your facial features are converted into an encrypted numerical code (embedding) and stored securely.
+          </Text>
+        </View>
+
+        <View style={s.bulletItem}>
+          <Text style={s.bulletPoint}>•</Text>
+          <Text variant="body" tone="secondary" style={s.bulletText}>
+            <Text variant="bodyStrong">Profile Updates: </Text>
+            Biometric data can be refreshed once every 30 days in case of significant physical changes.
+          </Text>
+        </View>
+      </View>
 
       <View style={s.consentRow}>
         <Button
-          label={consentGiven ? 'Consent given ✓' : 'I understand and consent'}
+          label={consentGiven ? 'Consent Given ✓' : 'I Understand & Consent'}
           variant={consentGiven ? 'secondary' : 'outline'}
           onPress={() => setConsentGiven((c) => !c)}
           fullWidth
@@ -85,7 +105,7 @@ export function FaceEnrollmentScreen() {
       </View>
 
       <Button
-        label={starting ? 'Starting...' : 'Start Enrollment'}
+        label={starting ? 'Starting Session...' : 'Start Enrollment'}
         onPress={onStart}
         disabled={!consentGiven || starting}
         loading={starting}
@@ -115,9 +135,37 @@ export function FaceEnrollmentScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
-  header: { alignItems: 'center' as const, gap: t.spacing.sm, marginBottom: t.spacing.lg },
-  title: { textAlign: 'center' as const },
-  paragraph: { marginBottom: t.spacing.md, lineHeight: 20 },
-  consentRow: { marginTop: t.spacing.md, marginBottom: t.spacing.sm },
-  startButton: { marginTop: t.spacing.sm },
+  header: { alignItems: 'center' as const, gap: t.spacing.xs, marginTop: t.spacing.md, marginBottom: t.spacing.xl },
+  title: { textAlign: 'center' as const, letterSpacing: 0.5 },
+  cardContainer: {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.lg,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    padding: t.spacing.lg,
+    gap: t.spacing.md,
+    marginBottom: t.spacing.md,
+  },
+  cardTitle: {
+    marginBottom: t.spacing.xs,
+    color: t.colors.textPrimary,
+  },
+  bulletItem: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    gap: t.spacing.sm,
+  },
+  bulletPoint: {
+    fontSize: 16,
+    color: t.colors.primary,
+    lineHeight: 22,
+  },
+  bulletText: {
+    flex: 1,
+    lineHeight: 22,
+    textAlign: 'justify' as const,
+  },
+  paragraph: { marginBottom: t.spacing.sm, lineHeight: 22 },
+  consentRow: { marginTop: t.spacing.sm, marginBottom: t.spacing.xs },
+  startButton: { marginTop: t.spacing.xs },
 });

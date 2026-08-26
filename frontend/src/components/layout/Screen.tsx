@@ -12,20 +12,32 @@ interface Props {
 
 export function Screen({ children, scroll = false, padded = true, style }: Props) {
   const theme = useTheme();
+
   const content = scroll ? (
     <ScrollView
-      contentContainerStyle={[padded && { padding: theme.spacing.lg }, style]}
+      contentContainerStyle={[
+        styles.scrollContent,
+        padded && { padding: theme.spacing.lg },
+        style,
+      ]}
       keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
       {children}
     </ScrollView>
   ) : (
-    <View style={[styles.flex, padded && { padding: theme.spacing.lg }, style]}>{children}</View>
+    <View style={[styles.flex, padded && { padding: theme.spacing.lg }, style]}>
+      {children}
+    </View>
   );
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['bottom', 'left', 'right']}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
         {content}
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -34,4 +46,7 @@ export function Screen({ children, scroll = false, padded = true, style }: Props
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  scrollContent: {
+    flexGrow: 1, // Focus hone par scroll view shrink hone se rokta hai
+  },
 });

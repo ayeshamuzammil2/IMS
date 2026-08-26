@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
-import { View, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Pressable, ActivityIndicator, Alert, FlatList } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import * as Location from 'expo-location';
-import { Power, PowerOff, Trash2 } from 'lucide-react-native';
+import { Power, PowerOff, Trash2, ChevronRight } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
 import { Button } from '../../components/primitives/Button';
 import { FormModal } from '../../components/forms/FormModal';
-import { DataTable, type DataTableColumn } from '../../components/data/DataTable';
 import { departmentsApi, type DepartmentDto } from '../../api/resources/departments.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
@@ -31,8 +30,6 @@ const schema = z.object({
     .max(100, 'Radius cannot exceed 100 meters.'),
 });
 
-// z.coerce.number() accepts unknown as input and outputs number - useForm needs both shapes since
-// the on-screen fields hold raw text while the submitted values are the coerced numbers.
 type FormInput = z.input<typeof schema>;
 type FormOutput = z.output<typeof schema>;
 
@@ -167,62 +164,69 @@ export function DepartmentsScreen() {
     }
   };
 
-  const columns: DataTableColumn<DepartmentDto>[] = [
-    { key: 'name', label: 'Name', width: 170, render: (d) => <Text variant="bodyStrong">{d.name}</Text> },
-    { key: 'code', label: 'Code', width: 80, render: (d) => <Text variant="body">{d.code}</Text> },
-    { key: 'radius', label: 'Geofence', width: 90, render: (d) => <Text variant="body">{d.geofenceRadiusMeters} m</Text> },
-    { key: 'mentors', label: 'Mentors', width: 80, render: (d) => <Text variant="body">{d.mentorCount}</Text> },
-    { key: 'interns', label: 'Interns', width: 80, render: (d) => <Text variant="body">{d.internCount}</Text> },
-    {
-      key: 'status',
-      label: 'Status',
-      width: 90,
-      render: (d) => (
-        <Text variant="caption" tone={d.isActive ? 'success' : 'error'}>
-          {d.isActive ? 'Active' : 'Inactive'}
-        </Text>
-      ),
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      width: 90,
-      render: (d) => {
-        const toggling = toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === d.id;
-        const deleting = deleteMutation.isPending && deleteMutation.variables === d.id;
-        return (
-          <View style={s.actionsRow}>
-            <Pressable
-              hitSlop={8}
-              style={s.iconOnlyButton}
-              onPress={(e) => {
-                e.stopPropagation();
-                confirmToggleActive(d);
-              }}
-            >
-              {toggling ? (
-                <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-              ) : d.isActive ? (
-                <PowerOff size={18} color={theme.colors.error} />
-              ) : (
-                <Power size={18} color={theme.colors.success} />
-              )}
-            </Pressable>
-            <Pressable
-              hitSlop={8}
-              style={s.iconOnlyButton}
-              onPress={(e) => {
-                e.stopPropagation();
-                confirmDelete(d);
-              }}
-            >
-              {deleting ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : <Trash2 size={18} color={theme.colors.error} />}
-            </Pressable>
+  const renderCard = ({ item: d }: { item: DepartmentDto }) => {
+    const busyToggle = toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === d.id;
+    const busyDelete = deleteMutation.isPending && deleteMutation.variables === d.id;
+
+    return (
+      <Pressable style={s.card} onPress={() => openEdit(d)}>
+        <View style={s.cardHeader}>
+          <View style={s.cardHeaderText}>
+            <Text variant="bodyStrong" numberOfLines={1}>
+              {d.name}
+            </Text>
+            <Text variant="caption" tone="muted">
+              {d.code}
+            </Text>
           </View>
-        );
-      },
-    },
-  ];
+          <ChevronRight size={18} color={theme.colors.textMuted} />
+        </View>
+
+        <Text variant="caption" tone="secondary" numberOfLines={1} style={s.cardSubline}>
+          Geofence: {d.geofenceRadiusMeters}m · {d.mentorCount} Mentors · {d.internCount} Interns
+        </Text>
+
+        <View style={s.badgeRow}>
+          <View style={[s.badge, { backgroundColor: d.isActive ? theme.colors.successBg : theme.colors.errorBg }]}>
+            <Text variant="caption" tone={d.isActive ? 'success' : 'error'}>
+              {d.isActive ? 'Active' : 'Inactive'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={s.divider} />
+
+        <View style={s.actionsRow}>
+          <Pressable
+            hitSlop={8}
+            style={s.actionIcon}
+            onPress={(e) => {
+              e.stopPropagation();
+              confirmToggleActive(d);
+            }}
+          >
+            {busyToggle ? (
+              <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+            ) : d.isActive ? (
+              <PowerOff size={18} color={theme.colors.error} />
+            ) : (
+              <Power size={18} color={theme.colors.success} />
+            )}
+          </Pressable>
+          <Pressable
+            hitSlop={8}
+            style={s.actionIcon}
+            onPress={(e) => {
+              e.stopPropagation();
+              confirmDelete(d);
+            }}
+          >
+            {busyDelete ? <ActivityIndicator size="small" color={theme.colors.error} /> : <Trash2 size={18} color={theme.colors.error} />}
+          </Pressable>
+        </View>
+      </Pressable>
+    );
+  };
 
   return (
     <Screen scroll={false}>
@@ -238,12 +242,17 @@ export function DepartmentsScreen() {
           Loading...
         </Text>
       ) : (
-        <DataTable
-          columns={columns}
-          rows={departments}
+        <FlatList
+          data={departments}
           keyExtractor={(d) => String(d.id)}
-          onRowPress={openEdit}
-          emptyLabel="No departments yet. Add one to get started."
+          renderItem={renderCard}
+          style={s.list}
+          contentContainerStyle={departments.length === 0 ? s.emptyListContent : s.listContent}
+          ListEmptyComponent={
+            <Text variant="body" tone="muted">
+              No departments yet. Add one to get started.
+            </Text>
+          }
         />
       )}
 
@@ -358,9 +367,26 @@ const makeStyles = (t: AppTheme) => ({
     alignItems: 'center' as const,
     marginBottom: t.spacing.md,
   },
+  list: { flex: 1 },
+  listContent: { gap: t.spacing.sm, paddingBottom: t.spacing.lg },
+  emptyListContent: { flexGrow: 1, alignItems: 'center' as const, justifyContent: 'center' as const },
+  card: {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.lg,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    padding: t.spacing.lg,
+    ...t.shadows.sm,
+  },
+  cardHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, gap: t.spacing.sm },
+  cardHeaderText: { flex: 1 },
+  cardSubline: { marginTop: 2 },
+  badgeRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: t.spacing.xs, marginTop: t.spacing.sm },
+  badge: { paddingHorizontal: t.spacing.sm, paddingVertical: 3, borderRadius: t.radii.full },
+  divider: { height: 1, backgroundColor: t.colors.border, marginTop: t.spacing.md, marginBottom: t.spacing.sm },
+  actionsRow: { flexDirection: 'row' as const, gap: t.spacing.lg, justifyContent: 'flex-end' as const },
+  actionIcon: { padding: t.spacing.xs },
   locationRow: { flexDirection: 'row' as const, gap: t.spacing.md },
   locationFields: { flex: 1 },
   locationButton: { marginBottom: t.spacing.md, marginTop: -t.spacing.sm },
-  iconOnlyButton: { paddingHorizontal: t.spacing.sm },
-  actionsRow: { flexDirection: 'row' as const },
 });

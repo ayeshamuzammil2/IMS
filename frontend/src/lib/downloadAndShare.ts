@@ -1,9 +1,11 @@
+import { Platform } from 'react-native';
 import { File, Paths } from 'expo-file-system';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
+import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
 import { getAccessToken } from '../api/client';
 
-/** Downloads an authenticated API file (PDF, etc.) to cache, then opens the OS share sheet. */
-export async function downloadAndShare(url: string, fileName: string): Promise<void> {
+export async function downloadAndShare(url: string, fileName: string, mimeType = 'application/pdf'): Promise<void> {
   const token = getAccessToken();
   const destination = new File(Paths.cache, fileName);
   const file = await File.downloadFileAsync(url, destination, {
@@ -11,14 +13,22 @@ export async function downloadAndShare(url: string, fileName: string): Promise<v
     idempotent: true,
   });
 
+  if (Platform.OS === 'android') {
+    const contentUri = await FileSystemLegacy.getContentUriAsync(file.uri);
+    await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+      data: contentUri,
+      flags: 1,
+      type: mimeType,
+    });
+    return;
+  }
+
   const available = await Sharing.isAvailableAsync();
   if (available) {
-    await Sharing.shareAsync(file.uri);
+    await Sharing.shareAsync(file.uri, { mimeType });
   }
 }
 
-/** Writes text content (e.g. a CSV export) to cache, then opens the OS share sheet - no network
- * fetch involved, unlike downloadAndShare above. */
 export async function writeTextAndShare(content: string, fileName: string, mimeType?: string): Promise<void> {
   const file = new File(Paths.cache, fileName);
   if (file.exists) file.delete();
