@@ -53,9 +53,6 @@ export function SetNewPasswordScreen() {
 
   return (
     <Screen scroll>
-      <Text variant="h2" style={s.title}>
-        Set a New Password
-      </Text>
       <Text variant="body" tone="secondary" style={s.subtitle}>
         For your security, you must set a new password before continuing.
       </Text>
@@ -114,8 +111,7 @@ export function SetNewPasswordScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
-  title: { marginTop: t.spacing.lg, marginBottom: t.spacing.xs },
-  subtitle: { marginBottom: t.spacing.lg },
+  subtitle: { marginBottom: t.spacing.lg, fontWeight: '500' as const },
   error: { marginBottom: t.spacing.md },
   spacer: { height: t.spacing.sm },
 });

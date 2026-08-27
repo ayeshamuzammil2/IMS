@@ -53,7 +53,7 @@ export function LoginScreen() {
           PIA Wings
         </Text>
         <Text variant="caption" tone="secondary" style={s.appTagline}>
-          Intern Operations Portal
+          Internship Management & Operations Portal
         </Text>
       </View>
 

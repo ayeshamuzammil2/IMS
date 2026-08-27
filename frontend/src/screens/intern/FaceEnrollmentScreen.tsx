@@ -39,7 +39,6 @@ export function FaceEnrollmentScreen() {
     onError: (error: any) => {
       Toast.show({ type: 'error', text1: 'Enrollment failed', text2: error?.message });
     },
-    onSettled: () => setActiveSession(null),
   });
 
   const onStart = async () => {
@@ -117,7 +116,13 @@ export function FaceEnrollmentScreen() {
         {activeSession ? (
           <ChallengeCaptureView
             challenge={activeSession.challenge}
-            onComplete={(frames) => submitMutation.mutate(frames)}
+            onComplete={(frames) => {
+              // Close the camera modal right away - the submit is a background network call,
+              // there's no reason to keep the camera session alive (and racing against it) while
+              // it's in flight.
+              setActiveSession(null);
+              submitMutation.mutate(frames);
+            }}
             onCancel={() => setActiveSession(null)}
             onTimeout={() => {
               Toast.show({

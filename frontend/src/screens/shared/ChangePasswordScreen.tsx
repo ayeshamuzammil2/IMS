@@ -109,6 +109,6 @@ export function ChangePasswordScreen() {
 
 const makeStyles = (t: AppTheme) => ({
   title: { marginBottom: t.spacing.xs },
-  subtitle: { marginBottom: t.spacing.lg },
+  subtitle: { marginBottom: t.spacing.lg, fontWeight: '500' as const,},
   spacer: { height: t.spacing.sm },
 });

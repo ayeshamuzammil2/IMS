@@ -100,6 +100,14 @@ export function ChallengeCaptureView({ challenge, onComplete, onCancel, onTimeou
   // than calling Date.now() during render (an impure call render must not make).
   const stepStartedAtRef = useRef<number | null>(null);
   const timedOutRef = useRef(false);
+  // Set the instant the final frame is captured and onComplete() is invoked. Without this, the
+  // last step's stepIndex never advances (there's no "next step" to move to), so its interval
+  // keeps ticking - and since the held pose is still satisfied, it keeps calling
+  // capturePhotoToFile() again and again every 150ms while the parent screen is asynchronously
+  // submitting the frames and waiting to close the modal. When the modal/camera is finally torn
+  // down, one of those dangling in-flight captures throws "Camera is closed" as an unhandled
+  // promise rejection. This ref stops the loop the moment we're done, before that race exists.
+  const completedRef = useRef(false);
 
   const faceDetectorOutput = useFaceDetectorOutput({
     performanceMode: 'fast',
@@ -122,7 +130,7 @@ export function ChallengeCaptureView({ challenge, onComplete, onCancel, onTimeou
     const step = challenge.steps[stepIndex];
 
     const interval = setInterval(async () => {
-      if (capturingRef.current || timedOutRef.current) return;
+      if (capturingRef.current || timedOutRef.current || completedRef.current) return;
 
       // Lazily mark this step's start on the first tick after it becomes current, instead of
       // resetting it from a separate effect keyed on stepIndex (avoids a setState-in-effect-body).
@@ -180,6 +188,10 @@ export function ChallengeCaptureView({ challenge, onComplete, onCancel, onTimeou
         capturedRef.current = [...capturedRef.current, { uri, telemetry }];
 
         if (capturedRef.current.length >= challenge.steps.length) {
+          // Stop the loop *before* handing off to the parent - onComplete triggers an async
+          // submit + eventual unmount, and this tick's interval must not fire again in the
+          // meantime (see completedRef's declaration comment above for why).
+          completedRef.current = true;
           onComplete(capturedRef.current);
         } else {
           satisfiedSinceRef.current = null;
@@ -187,6 +199,11 @@ export function ChallengeCaptureView({ challenge, onComplete, onCancel, onTimeou
           setHolding(false);
           setStepIndex((i) => i + 1);
         }
+      } catch {
+        // The native camera session can legitimately go away mid-capture (screen backgrounded,
+        // permission revoked, session torn down by the parent). Swallowing this here - rather
+        // than letting it propagate - is what prevents the "Camera is closed" unhandled
+        // rejection; the user simply keeps holding the pose and the next tick tries again.
       } finally {
         capturingRef.current = false;
       }

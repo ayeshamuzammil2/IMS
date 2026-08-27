@@ -56,6 +56,11 @@ export function DashboardScreen() {
     );
   }
 
+  // Check if self details have already been submitted
+  const isSelfDetailsSubmitted = Boolean(
+    data.address || data.emergencyContactName || data.emergencyContactPhone || data.bloodGroup
+  );
+
   return (
     <Screen scroll>
       <View style={s.photoWrap}>
@@ -98,10 +103,24 @@ export function DashboardScreen() {
         SELF DETAILS
       </Text>
       <View style={s.card}>
-        <SelfDetailsForm
-          initial={data}
-          onSubmitted={() => queryClient.invalidateQueries({ queryKey: ['documents', 'dashboard'] })}
-        />
+        {isSelfDetailsSubmitted ? (
+          <>
+            <Row label="Address" value={data.address} />
+            <Row label="Emergency Contact Name" value={data.emergencyContactName} />
+            <Row label="Emergency Contact Phone" value={data.emergencyContactPhone} />
+            <Row label="Blood Group" value={data.bloodGroup} />
+            
+            {/* Professional Notice Message */}
+            <Text variant="caption" tone="muted" style={s.noticeText}>
+              To modify or update these details, please contact your mentor.
+            </Text>
+          </>
+        ) : (
+          <SelfDetailsForm
+            initial={data}
+            onSubmitted={() => queryClient.invalidateQueries({ queryKey: ['documents', 'dashboard'] })}
+          />
+        )}
       </View>
     </Screen>
   );
@@ -123,7 +142,7 @@ function SelfDetailsForm({ initial, onSubmitted }: { initial: InternDashboardDto
         emergencyContactPhone: emergencyPhone.trim() || null,
         bloodGroup: bloodGroup.trim() || null,
       });
-      Toast.show({ type: 'success', text1: 'Details saved' });
+      Toast.show({ type: 'success', text1: 'Details saved successfully' });
       onSubmitted();
     } catch (error: any) {
       Toast.show({ type: 'error', text1: 'Could not save details', text2: error?.message });
@@ -157,17 +176,15 @@ function Row({ label, value }: { label: string; value?: string | null }) {
 }
 
 const makeStyles = (t: AppTheme) => ({
-photoWrap: {
+  photoWrap: {
     alignSelf: 'center' as const,
     marginBottom: t.spacing.md,
     position: 'relative' as const,
-    // Outer Container & Soft Elevation Shadow
     borderRadius: t.radii.lg,
-    padding: 3, // Ring effect ke liye halka gap
+    padding: 3,
     backgroundColor: t.colors.surface,
     borderWidth: 1.5,
-    borderColor: t.colors.border, // Clean muted ring
-    // Soft Modern Shadow
+    borderColor: t.colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
@@ -176,10 +193,10 @@ photoWrap: {
   },
   photo: {
     width: 110,
-    height: 140, // Standard aspect ratio (Passport ID card look)
+    height: 140,
     borderRadius: t.radii.md,
     borderWidth: 1,
-    borderColor: t.colors.primary, // Sleek primary accent border
+    borderColor: t.colors.primary,
   },
   editButton: {
     position: 'absolute' as const,
@@ -191,20 +208,14 @@ photoWrap: {
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     borderWidth: 2,
-    borderColor: t.colors.surface, // Background separation ring
+    borderColor: t.colors.surface,
     zIndex: 2,
-    // Button Shadow
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 4,
   },
-
-
-
-
-  
   name: { textAlign: 'center' as const, marginTop: t.spacing.xs },
   internCode: { textAlign: 'center' as const, marginBottom: t.spacing.lg },
   sectionLabel: { marginTop: t.spacing.sm, marginBottom: t.spacing.xs, marginLeft: t.spacing.xs },
@@ -218,4 +229,8 @@ photoWrap: {
     marginBottom: t.spacing.lg,
   },
   infoRow: { gap: 2 },
+  noticeText: {
+    marginTop: t.spacing.xs,
+    fontStyle: 'italic' as const,
+  },
 });

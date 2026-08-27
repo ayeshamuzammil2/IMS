@@ -148,9 +148,6 @@ export function AttendanceScreen() {
       }
       Toast.show({ type: 'error', text1: 'Could not mark attendance', text2: error?.message });
     },
-        onSettled: () => {
-      setTimeout(() => setActiveSession(null), 300);
-    },
   });
 
   const onStart = async (eventType: AttendanceEventType) => {
@@ -275,7 +272,12 @@ export function AttendanceScreen() {
     <ChallengeCaptureView
       key={activeSession.session.sessionId}
       challenge={activeSession.session.challenge}
-      onComplete={(frames) => submitMutation.mutate(frames)}
+      onComplete={(frames) => {
+        // Close the camera modal right away - the submit is a background network call, there's
+        // no reason to keep the camera session alive (and racing against it) while it's in flight.
+        setActiveSession(null);
+        submitMutation.mutate(frames);
+      }}
       onCancel={() => setActiveSession(null)}
       onTimeout={() => {
         Toast.show({

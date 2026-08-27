@@ -77,7 +77,7 @@ export function DocumentsScreen() {
     setUploadingType('ExtraDocument');
     try {
       await documentsApi.upload({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType }, 'ExtraDocument');
-      Toast.show({ type: 'success', text1: 'Extra document uploaded', text2: 'Awaiting review by your mentor.' });
+      Toast.show({ type: 'success', text1: 'Additional document uploaded', text2: 'Awaiting review by your mentor.' });
       invalidate();
     } catch (error: any) {
       Toast.show({ type: 'error', text1: 'Upload failed', text2: error?.message });
@@ -168,7 +168,7 @@ function ExtraDocumentCard({
   return (
     <View style={s.card}>
       <View style={s.cardHeader}>
-        <Text variant="bodyStrong">Extra Document (Optional)</Text>
+        <Text variant="bodyStrong">Additional Document (Optional)</Text>
         <StatusBadge status={doc?.status ?? null} />
       </View>
       <Text variant="caption" tone="muted" style={s.helper}>

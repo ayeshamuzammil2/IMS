@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PIA.Application.Abstractions;
 using PIA.Application.Contracts.Attendance;
@@ -31,7 +32,8 @@ public sealed class FaceEnrollmentService(
     IChallengeGenerator challengeGenerator,
     IFaceVerificationProvider faceProvider,
     IOptions<AttendanceOptions> attendanceOptions,
-    IOptions<FaceOptions> faceOptions) : IFaceEnrollmentService
+    IOptions<FaceOptions> faceOptions,
+    ILogger<FaceEnrollmentService> logger) : IFaceEnrollmentService
 {
     public async Task RevokeAsync(int internProfileId, string reason, CancellationToken ct)
     {
@@ -152,20 +154,46 @@ public sealed class FaceEnrollmentService(
         foreach (var frame in request.Frames.OrderBy(f => f.Telemetry.Index))
         {
             var bbox = frame.Telemetry.BoundingBox;
-            if (bbox is null) continue;
+            if (bbox is null)
+            {
+                logger.LogWarning("Enrollment frame {Index}: no bounding box in telemetry, skipped.", frame.Telemetry.Index);
+                continue;
+            }
 
             using var buffer = new MemoryStream();
             await frame.Content.CopyToAsync(buffer, ct);
             var bytes = buffer.ToArray();
             using var bitmap = SKBitmap.Decode(bytes);
-            if (bitmap is null) continue;
+            if (bitmap is null)
+            {
+                logger.LogWarning("Enrollment frame {Index}: could not decode {ByteCount} bytes as an image, skipped.", frame.Telemetry.Index, bytes.Length);
+                continue;
+            }
+
+            // TEMP DIAGNOSTIC: logs the raw photo dimensions against the bounding box the client
+            // reported. If BoundingBox was measured against a different frame size than this photo
+            // (e.g. a downscaled face-detector analysis frame vs. the full-resolution capture),
+            // Width/Height here will look wildly out of proportion to bitmap.Width/Height and the
+            // crop below will zoom into the wrong region instead of the face - this line is what
+            // will make that visible without guessing.
+            logger.LogInformation(
+                "Enrollment frame {Index}: photo={PhotoW}x{PhotoH}, bbox=({BX},{BY},{BW},{BH})",
+                frame.Telemetry.Index, bitmap.Width, bitmap.Height, bbox.X, bbox.Y, bbox.Width, bbox.Height);
 
             var blur = ComputeBlurVariance(bitmap);
             var crop = FaceCropper.CropAligned(bitmap, bbox, faceOptions.Value.PadCropScale);
-            if (crop is null) continue;
+            if (crop is null)
+            {
+                logger.LogWarning("Enrollment frame {Index}: crop rejected (too small/out of bounds after clamping).", frame.Telemetry.Index);
+                continue;
+            }
 
             var embedding = await faceProvider.ExtractEmbeddingAsync(crop, ct);
-            if (embedding is null) continue;
+            if (embedding is null)
+            {
+                logger.LogWarning("Enrollment frame {Index}: embedding extraction returned null (model not configured?).", frame.Telemetry.Index);
+                continue;
+            }
 
             frameEmbeddings.Add((frame.Telemetry.Index, embedding.Embedding, blur));
             if (blur > bestBlur)
@@ -183,7 +211,28 @@ public sealed class FaceEnrollmentService(
         }
 
         // Liveness gate on enrollment itself - never enroll a spoofed reference.
+        // TEMP DIAGNOSTIC: dumps the exact bytes handed to the liveness model to disk. A
+        // live=0.000/replay=0.994 result this extreme almost always means the model is looking at
+        // something other than an upright, well-framed face (e.g. a 90*-rotated crop, or a crop
+        // centered on the wrong region) rather than a borderline lighting/threshold issue - opening
+        // this file is far more conclusive than reasoning about coordinates blind.
+        try
+        {
+            var debugDir = Path.Combine(AppContext.BaseDirectory, "debug-crops");
+            Directory.CreateDirectory(debugDir);
+            var debugPath = Path.Combine(debugDir, $"enrollment-{session.Id}-frame{bestIndex}.jpg");
+            await File.WriteAllBytesAsync(debugPath, bestCrop, ct);
+            logger.LogWarning("DEBUG: wrote the exact liveness-model input crop to {Path} - open this file to see what the model saw.", debugPath);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "DEBUG: could not write debug crop to disk.");
+        }
+
         var padResult = await faceProvider.EvaluateLivenessAsync(bestCrop, ct);
+        logger.LogInformation(
+            "Enrollment liveness (best frame {BestIndex}, blur={Blur:F1}): live={Live:F3} print={Print:F3} replay={Replay:F3} threshold={Threshold:F2}",
+            bestIndex, bestBlur, padResult?.LiveProbability, padResult?.PrintAttackProbability, padResult?.ReplayAttackProbability, faceOptions.Value.PadLiveThreshold);
         if (padResult is not null && padResult.LiveProbability < faceOptions.Value.PadLiveThreshold)
         {
             await HardFailAsync(session, ct);

@@ -64,7 +64,7 @@ public sealed class OnnxFaceVerificationProvider : IFaceVerificationProvider, ID
         if (session is null) return Task.FromResult<PadResult?>(null);
 
         var size = _options.PadInputSize;
-        var tensor = ToChwTensor(alignedFaceJpegBytes, size, mean: 0f, scale: 1 / 255f);
+        var tensor = ToChwTensor(alignedFaceJpegBytes, size, mean: 0f, scale: 1 / 255f, bgrOrder: true);
         var inputName = session.InputMetadata.Keys.First();
 
         using var results = session.Run([NamedOnnxValue.CreateFromTensor(inputName, tensor)]);
@@ -101,7 +101,7 @@ public sealed class OnnxFaceVerificationProvider : IFaceVerificationProvider, ID
     private string ResolveModelsRoot() =>
         Path.IsPathRooted(_options.ModelsPath) ? _options.ModelsPath : Path.Combine(AppContext.BaseDirectory, _options.ModelsPath);
 
-    private static DenseTensor<float> ToChwTensor(byte[] jpegBytes, int size, float mean, float scale)
+    private static DenseTensor<float> ToChwTensor(byte[] jpegBytes, int size, float mean, float scale, bool bgrOrder = false)
     {
         using var bitmap = SKBitmap.Decode(jpegBytes) ?? throw new InvalidOperationException("Face crop could not be decoded.");
         using var resized = bitmap.Resize(new SKImageInfo(size, size), SKFilterQuality.High) ?? bitmap;
@@ -112,9 +112,23 @@ public sealed class OnnxFaceVerificationProvider : IFaceVerificationProvider, ID
             for (var x = 0; x < size; x++)
             {
                 var pixel = resized.GetPixel(x, y);
-                tensor[0, 0, y, x] = (pixel.Red - mean) * scale;
-                tensor[0, 1, y, x] = (pixel.Green - mean) * scale;
-                tensor[0, 2, y, x] = (pixel.Blue - mean) * scale;
+                // minifasnet.onnx (Silent-Face-Anti-Spoofing) was trained on OpenCV-loaded images,
+                // which are BGR by default - facenet.onnx (facenet-pytorch, PIL-loaded) was trained
+                // on RGB. Feeding the wrong channel order doesn't error, it just silently corrupts
+                // the model's input, which is exactly the kind of bug that produces consistently
+                // low/wrong scores for every genuine live capture instead of an obvious crash.
+                if (bgrOrder)
+                {
+                    tensor[0, 0, y, x] = (pixel.Blue - mean) * scale;
+                    tensor[0, 1, y, x] = (pixel.Green - mean) * scale;
+                    tensor[0, 2, y, x] = (pixel.Red - mean) * scale;
+                }
+                else
+                {
+                    tensor[0, 0, y, x] = (pixel.Red - mean) * scale;
+                    tensor[0, 1, y, x] = (pixel.Green - mean) * scale;
+                    tensor[0, 2, y, x] = (pixel.Blue - mean) * scale;
+                }
             }
         }
         return tensor;

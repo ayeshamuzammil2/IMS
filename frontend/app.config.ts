@@ -23,7 +23,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   version: '0.1.0',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
-  icon: './assets/pia-logo.png',
+  icon: './assets/pia-app.png', // <-- FIXED: Root Icon Updated
   assetBundlePatterns: ['**/*'],
 
   extra: {
@@ -34,11 +34,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: PACKAGE[VARIANT],
     versionCode: 1,
+    icon: './assets/pia-app.png',
     adaptiveIcon: {
-      foregroundImage: './assets/android-icon-foreground.png',
-      backgroundImage: './assets/android-icon-background.png',
-      monochromeImage: './assets/android-icon-monochrome.png',
-      backgroundColor: '#FFFFFF', // Clean White Background
+      foregroundImage: './assets/pia-app.png',
+      backgroundColor: '#FFFFFF',
     },
     permissions: [
       'android.permission.CAMERA',
@@ -69,14 +68,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-dev-client',
     'expo-secure-store',
     'expo-font',
-     'expo-image',   
+    'expo-image',   
     [
       'expo-splash-screen',
       {
-        image: './assets/pia-logo.png',
+        image: './assets/pia-app.png', // <-- FIXED: Splash Screen Icon Updated
         resizeMode: 'contain',
-        backgroundColor: '#F4F9F5', // Soft Light Greenish-White
-        dark: { backgroundColor: '#0B1F16' }, // Dark mode option
+        backgroundColor: '#F4F9F5',
+        dark: { backgroundColor: '#0B1F16' },
       },
     ],
     [
@@ -105,7 +104,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-notifications',
       {
-        color: '#00502B', // PIA Green for icon highlights
+        color: '#00502B',
       },
     ],
   ],
