@@ -281,6 +281,8 @@ export function AttendanceReviewScreen() {
 }
 
 function RequestOverrideModal({ visible, onClose, onRequested }: { visible: boolean; onClose: () => void; onRequested: () => void }) {
+  const theme = useTheme();
+  const s = useThemedStyles(makeStyles);
   const [internProfileId, setInternProfileId] = useState<number | null>(null);
   const [eventType, setEventType] = useState<AttendanceEventType | null>(null);
   const [reasonCode, setReasonCode] = useState<string | null>(null);
@@ -296,6 +298,15 @@ function RequestOverrideModal({ visible, onClose, onRequested }: { visible: bool
     { value: 'Departure', label: 'Departure' },
   ];
 
+  const selectedIntern = useMemo(
+    () => interns.find((i) => i.id === internProfileId) ?? null,
+    [interns, internProfileId],
+  );
+  // Same dual-lock as normal attendance: an override can't be requested for an intern whose
+  // profile photo / face enrollment isn't verified yet - it would otherwise be a backdoor around
+  // face verification. Mirrors the ATTENDANCE_LOCKED check enforced server-side.
+  const isOverrideLocked = selectedIntern !== null && !selectedIntern.attendanceReady;
+
   const reset = () => {
     setInternProfileId(null);
     setEventType(null);
@@ -305,7 +316,7 @@ function RequestOverrideModal({ visible, onClose, onRequested }: { visible: bool
     setMarkedTime(null);
   };
 
-  const canSubmit = internProfileId && eventType && reasonCode && justification.trim().length >= 20 && workDate && markedTime;
+  const canSubmit = internProfileId && eventType && reasonCode && justification.trim().length >= 20 && workDate && markedTime && !isOverrideLocked;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -323,7 +334,11 @@ function RequestOverrideModal({ visible, onClose, onRequested }: { visible: bool
       onRequested();
       onClose();
     } catch (error: any) {
-      Toast.show({ type: 'error', text1: 'Could not request override', text2: error?.message });
+      Toast.show({
+        type: 'error',
+        text1: 'Could not request override',
+        text2: error?.response?.data?.message ?? error?.message,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -342,6 +357,14 @@ function RequestOverrideModal({ visible, onClose, onRequested }: { visible: bool
       }
     >
       <SelectField label="Intern" required placeholder="Select an intern" value={internProfileId} options={internOptions} onChange={setInternProfileId} />
+      {isOverrideLocked ? (
+        <View style={s.lockRow}>
+          <Lock size={14} color={theme.colors.error} />
+          <Text variant="caption" tone="error" style={{ flex: 1 }}>
+            Override is locked - this intern's profile photo and face enrollment must be verified first.
+          </Text>
+        </View>
+      ) : null}
       <SelectField label="Event" required placeholder="Arrival or Departure" value={eventType} options={eventTypeOptions} onChange={(v) => setEventType(v as AttendanceEventType)} />
       <SelectField label="Reason" required placeholder="Select a reason" value={reasonCode} options={REASON_OPTIONS} onChange={setReasonCode} />
       <DateField label="Work Date" required value={workDate} onChange={setWorkDate} />

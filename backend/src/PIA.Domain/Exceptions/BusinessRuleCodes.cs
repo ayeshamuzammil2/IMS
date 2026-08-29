@@ -35,6 +35,7 @@ public static class BusinessRuleCodes
 
     public const string CertificateNotEligible = "CERTIFICATE_NOT_ELIGIBLE";
     public const string IdCardNoPhoto = "IDCARD_NO_PHOTO";
+    public const string IdCardNotReadyForDownload = "IDCARD_NOT_READY_FOR_DOWNLOAD";
     public const string DesignationRequired = "DESIGNATION_REQUIRED";
     public const string TemplateUnknownMergeFields = "TEMPLATE_UNKNOWN_MERGE_FIELDS";
 

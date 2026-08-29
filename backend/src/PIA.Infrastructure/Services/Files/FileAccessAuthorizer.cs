@@ -5,6 +5,9 @@ using PIA.Domain.Enums;
 using PIA.Domain.Exceptions;
 using PIA.Infrastructure.Persistence;
 
+// FileCategory.GeneratedIdCard and IdCardStatus live in PIA.Domain.Enums (already imported above);
+// IdCard entity lives in PIA.Domain.Entities (already imported above).
+
 namespace PIA.Infrastructure.Services.Files;
 
 public sealed class FileAccessAuthorizer(PiaDbContext db, ICurrentUser currentUser) : IFileAccessAuthorizer
@@ -16,6 +19,21 @@ public sealed class FileAccessAuthorizer(PiaDbContext db, ICurrentUser currentUs
 
         if (currentUser.Role == UserRole.Admin)
         {
+            return;
+        }
+
+        // Dual-lock for the intern's own generated ID card PDF: the file exists (and is owned by
+        // the intern) as soon as the mentor submits it, but it must only be downloadable by the
+        // intern once Admin has approved or issued it - mirrors the attendance dual-lock pattern.
+        if (file.Category == FileCategory.GeneratedIdCard && currentUser.Role == UserRole.Intern &&
+            file.OwnerUserId == currentUser.UserId)
+        {
+            var card = await db.IdCards.AsNoTracking().FirstOrDefaultAsync(c => c.GeneratedFileId == fileId, ct);
+            if (card is null || (card.Status != IdCardStatus.Approved && card.Status != IdCardStatus.Issued))
+            {
+                throw new BusinessRuleException(BusinessRuleCodes.IdCardNotReadyForDownload,
+                    "Your ID card is not available for download yet - it must be approved or issued by admin first.");
+            }
             return;
         }
 

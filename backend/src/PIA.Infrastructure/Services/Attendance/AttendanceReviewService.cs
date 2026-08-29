@@ -16,6 +16,7 @@ public sealed class AttendanceReviewService(
     ICurrentUser currentUser,
     ICorrelationContext correlation,
     IClock clock,
+    IFaceVerificationProvider faceProvider,
     IOptions<AttendanceOptions> attendanceOptions) : IAttendanceReviewService
 {
     public async Task<IReadOnlyList<ReviewQueueItemDto>> GetPendingReviewsAsync(CancellationToken ct)
@@ -98,6 +99,17 @@ public sealed class AttendanceReviewService(
         if (currentUser.Role == UserRole.Mentor && profile.MentorId != currentUser.UserId)
         {
             throw new ForbiddenException("You can only request overrides for your own interns.");
+        }
+
+        // Same dual-lock as normal attendance clock-in: an override is a manual substitute for a
+        // face-verified punch, so it must not be usable to bypass face verification altogether.
+        // Only enforced when a real face provider is configured - see AttendanceService's identical
+        // comment: without one, attendance itself already degrades to geofence-only for everyone.
+        if (faceProvider.IsConfigured &&
+            (profile.ProfilePhotoStatus != ProfilePhotoStatus.Approved || profile.FaceEnrollmentStatus != FaceEnrollmentStatus.Active))
+        {
+            throw new BusinessRuleException(BusinessRuleCodes.AttendanceLocked,
+                "Attendance override is locked until this intern's profile photo and face enrollment are verified.");
         }
 
         var monthStart = new DateOnly(request.WorkDate.Year, request.WorkDate.Month, 1);
