@@ -56,10 +56,16 @@ client.interceptors.response.use(
 
 function normalizeError(error: AxiosError): ApiError {
   const data = error.response?.data as { code?: string; title?: string; errors?: Record<string, string[]> } | undefined;
+  // The API's Title already contains the specific reason for validation failures (e.g. "Password
+  // must be at least 8 characters long."), but fall back to stitching the field errors together
+  // ourselves in case a future endpoint sends errors without a descriptive title.
+  const fieldErrorText = data?.errors
+    ? Object.values(data.errors).flat().join(' ')
+    : undefined;
   return {
     status: error.response?.status ?? 0,
     code: data?.code ?? 'NETWORK_ERROR',
-    message: data?.title ?? error.message ?? 'Something went wrong. Please try again.',
+    message: data?.title || fieldErrorText || error.message || 'Something went wrong. Please try again.',
     fieldErrors: data?.errors,
   };
 }

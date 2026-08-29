@@ -54,61 +54,104 @@ export function ChangePasswordScreen() {
   };
 
   return (
-    <Screen scroll>
-      
+    <Screen scroll style={s.container}>
       <Text variant="body" tone="secondary" style={s.subtitle}>
         Choose a strong new password.
       </Text>
 
-      <Controller
-        control={control}
-        name="currentPassword"
-        render={({ field }) => (
-          <Input
-            label="Current Password"
-            secureToggle
-            value={field.value}
-            onChangeText={field.onChange}
-            error={formState.errors.currentPassword?.message}
+      <View style={s.card}>
+        <View style={s.inputGap}>
+          <Controller
+            control={control}
+            name="currentPassword"
+            render={({ field }) => (
+              <Input
+                label="Current Password"
+                secureToggle
+                value={field.value}
+                onChangeText={field.onChange}
+                error={formState.errors.currentPassword?.message}
+              />
+            )}
           />
-        )}
-      />
-      <Controller
-        control={control}
-        name="newPassword"
-        render={({ field }) => (
-          <Input
-            label="New Password"
-            secureToggle
-            value={field.value}
-            onChangeText={field.onChange}
-            error={formState.errors.newPassword?.message}
-          />
-        )}
-      />
-      <PasswordStrengthChecklist password={newPassword} fullName={user?.fullName} />
-      <Controller
-        control={control}
-        name="confirmPassword"
-        render={({ field }) => (
-          <Input
-            label="Confirm New Password"
-            secureToggle
-            value={field.value}
-            onChangeText={field.onChange}
-            error={formState.errors.confirmPassword?.message}
-          />
-        )}
-      />
+        </View>
 
-      <View style={s.spacer} />
-      <Button label="Save New Password" onPress={handleSubmit(onSubmit)} loading={submitting} fullWidth />
+        <View style={s.inputGap}>
+          <Controller
+            control={control}
+            name="newPassword"
+            render={({ field }) => (
+              <Input
+                label="New Password"
+                secureToggle
+                value={field.value}
+                onChangeText={field.onChange}
+                error={formState.errors.newPassword?.message}
+              />
+            )}
+          />
+        </View>
+
+        <View style={s.checklistGap}>
+          <PasswordStrengthChecklist password={newPassword} fullName={user?.fullName} />
+        </View>
+
+        <View style={s.inputGap}>
+          <Controller
+            control={control}
+            name="confirmPassword"
+            render={({ field }) => (
+              <Input
+                label="Confirm New Password"
+                secureToggle
+                value={field.value}
+                onChangeText={field.onChange}
+                error={formState.errors.confirmPassword?.message}
+              />
+            )}
+          />
+        </View>
+
+        <Button 
+          label="Save New Password" 
+          onPress={handleSubmit(onSubmit)} 
+          loading={submitting} 
+          fullWidth 
+          style={s.button} 
+        />
+      </View>
     </Screen>
   );
 }
 
 const makeStyles = (t: AppTheme) => ({
-  title: { marginBottom: t.spacing.xs },
-  subtitle: { marginBottom: t.spacing.lg, fontWeight: '500' as const,},
-  spacer: { height: t.spacing.sm },
+  container: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  subtitle: {
+    marginBottom: 12,
+    fontSize: 14,
+  },
+  card: {
+    backgroundColor: t.colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  inputGap: {
+    marginBottom: 8,
+  },
+  checklistGap: {
+    marginVertical: 4,
+  },
+  button: {
+    marginTop: 12,
+  },
 });

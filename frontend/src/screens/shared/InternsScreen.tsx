@@ -23,6 +23,31 @@ import { useTheme } from '../../providers/ThemeProvider';
 import { useAuth } from '../../providers/AuthProvider';
 import type { AppTheme } from '../../theme/types';
 
+// Helper: Format Phone (+92 3XX XXXXXXX)
+function formatPhoneInput(text: string): string {
+  let digits = text.replace(/\D/g, '');
+  if (digits.startsWith('92')) {
+    digits = digits.slice(2);
+  } else if (digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+  digits = digits.slice(0, 10);
+  if (digits.length === 0) return '+92 ';
+  return `+92 ${digits}`;
+}
+
+// Helper: Format CNIC (XXXXX-XXXXXXX-X)
+function formatCnicInput(text: string): string {
+  const digits = text.replace(/\D/g, '').slice(0, 13);
+  if (digits.length <= 5) {
+    return digits;
+  } else if (digits.length <= 12) {
+    return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+  } else {
+    return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`;
+  }
+}
+
 const formShape = {
   fullName: z.string().min(1, 'Full name is required.').max(150),
   phone: z.string().optional(),
@@ -78,7 +103,7 @@ const emptyCreate: CreateValues = {
   fullName: '',
   email: '',
   cnic: '',
-  phone: '',
+  phone: '+92 ',
   mentorId: null,
   internshipStartDate: '',
   internshipEndDate: '',
@@ -104,8 +129,6 @@ const statusBgKey: Record<string, 'surfaceSunken' | 'warningBg' | 'successBg' | 
   Rejected: 'errorBg',
 };
 
-/** Shared between Admin and Mentor navigators - the backend already scopes the list/actions to a
- * mentor's own mentees, so the only UI difference here is whether the mentor picker is shown. */
 export function InternsScreen() {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
@@ -130,7 +153,7 @@ export function InternsScreen() {
   const createForm = useForm<CreateValues>({ resolver: zodResolver(createSchema), defaultValues: emptyCreate });
   const updateForm = useForm<UpdateValues>({
     resolver: zodResolver(updateSchema),
-    defaultValues: { ...emptyCreate, ...{ address: '', emergencyContactName: '', emergencyContactPhone: '', bloodGroup: '' } },
+    defaultValues: { ...emptyCreate, ...{ address: '', emergencyContactName: '', emergencyContactPhone: '+92 ', bloodGroup: '' } },
   });
   const resetPasswordForm = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
@@ -143,13 +166,15 @@ export function InternsScreen() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['interns'] });
 
   const createMutation = useMutation({
-    mutationFn: (values: CreateValues) =>
-      internsApi.create({
+    mutationFn: (values: CreateValues) => {
+      const cleanPhone = values.phone?.trim() === '+92' ? null : values.phone?.trim();
+      return internsApi.create({
         ...values,
-        phone: values.phone?.trim() ? values.phone : null,
+        phone: cleanPhone || null,
         universityName: values.universityName?.trim() ? values.universityName : null,
         degreeProgram: values.degreeProgram?.trim() ? values.degreeProgram : null,
-      }),
+      });
+    },
     onSuccess: () => {
       Toast.show({ type: 'success', text1: 'Intern created', text2: 'Share the password you set with them directly.' });
       invalidate();
@@ -160,17 +185,20 @@ export function InternsScreen() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: UpdateValues }) =>
-      internsApi.update(id, {
+    mutationFn: ({ id, body }: { id: number; body: UpdateValues }) => {
+      const cleanPhone = body.phone?.trim() === '+92' ? null : body.phone?.trim();
+      const cleanEmPhone = body.emergencyContactPhone?.trim() === '+92' ? null : body.emergencyContactPhone?.trim();
+      return internsApi.update(id, {
         ...body,
-        phone: body.phone?.trim() ? body.phone : null,
+        phone: cleanPhone || null,
         universityName: body.universityName?.trim() ? body.universityName : null,
         degreeProgram: body.degreeProgram?.trim() ? body.degreeProgram : null,
         address: body.address?.trim() ? body.address : null,
         emergencyContactName: body.emergencyContactName?.trim() ? body.emergencyContactName : null,
-        emergencyContactPhone: body.emergencyContactPhone?.trim() ? body.emergencyContactPhone : null,
+        emergencyContactPhone: cleanEmPhone || null,
         bloodGroup: body.bloodGroup?.trim() ? body.bloodGroup : null,
-      }),
+      });
+    },
     onSuccess: () => {
       Toast.show({ type: 'success', text1: 'Intern updated' });
       invalidate();
@@ -261,7 +289,7 @@ export function InternsScreen() {
     setEditing(intern);
     updateForm.reset({
       fullName: intern.fullName,
-      phone: intern.phone ?? '',
+      phone: intern.phone ? formatPhoneInput(intern.phone) : '+92 ',
       mentorId: intern.mentorId,
       internshipStartDate: intern.internshipStartDate,
       internshipEndDate: intern.internshipEndDate,
@@ -271,7 +299,7 @@ export function InternsScreen() {
       degreeProgram: intern.degreeProgram ?? '',
       address: intern.address ?? '',
       emergencyContactName: intern.emergencyContactName ?? '',
-      emergencyContactPhone: intern.emergencyContactPhone ?? '',
+      emergencyContactPhone: intern.emergencyContactPhone ? formatPhoneInput(intern.emergencyContactPhone) : '+92 ',
       bloodGroup: intern.bloodGroup ?? '',
     } as UpdateValues);
     setModalOpen(true);
@@ -450,7 +478,15 @@ export function InternsScreen() {
             <Controller
               control={updateForm.control}
               name="phone"
-              render={({ field }) => <Input label="Phone" value={field.value} onChangeText={field.onChange} keyboardType="phone-pad" />}
+              render={({ field }) => (
+                <Input
+                  label="Phone"
+                  value={field.value}
+                  onChangeText={(val) => field.onChange(formatPhoneInput(val))}
+                  keyboardType="phone-pad"
+                  placeholder="+92 3XX XXXXXXX"
+                />
+              )}
             />
             {isAdmin ? (
               <Controller
@@ -512,7 +548,15 @@ export function InternsScreen() {
             <Controller
               control={updateForm.control}
               name="emergencyContactPhone"
-              render={({ field }) => <Input label="Emergency Contact Phone" value={field.value} onChangeText={field.onChange} keyboardType="phone-pad" />}
+              render={({ field }) => (
+                <Input
+                  label="Emergency Contact Phone"
+                  value={field.value}
+                  onChangeText={(val) => field.onChange(formatPhoneInput(val))}
+                  keyboardType="phone-pad"
+                  placeholder="+92 3XX XXXXXXX"
+                />
+              )}
             />
             <Controller
               control={updateForm.control}
@@ -553,7 +597,8 @@ export function InternsScreen() {
                   required
                   placeholder="42101-1234567-1"
                   value={field.value}
-                  onChangeText={field.onChange}
+                  onChangeText={(val) => field.onChange(formatCnicInput(val))}
+                  keyboardType="number-pad"
                   error={createForm.formState.errors.cnic?.message}
                 />
               )}
@@ -561,7 +606,15 @@ export function InternsScreen() {
             <Controller
               control={createForm.control}
               name="phone"
-              render={({ field }) => <Input label="Phone" value={field.value} onChangeText={field.onChange} keyboardType="phone-pad" />}
+              render={({ field }) => (
+                <Input
+                  label="Phone"
+                  value={field.value}
+                  onChangeText={(val) => field.onChange(formatPhoneInput(val))}
+                  keyboardType="phone-pad"
+                  placeholder="+92 3XX XXXXXXX"
+                />
+              )}
             />
             {isAdmin ? (
               <Controller

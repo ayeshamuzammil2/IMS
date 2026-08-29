@@ -52,66 +52,114 @@ export function SetNewPasswordScreen() {
   };
 
   return (
-    <Screen scroll>
+    <Screen scroll style={s.container}>
       <Text variant="body" tone="secondary" style={s.subtitle}>
         For your security, you must set a new password before continuing.
       </Text>
 
-      <Controller
-        control={control}
-        name="currentPassword"
-        render={({ field }) => (
-          <Input
-            label="Temporary Password"
-            secureToggle
-            value={field.value}
-            onChangeText={field.onChange}
-            error={formState.errors.currentPassword?.message}
+      <View style={s.card}>
+        <View style={s.inputGap}>
+          <Controller
+            control={control}
+            name="currentPassword"
+            render={({ field }) => (
+              <Input
+                label="Temporary Password"
+                secureToggle
+                value={field.value}
+                onChangeText={field.onChange}
+                error={formState.errors.currentPassword?.message}
+              />
+            )}
           />
-        )}
-      />
-      <Controller
-        control={control}
-        name="newPassword"
-        render={({ field }) => (
-          <Input
-            label="New Password"
-            secureToggle
-            value={field.value}
-            onChangeText={field.onChange}
-            error={formState.errors.newPassword?.message}
-          />
-        )}
-      />
-      <PasswordStrengthChecklist password={newPassword} fullName={user?.fullName} />
-      <Controller
-        control={control}
-        name="confirmPassword"
-        render={({ field }) => (
-          <Input
-            label="Confirm New Password"
-            secureToggle
-            value={field.value}
-            onChangeText={field.onChange}
-            error={formState.errors.confirmPassword?.message}
-          />
-        )}
-      />
+        </View>
 
-      {serverError ? (
-        <Text variant="caption" tone="error" style={s.error}>
-          {serverError}
-        </Text>
-      ) : null}
+        <View style={s.inputGap}>
+          <Controller
+            control={control}
+            name="newPassword"
+            render={({ field }) => (
+              <Input
+                label="New Password"
+                secureToggle
+                value={field.value}
+                onChangeText={field.onChange}
+                error={formState.errors.newPassword?.message}
+              />
+            )}
+          />
+        </View>
 
-      <View style={s.spacer} />
-      <Button label="Save & Continue" onPress={handleSubmit(onSubmit)} loading={submitting} fullWidth />
+        <View style={s.checklistGap}>
+          <PasswordStrengthChecklist password={newPassword} fullName={user?.fullName} />
+        </View>
+
+        <View style={s.inputGap}>
+          <Controller
+            control={control}
+            name="confirmPassword"
+            render={({ field }) => (
+              <Input
+                label="Confirm New Password"
+                secureToggle
+                value={field.value}
+                onChangeText={field.onChange}
+                error={formState.errors.confirmPassword?.message}
+              />
+            )}
+          />
+        </View>
+
+        {serverError ? (
+          <Text variant="caption" tone="error" style={s.error}>
+            {serverError}
+          </Text>
+        ) : null}
+
+        <Button
+          label="Save & Continue"
+          onPress={handleSubmit(onSubmit)}
+          loading={submitting}
+          fullWidth
+          style={s.button}
+        />
+      </View>
     </Screen>
   );
 }
 
 const makeStyles = (t: AppTheme) => ({
-  subtitle: { marginBottom: t.spacing.lg, fontWeight: '500' as const },
-  error: { marginBottom: t.spacing.md },
-  spacer: { height: t.spacing.sm },
+  container: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  subtitle: {
+    marginBottom: 12,
+    fontSize: 14,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  inputGap: {
+    marginBottom: 8,
+  },
+  checklistGap: {
+    marginVertical: 4,
+  },
+  error: {
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  button: {
+    marginTop: 12,
+  },
 });

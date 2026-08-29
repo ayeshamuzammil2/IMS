@@ -41,9 +41,19 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
     {
         return exception switch
         {
-            ValidationException ex => (ex.StatusCode, ex.ErrorCode, "Validation failed.", ex.Errors),
+            // Surface the actual field-level reason(s) in Title instead of a generic
+            // "Validation failed." - the client shows Title directly to the user, so a generic
+            // message here made every validation failure (weak password, bad CNIC/phone format,
+            // invalid date range, etc.) look identical and undiagnosable from the UI.
+            ValidationException ex => (ex.StatusCode, ex.ErrorCode, BuildValidationTitle(ex.Errors), ex.Errors),
             AppException ex => (ex.StatusCode, ex.ErrorCode, ex.Message, null),
             _ => (500, "INTERNAL_ERROR", "An unexpected error occurred.", null),
         };
+    }
+
+    private static string BuildValidationTitle(IReadOnlyDictionary<string, string[]> errors)
+    {
+        var allMessages = errors.Values.SelectMany(m => m).ToList();
+        return allMessages.Count > 0 ? string.Join(" ", allMessages) : "Validation failed.";
     }
 }

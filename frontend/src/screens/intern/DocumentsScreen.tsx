@@ -4,12 +4,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import Toast from 'react-native-toast-message';
-import { CheckCircle2, Clock, XCircle, FileWarning } from 'lucide-react-native';
+import { CheckCircle2, Clock, XCircle, FileWarning, ShieldCheck } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
 import { Button } from '../../components/primitives/Button';
-import { VerificationBanner } from '../../components/data/VerificationBanner';
 import { documentsApi, type DocumentDto, type DocumentTypeKey } from '../../api/resources/documents.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
@@ -88,7 +87,10 @@ export function DocumentsScreen() {
 
   return (
     <Screen scroll>
-      {data ? <VerificationBanner status={data.verificationStatus} /> : null}
+      {/* Dynamic Enhanced Verification Banner */}
+      {data?.verificationStatus ? (
+        <EnhancedVerificationBanner status={data.verificationStatus} />
+      ) : null}
 
       {isLoading ? (
         <Text variant="body" tone="muted">
@@ -147,6 +149,47 @@ export function DocumentsScreen() {
         </>
       )}
     </Screen>
+  );
+}
+
+function EnhancedVerificationBanner({ status }: { status: string }) {
+  const s = useThemedStyles(makeStyles);
+  const theme = useTheme();
+
+  const isApproved = status === 'Approved' || status === 'Verified';
+
+  if (isApproved) {
+    return (
+      <View style={s.bannerCard}>
+        <View style={[s.iconBox, { backgroundColor: theme.colors.successBg }]}>
+          <ShieldCheck size={18} color={theme.colors.success} />
+        </View>
+        <View style={s.bannerTextContainer}>
+          <Text variant="bodyStrong" tone="success" style={s.bannerTitle}>
+            Verification Completed
+          </Text>
+          <Text variant="caption" tone="secondary">
+            All required documents have been reviewed and verified.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={s.bannerCard}>
+      <View style={[s.iconBox, { backgroundColor: theme.colors.warningBg }]}>
+        <Clock size={18} color={theme.colors.warning} />
+      </View>
+      <View style={s.bannerTextContainer}>
+        <Text variant="bodyStrong" tone="warning" style={s.bannerTitle}>
+          Verification Pending
+        </Text>
+        <Text variant="caption" tone="muted">
+          Documents are under review by your mentor.
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -238,6 +281,38 @@ function StatusBadge({ status }: { status: DocumentDto['status'] | null }) {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  bannerCard: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.lg,
+    paddingHorizontal: t.spacing.md,
+    paddingVertical: t.spacing.sm + 2,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    marginBottom: t.spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    gap: t.spacing.sm + 2,
+  },
+  iconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: t.radii.full,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  bannerTextContainer: {
+    flex: 1,
+    gap: 1,
+  },
+  bannerTitle: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+  },
   card: {
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,

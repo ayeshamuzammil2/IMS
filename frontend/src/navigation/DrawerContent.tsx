@@ -31,15 +31,14 @@ export function DrawerContent(props: DrawerContentComponentProps) {
 
   return (
     <View style={s.flex}>
+      {/* Brand Block: Pure Left-Aligned Logo Only */}
       <View style={s.brandBlock}>
         <Image source={require('../../assets/pia-logo.png')} style={s.logo} resizeMode="contain" />
-        <Text variant="bodyStrong" tone="brand">
-          PIA Wings
-        </Text>
       </View>
 
+      {/* User Card */}
       <Pressable
-        style={s.userCard}
+        style={({ pressed }) => [s.userCard, pressed && s.pressed]}
         onPress={() => (props.navigation as any).navigate('Shared', { screen: 'Profile' })}
         accessibilityRole="button"
         accessibilityLabel={`${user?.fullName ?? 'Profile'}, ${user?.role ?? ''}`}
@@ -55,22 +54,25 @@ export function DrawerContent(props: DrawerContentComponentProps) {
         </View>
       </Pressable>
 
-      <DrawerContentScrollView {...props} contentContainerStyle={s.scrollContent}>
+      <DrawerContentScrollView {...props} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
         <DrawerItemList {...props} />
       </DrawerContentScrollView>
 
-      <Pressable
-        style={s.signOutRow}
-        onPress={handleSignOut}
-        disabled={signingOut}
-        accessibilityRole="button"
-        accessibilityLabel="Sign out"
-      >
-        <Power size={20} color={theme.colors.error} />
-        <Text variant="bodyStrong" tone="error" style={s.signOutLabel}>
-          Sign Out
-        </Text>
-      </Pressable>
+      {/* Raised Sign Out Button (Raised from bottom) */}
+      <View style={s.footer}>
+        <Pressable
+          style={({ pressed }) => [s.signOutRow, pressed && s.signOutPressed]}
+          onPress={handleSignOut}
+          disabled={signingOut}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+        >
+          <Power size={20} color={theme.colors.error} />
+          <Text variant="bodyStrong" tone="error" style={s.signOutLabel}>
+            Sign Out
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -78,13 +80,18 @@ export function DrawerContent(props: DrawerContentComponentProps) {
 const makeStyles = (t: AppTheme) => ({
   flex: { flex: 1, backgroundColor: t.colors.drawerBg },
   brandBlock: {
-    padding: t.spacing.lg,
+    paddingHorizontal: t.spacing.lg,
+    paddingTop: t.spacing.xl,
+    paddingBottom: t.spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: t.colors.border,
-    alignItems: 'center' as const,
-    gap: t.spacing.sm,
+    alignItems: 'flex-start' as const, // Strict Left Alignment
   },
-  logo: { width: 100, height: 100 },
+  logo: { 
+    width: 120, 
+    height: 120,
+    alignSelf: 'center' as const, // Pure Left Align
+  },
   userCard: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
@@ -93,15 +100,28 @@ const makeStyles = (t: AppTheme) => ({
     borderBottomWidth: 1,
     borderBottomColor: t.colors.border,
   },
+  pressed: {
+    opacity: 0.75,
+  },
   userInfo: { flex: 1 },
   scrollContent: { paddingTop: t.spacing.sm },
+  footer: {
+    paddingHorizontal: t.spacing.md,
+    paddingTop: t.spacing.md,
+    paddingBottom: t.spacing.xl, // Sign out ko niche se upar kiya
+    borderTopWidth: 1,
+    borderTopColor: t.colors.border,
+  },
   signOutRow: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: t.spacing.sm,
-    padding: t.spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: t.colors.border,
+    paddingVertical: t.spacing.md,
+    paddingHorizontal: t.spacing.md,
+    borderRadius: 8,
+  },
+  signOutPressed: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
   },
   signOutLabel: {},
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, View } from 'react-native';
+import { Image, View, Platform } from 'react-native';
 import { useTheme } from '../../providers/ThemeProvider';
 import { Text } from '../primitives/Text';
 
@@ -27,9 +27,23 @@ export function RoleAvatar({ name, imageUrl, size = 40 }: Props) {
     return <Image source={{ uri: imageUrl }} style={style} />;
   }
 
+  const fontSize = size * 0.4;
+
   return (
     <View style={style}>
-      <Text style={{ color: theme.colors.onPrimaryContainer, fontSize: size * 0.4, fontWeight: '700' }}>{initial}</Text>
+      <Text
+        style={{
+          color: theme.colors.onPrimaryContainer,
+          fontSize: fontSize,
+          fontWeight: '700',
+          lineHeight: fontSize * 1.2, // Text ko clipping se bachane ke liye
+          textAlign: 'center',
+          textAlignVertical: 'center',
+          includeFontPadding: false, // Android ka extra padding khatam karne ke liye
+        }}
+      >
+        {initial}
+      </Text>
     </View>
   );
 }

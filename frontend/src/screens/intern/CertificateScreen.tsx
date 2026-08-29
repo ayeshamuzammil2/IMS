@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { Award, Clock, XCircle, Lock } from 'lucide-react-native';
+import { Award, Clock, XCircle, Lock, ShieldCheck, Download, AlertCircle } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
@@ -14,12 +14,45 @@ import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
 import type { AppTheme } from '../../theme/types';
 
-const STATUS_CONFIG: Record<CertificateStatusKey, { tone: 'success' | 'warning' | 'error' | 'muted'; label: string; Icon: typeof Award }> = {
-  Locked: { tone: 'muted', label: 'Not yet available - completes after your internship period and verification.', Icon: Lock },
-  PendingApproval: { tone: 'warning', label: 'Generated - pending admin approval.', Icon: Clock },
-  Approved: { tone: 'warning', label: 'Approved - awaiting issuance.', Icon: Clock },
-  Issued: { tone: 'success', label: 'Issued', Icon: Award },
-  Rejected: { tone: 'error', label: 'Rejected', Icon: XCircle },
+const STATUS_CONFIG: Record<
+  CertificateStatusKey,
+  {
+    tone: 'success' | 'warning' | 'error' | 'muted';
+    title: string;
+    description: string;
+    Icon: typeof Award;
+  }
+> = {
+  Locked: {
+    tone: 'muted',
+    title: 'Certificate Locked',
+    description: 'Not yet available. It will unlock automatically after your internship period and document verification are completed.',
+    Icon: Lock,
+  },
+  PendingApproval: {
+    tone: 'warning',
+    title: 'Pending Admin Approval',
+    description: 'Your certificate has been generated and is awaiting final approval from the administration.',
+    Icon: Clock,
+  },
+  Approved: {
+    tone: 'warning',
+    title: 'Approved - Awaiting Issuance',
+    description: 'Your certificate is approved and will be issued very soon.',
+    Icon: Clock,
+  },
+  Issued: {
+    tone: 'success',
+    title: 'Certificate Successfully Issued!',
+    description: 'Congratulations! Your official internship completion certificate is ready for download.',
+    Icon: ShieldCheck,
+  },
+  Rejected: {
+    tone: 'error',
+    title: 'Certificate Request Rejected',
+    description: 'Your certificate issuance was rejected. Please contact your coordinator or support for details.',
+    Icon: XCircle,
+  },
 };
 
 export function CertificateScreen() {
@@ -61,36 +94,145 @@ export function CertificateScreen() {
   }
 
   const config = STATUS_CONFIG[data.status];
+  const IconComponent = config.Icon;
 
   return (
     <Screen scroll>
-      <View style={s.iconWrap}>
-        <config.Icon size={48} color={theme.colors[config.tone === 'muted' ? 'textMuted' : config.tone]} />
-      </View>
-      <Text variant="h3" style={s.statusLabel} tone={config.tone}>
-        {config.label}
-      </Text>
-      {data.certificateNumber ? (
-        <Text variant="caption" tone="muted" style={s.centerText}>
-          Certificate No: {data.certificateNumber}
-        </Text>
-      ) : null}
-      {data.issueDate ? (
-        <Text variant="caption" tone="muted" style={s.centerText}>
-          Issued: {new Date(data.issueDate).toLocaleDateString()}
-        </Text>
-      ) : null}
+      {/* Main Status Banner Card */}
+      <View style={[s.card, s[`card_${config.tone}`]]}>
+        <View style={[s.iconWrapper, s[`iconWrapper_${config.tone}`]]}>
+          <IconComponent size={32} color={getIconColor(config.tone, theme)} />
+        </View>
 
-      {data.status === 'Issued' && data.generatedFileId ? (
-        <Button label="Download Certificate" onPress={handleDownload} loading={downloading} fullWidth style={s.downloadButton} />
-      ) : null}
+        <Text variant="h3" style={s.cardTitle}>
+          {config.title}
+        </Text>
+
+        <Text variant="caption" tone="muted" style={s.cardDescription}>
+          {config.description}
+        </Text>
+
+        {/* Dynamic Badges & Meta Info */}
+        {(data.certificateNumber || data.issueDate) && (
+          <View style={s.metaContainer}>
+            {data.certificateNumber ? (
+              <View style={s.metaRow}>
+                <Text variant="caption" tone="muted">
+                  Certificate No:
+                </Text>
+                <Text variant="caption" style={s.metaValue}>
+                  {data.certificateNumber}
+                </Text>
+              </View>
+            ) : null}
+
+            {data.issueDate ? (
+              <View style={s.metaRow}>
+                <Text variant="caption" tone="muted">
+                  Issued On:
+                </Text>
+                <Text variant="caption" style={s.metaValue}>
+                  {new Date(data.issueDate).toLocaleDateString()}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        )}
+
+        {/* Action Button for Issued State */}
+        {data.status === 'Issued' && data.generatedFileId ? (
+          <Button
+            label="Download Certificate"
+            onPress={handleDownload}
+            loading={downloading}
+            fullWidth
+            style={s.downloadButton}
+          />
+        ) : null}
+      </View>
     </Screen>
   );
 }
 
+function getIconColor(tone: 'success' | 'warning' | 'error' | 'muted', theme: AppTheme) {
+  switch (tone) {
+    case 'success':
+      return theme.colors.success;
+    case 'warning':
+      return theme.colors.warning;
+    case 'error':
+      return theme.colors.error;
+    default:
+      return theme.colors.textMuted;
+  }
+}
+
 const makeStyles = (t: AppTheme) => ({
-  iconWrap: { alignItems: 'center' as const, marginTop: t.spacing.xl, marginBottom: t.spacing.md },
-  statusLabel: { textAlign: 'center' as const, marginBottom: t.spacing.xs, paddingHorizontal: t.spacing.lg },
-  centerText: { textAlign: 'center' as const },
-  downloadButton: { marginTop: t.spacing.xl },
+  card: {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.lg,
+    borderWidth: 1.5,
+    padding: t.spacing.xl,
+    alignItems: 'center' as const,
+    marginTop: t.spacing.md,
+  },
+  card_success: {
+    borderColor: t.colors.success,
+    backgroundColor: t.colors.successBg,
+  },
+  card_warning: {
+    borderColor: t.colors.warning,
+    backgroundColor: t.colors.warningBg,
+  },
+  card_error: {
+    borderColor: t.colors.error,
+    backgroundColor: t.colors.errorBg,
+  },
+  card_muted: {
+    borderColor: t.colors.border,
+    backgroundColor: t.colors.surface,
+  },
+
+  iconWrapper: {
+    padding: t.spacing.md,
+    borderRadius: 50,
+    marginBottom: t.spacing.md,
+  },
+  iconWrapper_success: { backgroundColor: 'rgba(34, 197, 94, 0.15)' },
+  iconWrapper_warning: { backgroundColor: 'rgba(234, 179, 8, 0.15)' },
+  iconWrapper_error: { backgroundColor: 'rgba(239, 68, 68, 0.15)' },
+  iconWrapper_muted: { backgroundColor: t.colors.surfaceSunken },
+
+  cardTitle: {
+    textAlign: 'center' as const,
+    marginBottom: t.spacing.xs,
+  },
+  cardDescription: {
+    textAlign: 'center' as const,
+    lineHeight: 18,
+    marginBottom: t.spacing.md,
+  },
+
+  metaContainer: {
+    width: '100%' as const,
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.md,
+    padding: t.spacing.md,
+    gap: t.spacing.xs,
+    marginTop: t.spacing.xs,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+  },
+  metaRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+  },
+  metaValue: {
+    fontWeight: '600' as const,
+  },
+
+  downloadButton: {
+    marginTop: t.spacing.lg,
+  },
 });

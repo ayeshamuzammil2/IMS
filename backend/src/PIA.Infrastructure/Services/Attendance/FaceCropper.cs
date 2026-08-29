@@ -1,3 +1,4 @@
+using System.Linq;
 using PIA.Application.Contracts.Attendance;
 using SkiaSharp;
 
@@ -15,16 +16,20 @@ public static class FaceCropper
     {
         var cx = bbox.X + bbox.Width / 2;
         var cy = bbox.Y + bbox.Height / 2;
-        var cropSize = Math.Max(bbox.Width, bbox.Height) * scale;
-        var half = cropSize / 2;
+        var desiredHalf = Math.Max(bbox.Width, bbox.Height) * scale / 2;
 
+        // Clamping left/top independently (the old approach) can silently shift the crop off the
+        // face center whenever the desired half-size doesn't fit within the image on one side -
+        // extremely common for selfies where the face already fills most of the frame. Instead,
+        // shrink the half-size symmetrically so the crop is guaranteed to stay centered on the
+        // face (possibly with less margin than the requested scale), which is far closer to what
+        // the model was trained on than a full-size but decentered crop.
+        var maxHalf = new[] { cx, cy, source.Width - cx, source.Height - cy }.Min();
+        var half = Math.Min(desiredHalf, maxHalf);
+
+        var size = (int)Math.Round(half * 2);
         var left = (int)Math.Round(cx - half);
         var top = (int)Math.Round(cy - half);
-        var size = (int)Math.Round(cropSize);
-
-        left = Math.Clamp(left, 0, Math.Max(0, source.Width - 1));
-        top = Math.Clamp(top, 0, Math.Max(0, source.Height - 1));
-        size = Math.Min(size, Math.Min(source.Width - left, source.Height - top));
         if (size <= 4) return null;
 
         using var cropped = new SKBitmap(size, size);

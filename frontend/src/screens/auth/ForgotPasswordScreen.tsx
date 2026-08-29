@@ -72,70 +72,106 @@ export function ForgotPasswordScreen() {
   };
 
   return (
-    <Screen scroll>
+    <Screen scroll style={s.container}>
       <Text variant="body" tone="secondary" style={s.subtitle}>
         Enter your email and set a new password for your account.
       </Text>
 
-      <Controller
-        control={control}
-        name="email"
-        render={({ field }) => (
-          <Input
-            label="Email"
-            value={field.value}
-            onChangeText={field.onChange}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            placeholder="you@pia.com.pk"
-            error={errors.email?.message}
+      <View style={s.card}>
+        <View style={s.inputGap}>
+          <Controller
+            control={control}
+            name="email"
+            render={({ field }) => (
+              <Input
+                label="Email"
+                value={field.value}
+                onChangeText={field.onChange}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                placeholder="you@pia.com.pk"
+                error={errors.email?.message}
+              />
+            )}
           />
-        )}
-      />
+        </View>
 
-      <Controller
-        control={control}
-        name="password"
-        render={({ field }) => (
-          <Input
-            label="New Password"
-            secureToggle
-            value={field.value}
-            onChangeText={field.onChange}
-            error={errors.password?.message}
+        <View style={s.inputGap}>
+          <Controller
+            control={control}
+            name="password"
+            render={({ field }) => (
+              <Input
+                label="New Password"
+                secureToggle
+                value={field.value}
+                onChangeText={field.onChange}
+                error={errors.password?.message}
+              />
+            )}
           />
-        )}
-      />
+        </View>
 
-      <PasswordStrengthChecklist password={password ?? ''} />
+        <View style={s.checklistGap}>
+          <PasswordStrengthChecklist password={password ?? ''} />
+        </View>
 
-      <Controller
-        control={control}
-        name="confirmPassword"
-        render={({ field }) => (
-          <Input
-            label="Confirm New Password"
-            secureToggle
-            value={field.value}
-            onChangeText={field.onChange}
-            error={errors.confirmPassword?.message}
+        <View style={s.inputGap}>
+          <Controller
+            control={control}
+            name="confirmPassword"
+            render={({ field }) => (
+              <Input
+                label="Confirm New Password"
+                secureToggle
+                value={field.value}
+                onChangeText={field.onChange}
+                error={errors.confirmPassword?.message}
+              />
+            )}
           />
-        )}
-      />
+        </View>
 
-      <View style={s.spacer} />
-
-      <Button
-        label="Reset Password"
-        onPress={handleSubmit(onSubmit)}
-        loading={isSubmitting}
-        fullWidth
-      />
+        <Button
+          label="Reset Password"
+          onPress={handleSubmit(onSubmit)}
+          loading={isSubmitting}
+          fullWidth
+          style={s.button}
+        />
+      </View>
     </Screen>
   );
 }
 
 const makeStyles = (t: AppTheme) => ({
-  subtitle: { marginBottom: t.spacing.lg, fontWeight: '500' as const },
-  spacer: { height: t.spacing.sm },
+  container: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  subtitle: {
+    marginBottom: 12,
+    fontSize: 14,
+  },
+  card: {
+    backgroundColor: t.colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  inputGap: {
+    marginBottom: 8,
+  },
+  checklistGap: {
+    marginVertical: 4,
+  },
+  button: {
+    marginTop: 12,
+  },
 });
