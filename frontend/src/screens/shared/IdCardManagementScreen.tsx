@@ -1,20 +1,20 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { View } from 'react-native';
+import { View, Pressable } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import { Search, X } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
 import { Button } from '../../components/primitives/Button';
 import { SelectField } from '../../components/forms/SelectField';
-import { FilterBar } from '../../components/filters/FilterBar';
 import { internsApi } from '../../api/resources/interns.api';
 import { idCardsApi } from '../../api/resources/idcards.api';
-import { departmentsApi } from '../../api/resources/departments.api';
 import { IdCardPreview } from '../../components/media/IdCardPreview';
 import { useThemedStyles } from '../../theme/useThemedStyles';
+import { useTheme } from '../../providers/ThemeProvider';
 import { useAuth } from '../../providers/AuthProvider';
 import type { AppTheme } from '../../theme/types';
 
@@ -28,6 +28,7 @@ const CARD_STATUS_TONE: Record<string, 'muted' | 'success' | 'warning' | 'error'
 
 export function IdCardManagementScreen() {
   const s = useThemedStyles(makeStyles);
+  const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'Admin';
   const queryClient = useQueryClient();
@@ -38,39 +39,43 @@ export function IdCardManagementScreen() {
   const [busy, setBusy] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
+  // Search state
+  const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState<number | null>(null);
 
   const { data: interns = [] } = useQuery({ queryKey: ['interns'], queryFn: () => internsApi.list() });
 
-  // Only Admin sees a department filter - a Mentor's intern list is already scoped by the
-  // backend to their own department, so a department picker would add nothing for them.
-  const { data: departmentOptions = [] } = useQuery({
-    queryKey: ['departments', 'lookup'],
-    queryFn: departmentsApi.lookup,
-    enabled: isAdmin,
-  });
-  const departmentSelectOptions = useMemo(() => departmentOptions.map((d) => ({ value: d.id, label: d.name })), [departmentOptions]);
-
   const filteredInterns = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return interns.filter((i) => {
-      if (isAdmin && departmentFilter && i.departmentId !== departmentFilter) return false;
-      if (!term) return true;
-      return i.fullName.toLowerCase().includes(term) || i.internCode.toLowerCase().includes(term);
-    });
-  }, [interns, isAdmin, departmentFilter, search]);
+    if (!term) return interns;
+    return interns.filter(
+      (i) =>
+        i.fullName.toLowerCase().includes(term) ||
+        i.internCode.toLowerCase().includes(term)
+    );
+  }, [interns, search]);
 
   const internOptions = useMemo(
-    () => filteredInterns.map((i) => ({ value: i.id, label: `${i.fullName} (${i.internCode})` })),
-    [filteredInterns],
+    () => filteredInterns.map((i) => ({ value: String(i.id), label: `${i.fullName} (${i.internCode})` })),
+    [filteredInterns]
   );
 
-  const handleDepartmentChange = (value: number | null) => {
-    setDepartmentFilter(value);
-    if (internProfileId && !interns.some((i) => i.id === internProfileId && (!value || i.departmentId === value))) {
-      setInternProfileId(null);
+  // Auto-sync search results with active intern selection
+  useEffect(() => {
+    if (search.trim() && filteredInterns.length > 0) {
+      const matchExists = filteredInterns.some((i) => i.id === internProfileId);
+      if (!matchExists) {
+        setInternProfileIdState(filteredInterns[0].id);
+        setDesignationOverride(null);
+      }
     }
+  }, [search, filteredInterns, internProfileId]);
+
+  const toggleSearch = () => {
+    if (showSearch) {
+      setSearch('');
+    }
+    setShowSearch((prev) => !prev);
   };
 
   const cardQuery = useQuery({
@@ -83,8 +88,8 @@ export function IdCardManagementScreen() {
 
   const designation = designationOverride ?? cardQuery.data?.designation ?? '';
 
-  const setInternProfileId = (id: number | null) => {
-    setInternProfileIdState(id);
+  const setInternProfileId = (id: string | number | null) => {
+    setInternProfileIdState(id ? Number(id) : null);
     setDesignationOverride(null);
   };
 
@@ -130,9 +135,6 @@ export function IdCardManagementScreen() {
     }
   };
 
-  // Captures the EXACT on-screen IdCardPreview as a PNG and shares it via Expo's Sharing API.
-  // The capture already produces a local file URI, so no separate download step is needed —
-  // this guarantees the shared/saved card looks identical to what's on screen.
   const handleDownload = async () => {
     if (!cardShotRef.current?.capture) return;
     setDownloading(true);
@@ -153,16 +155,39 @@ export function IdCardManagementScreen() {
 
   return (
     <Screen scroll>
-      <FilterBar
-        search={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search by intern name or code"
-        departmentOptions={isAdmin ? departmentSelectOptions : undefined}
-        departmentValue={departmentFilter}
-        onDepartmentChange={isAdmin ? handleDepartmentChange : undefined}
+      <SelectField
+        label="Intern"
+        required
+        placeholder="Select an intern"
+        value={internProfileId ? String(internProfileId) : ''}
+        options={internOptions}
+        onChange={setInternProfileId}
       />
 
-      <SelectField label="Intern" required placeholder="Select an intern" value={internProfileId} options={internOptions} onChange={setInternProfileId} />
+      {/* Search Icon Trigger & Expandable Input under Intern SelectField */}
+      <View style={s.searchBarSection}>
+        <View style={s.searchIconRow}>
+          <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
+            {showSearch ? (
+              <X size={20} color={theme.colors.textSecondary} />
+            ) : (
+              <Search size={20} color={theme.colors.textSecondary} />
+            )}
+          </Pressable>
+        </View>
+
+        {showSearch && (
+          <View style={s.searchContainer}>
+            <Input
+              placeholder="Search by intern name or code..."
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="none"
+              autoFocus
+            />
+          </View>
+        )}
+      </View>
 
       {internProfileId ? (
         <View style={s.card}>
@@ -210,6 +235,23 @@ export function IdCardManagementScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  searchBarSection: {
+    marginTop: t.spacing.xs,
+    marginBottom: t.spacing.sm,
+  },
+  searchIconRow: {
+    alignItems: 'flex-end' as const,
+  },
+  iconButton: {
+    padding: 8,
+    borderRadius: t.radii.md,
+    backgroundColor: t.colors.surface,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+  },
+  searchContainer: {
+    marginTop: t.spacing.xs,
+  },
   card: {
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,

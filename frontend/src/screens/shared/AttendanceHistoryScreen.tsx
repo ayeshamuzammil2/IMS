@@ -2,9 +2,10 @@ import React, { useMemo, useState } from 'react';
 import { View, Pressable } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { ChevronRight, Clock, Calendar } from 'lucide-react-native';
+import { ChevronRight, Clock, Calendar, Search, X } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
+import { Input } from '../../components/primitives/Input';
 import { Button } from '../../components/primitives/Button';
 import { DateField } from '../../components/forms/DateField';
 import { SelectField } from '../../components/forms/SelectField';
@@ -50,6 +51,10 @@ export function AttendanceHistoryScreen() {
   const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
 
+  // Search State
+  const [showSearch, setShowSearch] = useState(false);
+  const [search, setSearch] = useState('');
+
   const { data: departmentOptions = [] } = useQuery({
     queryKey: ['departments', 'lookup'],
     queryFn: departmentsApi.lookup,
@@ -63,11 +68,32 @@ export function AttendanceHistoryScreen() {
     enabled: !!startDate && !!endDate,
   });
 
+  // Client-side Filter Logic for Search Query
+  const filteredRows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return rows;
+    return rows.filter((r) => {
+      return (
+        r.internFullName.toLowerCase().includes(term) ||
+        r.internCode.toLowerCase().includes(term) ||
+        (r.departmentName && r.departmentName.toLowerCase().includes(term)) ||
+        r.status.toLowerCase().includes(term)
+      );
+    });
+  }, [rows, search]);
+
+  const toggleSearch = () => {
+    if (showSearch) {
+      setSearch('');
+    }
+    setShowSearch((prev) => !prev);
+  };
+
   const handleExport = async () => {
-    if (rows.length === 0) return;
+    if (filteredRows.length === 0) return;
     setExporting(true);
     try {
-      const csv = toCsv(rows, [
+      const csv = toCsv(filteredRows, [
         { header: 'Intern Name', value: (r) => r.internFullName },
         { header: 'Intern Code', value: (r) => r.internCode },
         { header: 'Department', value: (r) => r.departmentName },
@@ -100,25 +126,50 @@ export function AttendanceHistoryScreen() {
         ) : null}
       </View>
 
+      {/* Search Icon Trigger & Expandable Input Bar */}
+      <View style={s.searchSection}>
+        <View style={s.searchIconRow}>
+          <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
+            {showSearch ? (
+              <X size={20} color={theme.colors.textSecondary} />
+            ) : (
+              <Search size={20} color={theme.colors.textSecondary} />
+            )}
+          </Pressable>
+        </View>
+
+        {showSearch && (
+          <View style={s.searchContainer}>
+            <Input
+              placeholder="Search by intern name, code or dept"
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="none"
+              autoFocus
+            />
+          </View>
+        )}
+      </View>
+
       <View style={s.headerRow}>
         <Text variant="body" tone="secondary">
-          {rows.length} record{rows.length === 1 ? '' : 's'}
+          {filteredRows.length} record{filteredRows.length === 1 ? '' : 's'}
         </Text>
-        <Button label="Export CSV" size="sm" variant="outline" onPress={handleExport} loading={exporting} disabled={rows.length === 0} />
+        <Button label="Export CSV" size="sm" variant="outline" onPress={handleExport} loading={exporting} disabled={filteredRows.length === 0} />
       </View>
 
       {isLoading ? (
         <Text variant="body" tone="muted">
           Loading...
         </Text>
-      ) : rows.length === 0 ? (
+      ) : filteredRows.length === 0 ? (
         <View style={s.emptyContainer}>
           <Text variant="body" tone="muted">
-            No attendance records in this range.
+            {rows.length === 0 ? 'No attendance records in this range.' : 'No matching records found.'}
           </Text>
         </View>
       ) : (
-        rows.map((row) => (
+        filteredRows.map((row) => (
           <View key={`${row.internProfileId}-${row.workDate}`} style={s.card}>
             <View style={s.cardMain}>
               <View style={s.cardInfo}>
@@ -190,11 +241,28 @@ const makeStyles = (t: AppTheme) => ({
   filterRow: {
     flexDirection: 'row' as const,
     gap: t.spacing.sm,
-    marginBottom: t.spacing.sm,
+    marginBottom: t.spacing.xs,
     flexWrap: 'wrap' as const,
   },
   dateField: { flex: 1, minWidth: 130 },
   deptField: { flex: 1, minWidth: 150 },
+  searchSection: {
+    marginTop: t.spacing.xs,
+    marginBottom: t.spacing.sm,
+  },
+  searchIconRow: {
+    alignItems: 'flex-end' as const,
+  },
+  iconButton: {
+    padding: 8,
+    borderRadius: t.radii.md,
+    backgroundColor: t.colors.surface,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+  },
+  searchContainer: {
+    marginTop: t.spacing.xs,
+  },
   headerRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
@@ -215,10 +283,10 @@ const makeStyles = (t: AppTheme) => ({
     ...t.shadows.sm,
   },
   cardMain: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'flex-start' as const,
-  },
+  flexDirection: 'row' as const,
+  justifyContent: 'space-between' as const,
+  alignItems: 'flex-start' as const,
+},
   cardInfo: { flex: 1 },
   nameText: { fontSize: 16, fontWeight: '600' as const },
   deptText: { marginTop: 2 },

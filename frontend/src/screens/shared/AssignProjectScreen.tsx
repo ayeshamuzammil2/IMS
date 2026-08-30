@@ -1,25 +1,26 @@
-import React, { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, Pressable } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import Toast from 'react-native-toast-message';
-import { Paperclip } from 'lucide-react-native';
+import { Paperclip, Search, X } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
 import { Button } from '../../components/primitives/Button';
 import { SelectField } from '../../components/forms/SelectField';
 import { DateField } from '../../components/forms/DateField';
-import { FilterBar } from '../../components/filters/FilterBar';
 import { internsApi } from '../../api/resources/interns.api';
 import { projectsApi } from '../../api/resources/projects.api';
 import { departmentsApi } from '../../api/resources/departments.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
+import { useTheme } from '../../providers/ThemeProvider';
 import { useAuth } from '../../providers/AuthProvider';
 import type { AppTheme } from '../../theme/types';
 
 export function AssignProjectScreen() {
   const s = useThemedStyles(makeStyles);
+  const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'Admin';
   const queryClient = useQueryClient();
@@ -30,39 +31,62 @@ export function AssignProjectScreen() {
   const [pickedFile, setPickedFile] = useState<{ uri: string; name: string; mimeType: string | null } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState<number | null>(null);
 
   const { data: interns = [] } = useQuery({ queryKey: ['interns'], queryFn: () => internsApi.list() });
 
-  // Only Admin sees a department filter - a Mentor's intern list is already scoped by the
-  // backend to their own department, so a department picker would add nothing for them.
   const { data: departmentOptions = [] } = useQuery({
     queryKey: ['departments', 'lookup'],
     queryFn: departmentsApi.lookup,
     enabled: isAdmin,
   });
-  const departmentSelectOptions = useMemo(() => departmentOptions.map((d) => ({ value: d.id, label: d.name })), [departmentOptions]);
 
+  const departmentSelectOptions = useMemo(() => {
+    const list = departmentOptions.map((d) => ({ value: String(d.id), label: d.name }));
+    return [{ value: 'all', label: 'All Departments' }, ...list];
+  }, [departmentOptions]);
+
+  // 1. Filter interns based on department and search term
   const filteredInterns = useMemo(() => {
     const term = search.trim().toLowerCase();
     return interns.filter((i) => {
       if (isAdmin && departmentFilter && i.departmentId !== departmentFilter) return false;
       if (!term) return true;
-      return i.fullName.toLowerCase().includes(term) || i.internCode.toLowerCase().includes(term);
+      return (
+        i.fullName.toLowerCase().includes(term) ||
+        i.internCode.toLowerCase().includes(term)
+      );
     });
   }, [interns, isAdmin, departmentFilter, search]);
 
   const internOptions = useMemo(
-    () => filteredInterns.map((i) => ({ value: i.id, label: `${i.fullName} (${i.internCode})` })),
+    () => filteredInterns.map((i) => ({ value: String(i.id), label: `${i.fullName} (${i.internCode})` })),
     [filteredInterns],
   );
 
-  const handleDepartmentChange = (value: number | null) => {
-    setDepartmentFilter(value);
-    if (internProfileId && !interns.some((i) => i.id === internProfileId && (!value || i.departmentId === value))) {
-      setInternProfileId(null);
+  // 2. Auto-select first matching intern if current selection becomes invalid after search
+  useEffect(() => {
+    if (search.trim() && filteredInterns.length > 0) {
+      const matchExists = filteredInterns.some((i) => i.id === internProfileId);
+      if (!matchExists) {
+        setInternProfileId(filteredInterns[0].id);
+      }
     }
+  }, [search, filteredInterns, internProfileId]);
+
+  const handleDepartmentChange = (value: string) => {
+    const deptId = value === 'all' ? null : Number(value);
+    setDepartmentFilter(deptId);
+    setInternProfileId(null);
+  };
+
+  const toggleSearch = () => {
+    if (showSearch) {
+      setSearch('');
+    }
+    setShowSearch((prev) => !prev);
   };
 
   const { data: assignments = [], refetch } = useQuery({
@@ -108,23 +132,52 @@ export function AssignProjectScreen() {
 
   return (
     <Screen scroll>
-      <FilterBar
-        search={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search by intern name or code"
-        departmentOptions={isAdmin ? departmentSelectOptions : undefined}
-        departmentValue={departmentFilter}
-        onDepartmentChange={isAdmin ? handleDepartmentChange : undefined}
-      />
+      {/* Department Filter Dropdown (Admin Only) */}
+      {isAdmin && (
+        <View style={s.filterSpacing}>
+          <SelectField
+            label="Department"
+            placeholder="Select Department"
+            value={departmentFilter ? String(departmentFilter) : 'all'}
+            options={departmentSelectOptions}
+            onChange={handleDepartmentChange}
+          />
+        </View>
+      )}
 
+      {/* Intern Filter Dropdown */}
       <SelectField
         label="Intern"
         required
         placeholder="Select an intern"
-        value={internProfileId}
+        value={internProfileId ? String(internProfileId) : ''}
         options={internOptions}
-        onChange={setInternProfileId}
+        onChange={(val) => setInternProfileId(val ? Number(val) : null)}
       />
+
+      {/* Search Icon directly BELOW Intern Dropdown */}
+      <View style={s.searchIconRow}>
+        <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
+          {showSearch ? (
+            <X size={20} color={theme.colors.textSecondary} />
+          ) : (
+            <Search size={20} color={theme.colors.textSecondary} />
+          )}
+        </Pressable>
+      </View>
+
+      {/* Search Input */}
+      {showSearch && (
+        <View style={s.searchContainer}>
+          <Input
+            placeholder="Search by intern name or code..."
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+            autoFocus
+          />
+        </View>
+      )}
 
       {internProfileId ? (
         <>
@@ -178,6 +231,26 @@ export function AssignProjectScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  filterSpacing: {
+    marginBottom: t.spacing.sm,
+  },
+  searchIconRow: {
+    alignItems: 'flex-end' as const,
+    marginTop: t.spacing.xs,
+    marginBottom: t.spacing.xs,
+  },
+  iconButton: {
+    padding: 10,
+    borderRadius: t.radii.md,
+    backgroundColor: t.colors.surface,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  searchContainer: {
+    marginBottom: t.spacing.sm,
+  },
   card: {
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
@@ -185,6 +258,7 @@ const makeStyles = (t: AppTheme) => ({
     borderColor: t.colors.border,
     padding: t.spacing.lg,
     gap: t.spacing.md,
+    marginTop: t.spacing.xs,
     marginBottom: t.spacing.lg,
   },
   attachButton: { alignSelf: 'flex-start' as const },

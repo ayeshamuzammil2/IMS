@@ -3,7 +3,7 @@ import { View, Pressable, Linking } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { ExternalLink, FileText, ChevronRight, Check, X } from 'lucide-react-native';
+import { ExternalLink, FileText, ChevronRight, Check, X, Search } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
@@ -45,6 +45,7 @@ export function DocumentReviewScreen() {
   const [previewItem, setPreviewItem] = useState<DocumentReviewQueueItemDto | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
+  const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState<number | null>(null);
   const [internFilter, setInternFilter] = useState<number | null>(null);
@@ -54,8 +55,6 @@ export function DocumentReviewScreen() {
     queryFn: documentsApi.review.getQueue,
   });
 
-  // Only Admin gets a department filter - a Mentor's queue is already scoped by the backend
-  // to their own department's interns, so showing them a department picker adds nothing.
   const { data: departmentOptions = [] } = useQuery({
     queryKey: ['departments', 'lookup'],
     queryFn: departmentsApi.lookup,
@@ -86,6 +85,13 @@ export function DocumentReviewScreen() {
       return q.internFullName.toLowerCase().includes(term) || q.internCode.toLowerCase().includes(term);
     });
   }, [departmentScopedQueue, internFilter, search]);
+
+  const toggleSearch = () => {
+    if (showSearch) {
+      setSearch('');
+    }
+    setShowSearch((prev) => !prev);
+  };
 
   const handleDepartmentChange = (value: number | null) => {
     setDepartmentFilter(value);
@@ -140,10 +146,8 @@ export function DocumentReviewScreen() {
 
   return (
     <Screen scroll>
+      {/* FilterBar without default text search */}
       <FilterBar
-        search={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search by intern name or code"
         departmentOptions={isAdmin ? departmentSelectOptions : undefined}
         departmentValue={departmentFilter}
         onDepartmentChange={isAdmin ? handleDepartmentChange : undefined}
@@ -152,10 +156,34 @@ export function DocumentReviewScreen() {
         onInternChange={setInternFilter}
       />
 
-      <View style={s.headerRow}>
-        <Text variant="body" tone="secondary">
-          {filteredQueue.length} document{filteredQueue.length === 1 ? '' : 's'} awaiting review
-        </Text>
+      <View style={s.headerContainer}>
+        <View style={s.headerRow}>
+          <Text variant="body" tone="secondary">
+            {filteredQueue.length} document{filteredQueue.length === 1 ? '' : 's'} awaiting review
+          </Text>
+
+          {/* Search Icon Trigger placed on top-right */}
+          <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
+            {showSearch ? (
+              <X size={20} color={theme.colors.textSecondary} />
+            ) : (
+              <Search size={20} color={theme.colors.textSecondary} />
+            )}
+          </Pressable>
+        </View>
+
+        {/* Expandable Search Input Input field */}
+        {showSearch && (
+          <View style={s.searchContainer}>
+            <Input
+              placeholder="Search by intern name or code..."
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="none"
+              autoFocus
+            />
+          </View>
+        )}
       </View>
 
       {isLoading ? (
@@ -253,11 +281,23 @@ export function DocumentReviewScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  headerContainer: {
+    marginBottom: t.spacing.md,
+  },
   headerRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
-    marginBottom: t.spacing.md,
+  },
+  iconButton: {
+    padding: 8,
+    borderRadius: t.radii.md,
+    backgroundColor: t.colors.surface,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+  },
+  searchContainer: {
+    marginTop: t.spacing.sm,
   },
   emptyContainer: {
     alignItems: 'center' as const,

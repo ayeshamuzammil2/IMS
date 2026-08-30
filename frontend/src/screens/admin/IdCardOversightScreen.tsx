@@ -2,11 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { View, Pressable, ActivityIndicator, FlatList } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { CheckSquare, Square, CheckCircle2, Send } from 'lucide-react-native';
+import { CheckSquare, Square, CheckCircle2, Send, Search, X } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
+import { Input } from '../../components/primitives/Input';
 import { Button } from '../../components/primitives/Button';
-import { FilterBar } from '../../components/filters/FilterBar';
+import { SelectField } from '../../components/forms/SelectField';
 import { idCardsApi, type IdCardDto } from '../../api/resources/idcards.api';
 import { departmentsApi } from '../../api/resources/departments.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
@@ -33,13 +34,19 @@ export function IdCardOversightScreen() {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
   const queryClient = useQueryClient();
+
   const [departmentId, setDepartmentId] = useState<number | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const { data: departmentOptions = [] } = useQuery({ queryKey: ['departments', 'lookup'], queryFn: departmentsApi.lookup });
-  const deptSelectOptions = useMemo(() => departmentOptions.map((d) => ({ value: d.id, label: d.name })), [departmentOptions]);
+
+  const deptSelectOptions = useMemo(() => {
+    const list = departmentOptions.map((d) => ({ value: String(d.id), label: d.name }));
+    return [{ value: 'all', label: 'All Departments' }, ...list];
+  }, [departmentOptions]);
 
   const { data: allCards = [], isLoading } = useQuery({
     queryKey: ['idcards', 'list', departmentId],
@@ -55,6 +62,13 @@ export function IdCardOversightScreen() {
   }, [allCards, search]);
 
   const approvedSelectedCount = cards.filter((c) => selected.has(c.internProfileId) && c.status === 'Approved').length;
+
+  const toggleSearch = () => {
+    if (showSearch) {
+      setSearch('');
+    }
+    setShowSearch((prev) => !prev);
+  };
 
   const toggleSelect = (internProfileId: number) => {
     setSelected((prev) => {
@@ -174,14 +188,38 @@ export function IdCardOversightScreen() {
 
   return (
     <Screen scroll={false}>
-      <FilterBar
-        search={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search by intern name or code"
-        departmentOptions={deptSelectOptions}
-        departmentValue={departmentId}
-        onDepartmentChange={setDepartmentId}
+      {/* 1. Department Filter Dropdown */}
+      <SelectField
+        label="Department"
+        placeholder="Select Department"
+        value={departmentId ? String(departmentId) : 'all'}
+        options={deptSelectOptions}
+        onChange={(val) => setDepartmentId(val === 'all' ? null : Number(val))}
       />
+
+      {/* 2. Search Icon directly BELOW Department Dropdown */}
+      <View style={s.searchIconRow}>
+        <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
+          {showSearch ? (
+            <X size={20} color={theme.colors.textSecondary} />
+          ) : (
+            <Search size={20} color={theme.colors.textSecondary} />
+          )}
+        </Pressable>
+      </View>
+
+      {/* 3. Expandable Search Input field below icon */}
+      {showSearch && (
+        <View style={s.searchContainer}>
+          <Input
+            placeholder="Search by intern name or code..."
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+            autoFocus
+          />
+        </View>
+      )}
 
       <View style={s.headerRow}>
         <Text variant="body" tone="secondary">
@@ -219,11 +257,29 @@ export function IdCardOversightScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  searchIconRow: {
+    alignItems: 'flex-end' as const,
+    marginTop: t.spacing.xs,
+    marginBottom: t.spacing.xs,
+  },
+  iconButton: {
+    padding: 10,
+    borderRadius: t.radii.md,
+    backgroundColor: t.colors.surface,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  searchContainer: {
+    marginBottom: t.spacing.sm,
+  },
   headerRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
     marginBottom: t.spacing.md,
+    marginTop: t.spacing.xs,
   },
   list: { flex: 1 },
   listContent: { gap: t.spacing.sm, paddingBottom: t.spacing.lg },

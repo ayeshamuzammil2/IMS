@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Pressable, ActivityIndicator, Alert, FlatList } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import * as Location from 'expo-location';
-import { Power, PowerOff, Trash2, ChevronRight } from 'lucide-react-native';
+import { Power, PowerOff, Trash2, ChevronRight, Search, X } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
@@ -43,10 +43,29 @@ export function DepartmentsScreen() {
   const [editing, setEditing] = useState<DepartmentDto | null>(null);
   const [locating, setLocating] = useState(false);
 
+  // Search state
+  const [showSearch, setShowSearch] = useState(false);
+  const [search, setSearch] = useState('');
+
   const { data: departments = [], isLoading } = useQuery({
     queryKey: ['departments'],
     queryFn: departmentsApi.list,
   });
+
+  const filteredDepartments = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return departments;
+    return departments.filter(
+      (d) => d.name.toLowerCase().includes(term) || d.code.toLowerCase().includes(term)
+    );
+  }, [departments, search]);
+
+  const toggleSearch = () => {
+    if (showSearch) {
+      setSearch('');
+    }
+    setShowSearch((prev) => !prev);
+  };
 
   const { control, handleSubmit, formState, reset, setValue } = useForm<FormInput, any, FormOutput>({
     resolver: zodResolver(schema),
@@ -230,11 +249,37 @@ export function DepartmentsScreen() {
 
   return (
     <Screen scroll={false}>
+      {/* Top Header Row */}
       <View style={s.headerRow}>
         <Text variant="body" tone="secondary">
-          {departments.length} department{departments.length === 1 ? '' : 's'}
+          {filteredDepartments.length} department{filteredDepartments.length === 1 ? '' : 's'}
         </Text>
         <Button label="Add Department" size="sm" onPress={openCreate} />
+      </View>
+
+      {/* Search Icon Trigger & Expandable Input under Add Department */}
+      <View style={s.searchBarSection}>
+        <View style={s.searchIconRow}>
+          <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
+            {showSearch ? (
+              <X size={20} color={theme.colors.textSecondary} />
+            ) : (
+              <Search size={20} color={theme.colors.textSecondary} />
+            )}
+          </Pressable>
+        </View>
+
+        {showSearch && (
+          <View style={s.searchContainer}>
+            <Input
+              placeholder="Search by department name or code..."
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="none"
+              autoFocus
+            />
+          </View>
+        )}
       </View>
 
       {isLoading ? (
@@ -243,14 +288,14 @@ export function DepartmentsScreen() {
         </Text>
       ) : (
         <FlatList
-          data={departments}
+          data={filteredDepartments}
           keyExtractor={(d) => String(d.id)}
           renderItem={renderCard}
           style={s.list}
-          contentContainerStyle={departments.length === 0 ? s.emptyListContent : s.listContent}
+          contentContainerStyle={filteredDepartments.length === 0 ? s.emptyListContent : s.listContent}
           ListEmptyComponent={
             <Text variant="body" tone="muted">
-              No departments yet. Add one to get started.
+              {departments.length === 0 ? 'No departments yet. Add one to get started.' : 'No departments match your search.'}
             </Text>
           }
         />
@@ -365,7 +410,23 @@ const makeStyles = (t: AppTheme) => ({
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
-    marginBottom: t.spacing.md,
+    marginBottom: t.spacing.sm,
+  },
+  searchBarSection: {
+    marginBottom: t.spacing.sm,
+  },
+  searchIconRow: {
+    alignItems: 'flex-end' as const,
+  },
+  iconButton: {
+    padding: 8,
+    borderRadius: t.radii.md,
+    backgroundColor: t.colors.surface,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+  },
+  searchContainer: {
+    marginTop: t.spacing.xs,
   },
   list: { flex: 1 },
   listContent: { gap: t.spacing.sm, paddingBottom: t.spacing.lg },

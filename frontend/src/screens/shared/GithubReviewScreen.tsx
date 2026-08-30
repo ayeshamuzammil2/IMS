@@ -3,13 +3,13 @@ import { View, Pressable } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { GitBranch, ChevronRight, Check, X, RotateCcw } from 'lucide-react-native';
+import { GitBranch, ChevronRight, Check, X, RotateCcw, Search } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
 import { Input } from '../../components/primitives/Input';
 import { FormModal } from '../../components/forms/FormModal';
-import { FilterBar } from '../../components/filters/FilterBar';
+import { SelectField } from '../../components/forms/SelectField';
 import { githubApi, type GithubReviewQueueItemDto } from '../../api/resources/github.api';
 import { departmentsApi } from '../../api/resources/departments.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
@@ -29,6 +29,7 @@ export function GithubReviewScreen() {
   const [reason, setReason] = useState('');
   const [busyId, setBusyId] = useState<number | null>(null);
 
+  const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState<number | null>(null);
   const [internFilter, setInternFilter] = useState<number | null>(null);
@@ -38,14 +39,16 @@ export function GithubReviewScreen() {
     queryFn: githubApi.review.getQueue,
   });
 
-  // Only Admin gets a department filter - a Mentor's queue is already scoped by the backend
-  // to their own department's interns, so showing them a department picker adds nothing.
   const { data: departmentOptions = [] } = useQuery({
     queryKey: ['departments', 'lookup'],
     queryFn: departmentsApi.lookup,
     enabled: isAdmin,
   });
-  const departmentSelectOptions = useMemo(() => departmentOptions.map((d) => ({ value: d.id, label: d.name })), [departmentOptions]);
+
+  const departmentSelectOptions = useMemo(() => {
+    const list = departmentOptions.map((d) => ({ value: String(d.id), label: d.name }));
+    return [{ value: 'all', label: 'All Departments' }, ...list];
+  }, [departmentOptions]);
 
   const departmentScopedQueue = useMemo(
     () => (isAdmin && departmentFilter ? queue.filter((q) => q.departmentId === departmentFilter) : queue),
@@ -57,10 +60,21 @@ export function GithubReviewScreen() {
     for (const q of departmentScopedQueue) {
       if (!seen.has(q.internProfileId)) seen.set(q.internProfileId, `${q.internFullName} (${q.internCode})`);
     }
-    return Array.from(seen.entries())
-      .map(([value, label]) => ({ value, label }))
+    const list = Array.from(seen.entries())
+      .map(([value, label]) => ({ value: String(value), label }))
       .sort((a, b) => a.label.localeCompare(b.label));
+
+    return [{ value: 'all', label: 'All Interns' }, ...list];
   }, [departmentScopedQueue]);
+
+  // Handle live search text updates
+  const handleSearchChange = (text: string) => {
+    setSearch(text);
+    // Jab user search field me likhe toh intern filter reset kar dein taake globally queue filtering chale
+    if (text.trim() && internFilter) {
+      setInternFilter(null);
+    }
+  };
 
   const filteredQueue = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -75,9 +89,16 @@ export function GithubReviewScreen() {
     });
   }, [departmentScopedQueue, internFilter, search]);
 
-  const handleDepartmentChange = (value: number | null) => {
-    setDepartmentFilter(value);
+  const handleDepartmentChange = (value: string) => {
+    setDepartmentFilter(value === 'all' ? null : Number(value));
     setInternFilter(null);
+  };
+
+  const toggleSearch = () => {
+    if (showSearch) {
+      setSearch('');
+    }
+    setShowSearch((prev) => !prev);
   };
 
   useFocusEffect(
@@ -118,17 +139,54 @@ export function GithubReviewScreen() {
 
   return (
     <Screen scroll>
-      <FilterBar
-        search={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search by intern name, code, or repo URL"
-        departmentOptions={isAdmin ? departmentSelectOptions : undefined}
-        departmentValue={departmentFilter}
-        onDepartmentChange={isAdmin ? handleDepartmentChange : undefined}
-        internOptions={internSelectOptions}
-        internValue={internFilter}
-        onInternChange={setInternFilter}
+      {/* 1. Department Dropdown (Admin Only) */}
+      {isAdmin && (
+        <View style={s.filterSpacing}>
+          <SelectField
+            label="Department"
+            placeholder="Select Department"
+            value={departmentFilter ? String(departmentFilter) : 'all'}
+            options={departmentSelectOptions}
+            onChange={handleDepartmentChange}
+          />
+        </View>
+      )}
+
+      {/* 2. Intern Dropdown */}
+      <SelectField
+        label="Intern"
+        placeholder="Select Intern"
+        value={internFilter ? String(internFilter) : 'all'}
+        options={internSelectOptions}
+        onChange={(val) => {
+          setInternFilter(val === 'all' ? null : Number(val));
+          if (val !== 'all') setSearch(''); // Dropdown pick karne par active search clear ho jaye
+        }}
       />
+
+      {/* 3. Search Icon directly BELOW Intern Filter */}
+      <View style={s.searchIconRow}>
+        <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
+          {showSearch ? (
+            <X size={20} color={theme.colors.textSecondary} />
+          ) : (
+            <Search size={20} color={theme.colors.textSecondary} />
+          )}
+        </Pressable>
+      </View>
+
+      {/* 4. Expandable Search Input field below icon */}
+      {showSearch && (
+        <View style={s.searchContainer}>
+          <Input
+            placeholder="Search by intern name, code, or repo URL..."
+            value={search}
+            onChangeText={handleSearchChange}
+            autoCapitalize="none"
+            autoFocus
+          />
+        </View>
+      )}
 
       <View style={s.headerRow}>
         <Text variant="body" tone="secondary">
@@ -232,11 +290,32 @@ export function GithubReviewScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  filterSpacing: {
+    marginBottom: t.spacing.sm,
+  },
+  searchIconRow: {
+    alignItems: 'flex-end' as const,
+    marginTop: t.spacing.xs,
+    marginBottom: t.spacing.xs,
+  },
+  iconButton: {
+    padding: 10,
+    borderRadius: t.radii.md,
+    backgroundColor: t.colors.surface,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  searchContainer: {
+    marginBottom: t.spacing.sm,
+  },
   headerRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
     marginBottom: t.spacing.md,
+    marginTop: t.spacing.xs,
   },
   emptyContainer: {
     alignItems: 'center' as const,

@@ -5,25 +5,18 @@ import { SelectField, type SelectOption } from '../forms/SelectField';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import type { AppTheme } from '../../theme/types';
 
-/**
- * Reusable filter row used on every screen that lists interns/queues (Document Review,
- * GitHub Repo Review, ID Card management, Assign Project, ID Card oversight, etc.) so the
- * search + department + intern filtering UI looks and behaves identically everywhere.
- *
- * Department and Intern selects are optional - only pass the props for the filters a given
- * screen needs. Each renders with a synthetic "All ..." option so the filter can be cleared.
- */
 export interface FilterBarProps {
-  search: string;
-  onSearchChange: (value: string) => void;
+  /** Optional: Search text filter */
+  search?: string;
+  onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
 
-  /** Omit to hide the department filter entirely (e.g. for a Mentor, who is already scoped to one department). */
+  /** Omit to hide the department filter entirely */
   departmentOptions?: SelectOption<number>[];
   departmentValue?: number | null;
   onDepartmentChange?: (value: number | null) => void;
 
-  /** Omit to hide the intern filter entirely. */
+  /** Omit to hide the intern filter entirely */
   internOptions?: SelectOption<number>[];
   internValue?: number | null;
   onInternChange?: (value: number | null) => void;
@@ -55,7 +48,10 @@ export function FilterBar({
 
   return (
     <View style={s.container}>
-      <Input label="Search" placeholder={searchPlaceholder} value={search} onChangeText={onSearchChange} autoCapitalize="none" />
+      {/* Search Input will only render if both search and onSearchChange are provided */}
+      {search !== undefined && onSearchChange ? (
+        <Input label="Search" placeholder={searchPlaceholder} value={search} onChangeText={onSearchChange} autoCapitalize="none" />
+      ) : null}
 
       {departmentOptions && onDepartmentChange ? (
         <View style={s.filterRow}>
