@@ -1,9 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, FlatList } from 'react-native';
+import { View, FlatList, Pressable } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
+import { Search, X } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
+import { Input } from '../../components/primitives/Input';
 import { SelectField } from '../../components/forms/SelectField';
 import { attendanceApi, type TeamAttendanceRowDto } from '../../api/resources/attendance.api';
 import { departmentsApi } from '../../api/resources/departments.api';
@@ -40,7 +42,10 @@ export function TeamAttendanceScreen() {
   const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'Admin';
+
   const [departmentId, setDepartmentId] = useState<number | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [search, setSearch] = useState('');
 
   const { data: rows = [], isLoading, refetch } = useQuery({
     queryKey: ['attendance', 'team-today', departmentId],
@@ -52,13 +57,34 @@ export function TeamAttendanceScreen() {
     queryFn: departmentsApi.lookup,
     enabled: isAdmin,
   });
-  const deptSelectOptions = useMemo(() => departmentOptions.map((d) => ({ value: d.id, label: d.name })), [departmentOptions]);
+
+  const deptSelectOptions = useMemo(
+    () => departmentOptions.map((d) => ({ value: d.id, label: d.name })),
+    [departmentOptions],
+  );
+
+  const filteredRows = useMemo(() => {
+    if (!search.trim()) return rows;
+    const q = search.toLowerCase().trim();
+    return rows.filter(
+      (r) =>
+        r.internFullName?.toLowerCase().includes(q) ||
+        r.internCode?.toLowerCase().includes(q),
+    );
+  }, [rows, search]);
 
   useFocusEffect(
     useCallback(() => {
       refetch();
     }, [refetch]),
   );
+
+  const toggleSearch = () => {
+    if (showSearch) {
+      setSearch('');
+    }
+    setShowSearch((prev) => !prev);
+  };
 
   const renderCard = ({ item: r }: { item: TeamAttendanceRowDto }) => {
     return (
@@ -72,7 +98,12 @@ export function TeamAttendanceScreen() {
               {r.internCode}
             </Text>
           </View>
-          <View style={[s.badge, { backgroundColor: theme.colors[statusBgKey[r.status] ?? 'surfaceSunken'] }]}>
+          <View
+            style={[
+              s.badge,
+              { backgroundColor: theme.colors[statusBgKey[r.status] ?? 'surfaceSunken'] },
+            ]}
+          >
             <Text variant="caption" tone={statusTone[r.status] ?? 'muted'}>
               {r.status}
             </Text>
@@ -117,14 +148,47 @@ export function TeamAttendanceScreen() {
   };
 
   return (
-    <Screen scroll={false}>
-      <View style={s.headerRow}>
-        <Text variant="body" tone="secondary">
-          {rows.length} intern{rows.length === 1 ? '' : 's'} today
-        </Text>
-        {isAdmin && (
-          <View style={s.filter}>
-            <SelectField placeholder="All departments" value={departmentId} options={deptSelectOptions} onChange={setDepartmentId} />
+    <Screen scroll={false} style={s.container}>
+      <View style={s.headerContainer}>
+        {/* Main Header Row */}
+        <View style={s.headerRow}>
+          <Text variant="body" tone="secondary">
+            {filteredRows.length} intern{filteredRows.length === 1 ? '' : 's'} today
+          </Text>
+
+          {isAdmin && (
+            <View style={s.filter}>
+              <SelectField
+                placeholder="All departments"
+                value={departmentId}
+                options={deptSelectOptions}
+                onChange={setDepartmentId}
+              />
+            </View>
+          )}
+        </View>
+
+        {/* Search Icon Trigger placed below the Department Filter */}
+        <View style={s.searchIconRow}>
+          <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
+            {showSearch ? (
+              <X size={20} color={theme.colors.textSecondary} />
+            ) : (
+              <Search size={20} color={theme.colors.textSecondary} />
+            )}
+          </Pressable>
+        </View>
+
+        {/* Expandable Search Input */}
+        {showSearch && (
+          <View style={s.searchContainer}>
+            <Input
+              placeholder="Search by name or intern code..."
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="none"
+              autoFocus
+            />
           </View>
         )}
       </View>
@@ -135,11 +199,13 @@ export function TeamAttendanceScreen() {
         </Text>
       ) : (
         <FlatList
-          data={rows}
+          data={filteredRows}
           keyExtractor={(r) => String(r.internProfileId)}
           renderItem={renderCard}
           style={s.list}
-          contentContainerStyle={rows.length === 0 ? s.emptyListContent : s.listContent}
+          contentContainerStyle={
+            filteredRows.length === 0 ? s.emptyListContent : s.listContent
+          }
           ListEmptyComponent={
             <Text variant="body" tone="muted">
               No interns to show.
@@ -152,38 +218,70 @@ export function TeamAttendanceScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  container: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  headerContainer: {
+    marginBottom: 12,
+  },
   headerRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
-    marginBottom: t.spacing.md,
-    gap: t.spacing.md,
+    gap: 8,
   },
-  filter: { width: 180 },
-  list: { flex: 1 },
-  listContent: { gap: t.spacing.sm, paddingBottom: t.spacing.lg },
-  emptyListContent: { flexGrow: 1, alignItems: 'center' as const, justifyContent: 'center' as const },
-  card: {
+  filter: { width: 160 },
+  searchIconRow: {
+    alignItems: 'flex-end' as const,
+    marginTop: 8,
+  },
+  iconButton: {
+    padding: 8,
+    borderRadius: 8,
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
     borderWidth: 1,
     borderColor: t.colors.border,
-    padding: t.spacing.lg,
-    ...t.shadows.sm,
+  },
+  searchContainer: {
+    marginTop: 8,
+  },
+  list: { flex: 1 },
+  listContent: { gap: 12, paddingBottom: 16 },
+  emptyListContent: {
+    flexGrow: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  card: {
+    backgroundColor: t.colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
-    gap: t.spacing.sm,
+    gap: 8,
   },
   cardHeaderText: { flex: 1 },
-  badge: { paddingHorizontal: t.spacing.sm, paddingVertical: 3, borderRadius: t.radii.full },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 9999,
+  },
   attendanceGrid: {
     flexDirection: 'row' as const,
-    gap: t.spacing.md,
-    marginTop: t.spacing.md,
-    paddingTop: t.spacing.sm,
+    gap: 16,
+    marginTop: 12,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: t.colors.border,
   },

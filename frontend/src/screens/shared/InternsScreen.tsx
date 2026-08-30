@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { Power, PowerOff, KeyRound, Trash2, Unlock, ChevronRight } from 'lucide-react-native';
+import { Power, PowerOff, KeyRound, Trash2, Unlock, ChevronRight, Search, X } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
@@ -139,7 +139,32 @@ export function InternsScreen() {
   const [editing, setEditing] = useState<InternDto | null>(null);
   const [resetPasswordTarget, setResetPasswordTarget] = useState<InternDto | null>(null);
 
+  // Search State
+  const [search, setSearch] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+
+  const toggleSearch = () => {
+    if (showSearch) {
+      setSearch('');
+    }
+    setShowSearch(!showSearch);
+  };
+
   const { data: interns = [], isLoading } = useQuery({ queryKey: ['interns'], queryFn: () => internsApi.list() });
+
+  // Filtered Interns Logic
+  const filteredInterns = useMemo(() => {
+    if (!search.trim()) return interns;
+    const query = search.toLowerCase().trim();
+    return interns.filter(
+      (i) =>
+        i.fullName.toLowerCase().includes(query) ||
+        i.internCode.toLowerCase().includes(query) ||
+        i.email.toLowerCase().includes(query) ||
+        (i.mentorName && i.mentorName.toLowerCase().includes(query)),
+    );
+  }, [interns, search]);
+
   const { data: mentorOptions = [] } = useQuery({
     queryKey: ['mentors', 'active'],
     queryFn: () => mentorsApi.list({ isActive: true }),
@@ -334,7 +359,7 @@ export function InternsScreen() {
               {i.internCode}
             </Text>
           </View>
-          <ChevronRight size={18} color={theme.colors.textMuted} />
+          <ChevronRight size={20} color={theme.colors.textMuted} />
         </View>
 
         <Text variant="caption" tone="secondary" numberOfLines={1} style={s.cardSubline}>
@@ -373,7 +398,7 @@ export function InternsScreen() {
                 confirmUnlock(i);
               }}
             >
-              {busyUnlock ? <ActivityIndicator size="small" color={theme.colors.success} /> : <Unlock size={18} color={theme.colors.success} />}
+              {busyUnlock ? <ActivityIndicator size="small" color={theme.colors.success} /> : <Unlock size={20} color={theme.colors.success} />}
             </Pressable>
           ) : null}
           <Pressable
@@ -384,7 +409,7 @@ export function InternsScreen() {
               openResetPassword(i);
             }}
           >
-            <KeyRound size={18} color={theme.colors.textSecondary} />
+            <KeyRound size={20} color={theme.colors.textSecondary} />
           </Pressable>
           <Pressable
             hitSlop={8}
@@ -397,9 +422,9 @@ export function InternsScreen() {
             {busyToggle ? (
               <ActivityIndicator size="small" color={theme.colors.textSecondary} />
             ) : i.isActive ? (
-              <PowerOff size={18} color={theme.colors.error} />
+              <PowerOff size={20} color={theme.colors.error} />
             ) : (
-              <Power size={18} color={theme.colors.success} />
+              <Power size={20} color={theme.colors.success} />
             )}
           </Pressable>
           <Pressable
@@ -410,7 +435,7 @@ export function InternsScreen() {
               confirmDelete(i);
             }}
           >
-            {busyDelete ? <ActivityIndicator size="small" color={theme.colors.error} /> : <Trash2 size={18} color={theme.colors.error} />}
+            {busyDelete ? <ActivityIndicator size="small" color={theme.colors.error} /> : <Trash2 size={20} color={theme.colors.error} />}
           </Pressable>
         </View>
       </Pressable>
@@ -419,11 +444,34 @@ export function InternsScreen() {
 
   return (
     <Screen scroll={false}>
-      <View style={s.headerRow}>
-        <Text variant="body" tone="secondary">
-          {interns.length} intern{interns.length === 1 ? '' : 's'}
-        </Text>
-        <Button label="Add Intern" size="sm" onPress={openCreate} />
+      <View style={s.headerContainer}>
+        {/* Top Bar: Intern Count & Add Button */}
+        <View style={s.headerRow}>
+          <Text variant="body" tone="secondary">
+            {filteredInterns.length} of {interns.length} intern{interns.length === 1 ? '' : 's'}
+          </Text>
+          <Button label="Add Intern" size="sm" onPress={openCreate} />
+        </View>
+
+        {/* Right-aligned Search Icon directly below Add Intern button with size 20 */}
+        <View style={s.searchIconRow}>
+          <Pressable hitSlop={8} style={s.iconButton} onPress={toggleSearch}>
+            {showSearch ? <X size={20} color={theme.colors.textSecondary} /> : <Search size={20} color={theme.colors.textSecondary} />}
+          </Pressable>
+        </View>
+
+        {/* Expandable Search Input */}
+        {showSearch && (
+          <View style={s.searchContainer}>
+            <Input
+              placeholder="Search interns by name, code, email..."
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="none"
+              autoFocus
+            />
+          </View>
+        )}
       </View>
 
       {isLoading ? (
@@ -432,14 +480,14 @@ export function InternsScreen() {
         </Text>
       ) : (
         <FlatList
-          data={interns}
+          data={filteredInterns}
           keyExtractor={(i) => String(i.id)}
           renderItem={renderIntern}
           style={s.list}
-          contentContainerStyle={interns.length === 0 ? s.emptyListContent : s.listContent}
+          contentContainerStyle={filteredInterns.length === 0 ? s.emptyListContent : s.listContent}
           ListEmptyComponent={
             <Text variant="body" tone="muted">
-              No interns yet. Add one to get started.
+              {search.trim() ? 'No interns found matching your search.' : 'No interns yet. Add one to get started.'}
             </Text>
           }
         />
@@ -720,7 +768,7 @@ export function InternsScreen() {
           </>
         }
       >
-        <Text variant="body" tone="secondary" style={s.resetHint}>
+        <Text variant="body" tone="secondary" style={s.transferHint}>
           Set a new password for {resetPasswordTarget?.fullName}. They will be asked to set their own on next sign-in.
         </Text>
         <Controller
@@ -758,11 +806,28 @@ export function InternsScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  headerContainer: {
+    marginBottom: 12,
+  },
   headerRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
-    marginBottom: t.spacing.md,
+    marginBottom: t.spacing.xs,
+  },
+  searchIconRow: {
+    alignItems: 'flex-end' as const,
+    marginTop: 6,
+  },
+  iconButton: {
+    padding: t.spacing.sm,
+    borderRadius: t.radii.md,
+    backgroundColor: t.colors.surface,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+  },
+  searchContainer: {
+    marginTop: 8,
   },
   list: { flex: 1 },
   listContent: { gap: t.spacing.sm, paddingBottom: t.spacing.lg },
@@ -783,5 +848,5 @@ const makeStyles = (t: AppTheme) => ({
   divider: { height: 1, backgroundColor: t.colors.border, marginTop: t.spacing.md, marginBottom: t.spacing.sm },
   actionsRow: { flexDirection: 'row' as const, gap: t.spacing.lg, justifyContent: 'flex-end' as const },
   actionIcon: { padding: t.spacing.xs },
-  resetHint: { marginBottom: t.spacing.md },
+  transferHint: { marginBottom: t.spacing.md },
 });

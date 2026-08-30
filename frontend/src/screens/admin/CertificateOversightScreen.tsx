@@ -6,7 +6,7 @@ import { CheckSquare, Square, CheckCircle2, Send } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
-import { SelectField } from '../../components/forms/SelectField';
+import { FilterBar } from '../../components/filters/FilterBar';
 import { certificatesApi, type CertificateDto } from '../../api/resources/certificates.api';
 import { departmentsApi } from '../../api/resources/departments.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
@@ -33,19 +33,41 @@ export function CertificateOversightScreen() {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
   const queryClient = useQueryClient();
+
+  const [search, setSearch] = useState('');
   const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  const { data: departmentOptions = [] } = useQuery({ queryKey: ['departments', 'lookup'], queryFn: departmentsApi.lookup });
-  const deptSelectOptions = useMemo(() => departmentOptions.map((d) => ({ value: d.id, label: d.name })), [departmentOptions]);
+  const { data: departmentOptions = [] } = useQuery({
+    queryKey: ['departments', 'lookup'],
+    queryFn: departmentsApi.lookup,
+  });
+
+  const deptSelectOptions = useMemo(
+    () => departmentOptions.map((d) => ({ value: d.id, label: d.name })),
+    [departmentOptions],
+  );
 
   const { data: certificates = [], isLoading } = useQuery({
     queryKey: ['certificates', 'list', departmentId],
     queryFn: () => certificatesApi.list(departmentId ?? undefined),
   });
 
-  const approvedSelectedCount = certificates.filter((c) => selected.has(c.internProfileId) && c.status === 'Approved').length;
+  const filteredCertificates = useMemo(() => {
+    if (!search.trim()) return certificates;
+    const q = search.toLowerCase().trim();
+    return certificates.filter((c) => {
+      const nameMatch = c.internFullName?.toLowerCase().includes(q);
+      const codeMatch = c.internCode?.toLowerCase().includes(q);
+      const certMatch = c.certificateNumber?.toLowerCase().includes(q);
+      return nameMatch || codeMatch || certMatch;
+    });
+  }, [certificates, search]);
+
+  const approvedSelectedCount = certificates.filter(
+    (c) => selected.has(c.internProfileId) && c.status === 'Approved',
+  ).length;
 
   const toggleSelect = (internProfileId: number) => {
     setSelected((prev) => {
@@ -85,7 +107,9 @@ export function CertificateOversightScreen() {
   };
 
   const handleBulkIssue = async () => {
-    const targets = certificates.filter((c) => selected.has(c.internProfileId) && c.status === 'Approved');
+    const targets = certificates.filter(
+      (c) => selected.has(c.internProfileId) && c.status === 'Approved',
+    );
     if (targets.length === 0) return;
     setBusyId(-1);
     let succeeded = 0;
@@ -97,7 +121,10 @@ export function CertificateOversightScreen() {
         // continue
       }
     }
-    Toast.show({ type: succeeded === targets.length ? 'success' : 'warning', text1: `Issued ${succeeded} of ${targets.length}` });
+    Toast.show({
+      type: succeeded === targets.length ? 'success' : 'warning',
+      text1: `Issued ${succeeded} of ${targets.length}`,
+    });
     setSelected(new Set());
     setBusyId(null);
     invalidate();
@@ -117,7 +144,10 @@ export function CertificateOversightScreen() {
             {selected.has(c.internProfileId) ? (
               <CheckSquare size={20} color={theme.colors.primary} />
             ) : (
-              <Square size={20} color={c.status === 'Approved' ? theme.colors.textMuted : theme.colors.border} />
+              <Square
+                size={20}
+                color={c.status === 'Approved' ? theme.colors.textMuted : theme.colors.border}
+              />
             )}
           </Pressable>
           <View style={s.cardHeaderText}>
@@ -135,7 +165,12 @@ export function CertificateOversightScreen() {
         </Text>
 
         <View style={s.badgeRow}>
-          <View style={[s.badge, { backgroundColor: theme.colors[statusBgKey[c.status] ?? 'surfaceSunken'] }]}>
+          <View
+            style={[
+              s.badge,
+              { backgroundColor: theme.colors[statusBgKey[c.status] ?? 'surfaceSunken'] },
+            ]}
+          >
             <Text variant="caption" tone={statusTone[c.status] ?? 'muted'}>
               {c.status}
             </Text>
@@ -148,12 +183,20 @@ export function CertificateOversightScreen() {
             <View style={s.actionsRow}>
               {c.status === 'PendingApproval' && (
                 <Pressable hitSlop={8} style={s.actionIcon} onPress={() => handleApprove(c.internProfileId)}>
-                  {isBusy ? <ActivityIndicator size="small" color={theme.colors.primary} /> : <CheckCircle2 size={18} color={theme.colors.primary} />}
+                  {isBusy ? (
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                  ) : (
+                    <CheckCircle2 size={18} color={theme.colors.primary} />
+                  )}
                 </Pressable>
               )}
               {c.status === 'Approved' && (
                 <Pressable hitSlop={8} style={s.actionIcon} onPress={() => handleIssue(c.internProfileId)}>
-                  {isBusy ? <ActivityIndicator size="small" color={theme.colors.success} /> : <Send size={18} color={theme.colors.success} />}
+                  {isBusy ? (
+                    <ActivityIndicator size="small" color={theme.colors.success} />
+                  ) : (
+                    <Send size={18} color={theme.colors.success} />
+                  )}
                 </Pressable>
               )}
             </View>
@@ -165,13 +208,18 @@ export function CertificateOversightScreen() {
 
   return (
     <Screen scroll={false}>
-      <View style={s.filterRow}>
-        <SelectField label="Department" placeholder="All departments" value={departmentId} options={deptSelectOptions} onChange={setDepartmentId} />
-      </View>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search by name, code, or cert #"
+        departmentOptions={deptSelectOptions}
+        departmentValue={departmentId}
+        onDepartmentChange={setDepartmentId}
+      />
 
       <View style={s.headerRow}>
         <Text variant="body" tone="secondary">
-          {certificates.length} certificate{certificates.length === 1 ? '' : 's'}
+          {filteredCertificates.length} certificate{filteredCertificates.length === 1 ? '' : 's'}
         </Text>
         <Button
           label={`Bulk Issue (${approvedSelectedCount})`}
@@ -188,14 +236,16 @@ export function CertificateOversightScreen() {
         </Text>
       ) : (
         <FlatList
-          data={certificates}
+          data={filteredCertificates}
           keyExtractor={(c) => String(c.internProfileId)}
           renderItem={renderCard}
           style={s.list}
-          contentContainerStyle={certificates.length === 0 ? s.emptyListContent : s.listContent}
+          contentContainerStyle={
+            filteredCertificates.length === 0 ? s.emptyListContent : s.listContent
+          }
           ListEmptyComponent={
             <Text variant="body" tone="muted">
-              No certificates generated yet.
+              No certificates found.
             </Text>
           }
         />
@@ -205,7 +255,6 @@ export function CertificateOversightScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
-  filterRow: { marginBottom: t.spacing.sm },
   headerRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
@@ -214,7 +263,11 @@ const makeStyles = (t: AppTheme) => ({
   },
   list: { flex: 1 },
   listContent: { gap: t.spacing.sm, paddingBottom: t.spacing.lg },
-  emptyListContent: { flexGrow: 1, alignItems: 'center' as const, justifyContent: 'center' as const },
+  emptyListContent: {
+    flexGrow: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
   card: {
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
@@ -223,13 +276,35 @@ const makeStyles = (t: AppTheme) => ({
     padding: t.spacing.lg,
     ...t.shadows.sm,
   },
-  cardHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: t.spacing.sm },
+  cardHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: t.spacing.sm,
+  },
   checkboxContainer: { marginRight: 2 },
   cardHeaderText: { flex: 1 },
   cardSubline: { marginTop: 2 },
-  badgeRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: t.spacing.xs, marginTop: t.spacing.sm },
-  badge: { paddingHorizontal: t.spacing.sm, paddingVertical: 3, borderRadius: t.radii.full },
-  divider: { height: 1, backgroundColor: t.colors.border, marginTop: t.spacing.md, marginBottom: t.spacing.sm },
-  actionsRow: { flexDirection: 'row' as const, gap: t.spacing.lg, justifyContent: 'flex-end' as const },
+  badgeRow: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: t.spacing.xs,
+    marginTop: t.spacing.sm,
+  },
+  badge: {
+    paddingHorizontal: t.spacing.sm,
+    paddingVertical: 3,
+    borderRadius: t.radii.full,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: t.colors.border,
+    marginTop: t.spacing.md,
+    marginBottom: t.spacing.sm,
+  },
+  actionsRow: {
+    flexDirection: 'row' as const,
+    gap: t.spacing.lg,
+    justifyContent: 'flex-end' as const,
+  },
   actionIcon: { padding: t.spacing.xs },
 });

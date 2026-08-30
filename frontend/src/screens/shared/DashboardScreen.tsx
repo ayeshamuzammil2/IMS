@@ -31,7 +31,7 @@ export function DashboardScreen() {
 
   if (isLoading || !data) {
     return (
-      <Screen>
+      <Screen scroll={false}>
         <Text variant="body" tone="muted">
           Loading...
         </Text>
@@ -181,12 +181,12 @@ function ChartSection({ title, children }: { title: string; children: (showTable
   const theme = useTheme();
   const [showTable, setShowTable] = useState(false);
   return (
-    <View style={s.section}>
-      <View style={s.sectionHeader}>
+    <View style={s.card}>
+      <View style={s.cardHeader}>
         <Text variant="overline" tone="muted">
           {title}
         </Text>
-        <Pressable onPress={() => setShowTable((v) => !v)} hitSlop={8}>
+        <Pressable onPress={() => setShowTable((v) => !v)} hitSlop={8} style={s.actionIcon}>
           <Table size={16} color={showTable ? theme.colors.primary : theme.colors.textMuted} />
         </Pressable>
       </View>
@@ -268,8 +268,10 @@ function VerificationTable({ data }: { data: DashboardSummaryDto['verificationBr
 
 const makeStyles = (t: AppTheme) => ({
   heroCard: {
-    backgroundColor: t.colors.primaryContainer,
+    backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
+    borderWidth: 1,
+    borderColor: t.colors.border,
     paddingVertical: t.spacing.xl,
     paddingHorizontal: t.spacing.lg,
     alignItems: 'center' as const,
@@ -277,7 +279,7 @@ const makeStyles = (t: AppTheme) => ({
     ...t.shadows.sm,
   },
   heroLabel: { letterSpacing: 0.6, marginBottom: t.spacing.xs },
-  heroNumber: { color: t.colors.onPrimaryContainer },
+  heroNumber: { color: t.colors.primary },
   tileGrid: {
     flexDirection: 'row' as const,
     flexWrap: 'wrap' as const,
@@ -288,7 +290,7 @@ const makeStyles = (t: AppTheme) => ({
     flexBasis: '48%' as const,
     flexGrow: 1,
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.md,
+    borderRadius: t.radii.lg,
     borderWidth: 1,
     borderColor: t.colors.border,
     paddingVertical: t.spacing.md,
@@ -297,7 +299,7 @@ const makeStyles = (t: AppTheme) => ({
     gap: 2,
     ...t.shadows.sm,
   },
-  section: {
+  card: {
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
     borderWidth: 1,
@@ -306,12 +308,13 @@ const makeStyles = (t: AppTheme) => ({
     marginBottom: t.spacing.lg,
     ...t.shadows.sm,
   },
-  sectionHeader: {
+  cardHeader: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
     marginBottom: t.spacing.md,
   },
+  actionIcon: { padding: t.spacing.xs },
   donutRow: {
     flexDirection: 'row' as const,
     flexWrap: 'wrap' as const,
@@ -320,7 +323,7 @@ const makeStyles = (t: AppTheme) => ({
   },
   legendCol: { gap: t.spacing.sm, flexShrink: 1, minWidth: 120 },
   legendRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: t.spacing.xs },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendDot: { width: 10, height: 10, borderRadius: t.radii.full },
   legendText: { flex: 1 },
   tableRow: {
     flexDirection: 'row' as const,

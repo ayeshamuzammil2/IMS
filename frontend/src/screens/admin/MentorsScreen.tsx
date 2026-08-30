@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { Power, PowerOff, KeyRound, ArrowRightLeft, Trash2, ChevronRight } from 'lucide-react-native';
+import { Power, PowerOff, KeyRound, ArrowRightLeft, Trash2, ChevronRight, Search, X } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
@@ -62,12 +62,34 @@ export function MentorsScreen() {
   const [editing, setEditing] = useState<MentorDto | null>(null);
   const [transferDeptId, setTransferDeptId] = useState<number | null>(null);
 
+  const [showSearch, setShowSearch] = useState(false);
+  const [search, setSearch] = useState('');
+
   const { data: mentors = [], isLoading } = useQuery({ queryKey: ['mentors'], queryFn: () => mentorsApi.list() });
   const { data: departmentOptions = [] } = useQuery({
     queryKey: ['departments', 'lookup'],
     queryFn: departmentsApi.lookup,
   });
   const deptSelectOptions = useMemo(() => departmentOptions.map((d) => ({ value: d.id, label: d.name })), [departmentOptions]);
+
+  const filteredMentors = useMemo(() => {
+    if (!search.trim()) return mentors;
+    const q = search.toLowerCase().trim();
+    return mentors.filter(
+      (m) =>
+        m.fullName?.toLowerCase().includes(q) ||
+        m.email?.toLowerCase().includes(q) ||
+        m.departmentName?.toLowerCase().includes(q) ||
+        m.cnic?.toLowerCase().includes(q)
+    );
+  }, [mentors, search]);
+
+  const toggleSearch = () => {
+    if (showSearch) {
+      setSearch('');
+    }
+    setShowSearch((prev) => !prev);
+  };
 
   const createForm = useForm<CreateInput, any, CreateOutput>({
     resolver: zodResolver(createSchema),
@@ -284,11 +306,38 @@ export function MentorsScreen() {
 
   return (
     <Screen scroll={false}>
-      <View style={s.headerRow}>
-        <Text variant="body" tone="secondary">
-          {mentors.length} mentor{mentors.length === 1 ? '' : 's'}
-        </Text>
-        <Button label="Add Mentor" size="sm" onPress={openCreate} />
+      <View style={s.headerContainer}>
+        {/* Main Header Row */}
+        <View style={s.headerRow}>
+          <Text variant="body" tone="secondary">
+            {filteredMentors.length} mentor{filteredMentors.length === 1 ? '' : 's'}
+          </Text>
+          <Button label="Add Mentor" size="sm" onPress={openCreate} />
+        </View>
+
+        {/* Search Icon Trigger placed below Add Mentor */}
+        <View style={s.searchIconRow}>
+          <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
+            {showSearch ? (
+              <X size={20} color={theme.colors.textSecondary} />
+            ) : (
+              <Search size={20} color={theme.colors.textSecondary} />
+            )}
+          </Pressable>
+        </View>
+
+        {/* Expandable Search Input */}
+        {showSearch && (
+          <View style={s.searchContainer}>
+            <Input
+              placeholder="Search mentors..."
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="none"
+              autoFocus
+            />
+          </View>
+        )}
       </View>
 
       {isLoading ? (
@@ -297,14 +346,16 @@ export function MentorsScreen() {
         </Text>
       ) : (
         <FlatList
-          data={mentors}
+          data={filteredMentors}
           keyExtractor={(m) => String(m.id)}
           renderItem={renderCard}
           style={s.list}
-          contentContainerStyle={mentors.length === 0 ? s.emptyListContent : s.listContent}
+          contentContainerStyle={
+            filteredMentors.length === 0 ? s.emptyListContent : s.listContent
+          }
           ListEmptyComponent={
             <Text variant="body" tone="muted">
-              No mentors yet. Add one to get started.
+              {search ? 'No mentors match your search.' : 'No mentors yet. Add one to get started.'}
             </Text>
           }
         />
@@ -536,11 +587,28 @@ export function MentorsScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  headerContainer: {
+    marginBottom: 12,
+  },
   headerRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
-    marginBottom: t.spacing.md,
+    marginBottom: t.spacing.xs,
+  },
+  searchIconRow: {
+    alignItems: 'flex-end' as const,
+    marginTop: 8,
+  },
+  iconButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: t.colors.surface,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+  },
+  searchContainer: {
+    marginTop: 8,
   },
   list: { flex: 1 },
   listContent: { gap: t.spacing.sm, paddingBottom: t.spacing.lg },
