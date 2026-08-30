@@ -355,9 +355,20 @@ public sealed class AttendanceService(
 
                     if (replayBest >= Face.PadReplayHardFailThreshold)
                     {
-                        await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedLiveness, ct);
-                        await HardFailSessionAsync(session, ct);
-                        await ThrowFaceFailureAsync(profile, BusinessRuleCodes.LivenessFailed, "Liveness check failed. Please try again with a live camera.", ct);
+                        // NOTE: PAD (MiniFASNet) is intentionally never a hard-fail gate here.
+                        // Empirical testing (feeding the bundled/official model random noise,
+                        // solid colors, and genuine live selfies from real phone cameras) showed it
+                        // returns a near-constant high "replay" score regardless of input content -
+                        // it was trained on controlled kiosk/IR capture conditions and does not
+                        // generalize to arbitrary phone selfie cameras. Hard-failing on it would
+                        // reject every genuine live attempt. It still counts toward risk scoring
+                        // below so an unusually high replay signal is visible to reviewers, but the
+                        // actual anti-spoof guarantee here comes from the active challenge-response
+                        // capture (held pose/blink/turn, enforced above) and the geometry-based
+                        // parallaxDetector (hard-failed separately above) - both of which respond to
+                        // real capture behavior rather than static image texture.
+                        flags.Add("HighReplayScore");
+                        riskScore += 25;
                     }
                     if (padLiveMean < (decimal)Face.PadLiveThreshold)
                     {
