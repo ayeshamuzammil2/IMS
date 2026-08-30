@@ -14,6 +14,8 @@ public sealed record GithubReviewQueueItemDto(
     int InternProfileId,
     string InternFullName,
     string InternCode,
+    int? DepartmentId,
+    string? DepartmentName,
     string RepositoryUrl,
     int Version,
     DateTime SubmittedAtUtc);

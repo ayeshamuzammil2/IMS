@@ -59,6 +59,8 @@ public sealed record DocumentReviewQueueItemDto(
     int InternProfileId,
     string InternFullName,
     string InternCode,
+    int? DepartmentId,
+    string? DepartmentName,
     string DocumentType,
     Guid? FileId,
     string? ContentType,

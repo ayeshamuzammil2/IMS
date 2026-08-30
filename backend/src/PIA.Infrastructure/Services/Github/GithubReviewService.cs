@@ -22,7 +22,7 @@ public sealed class GithubReviewService(
     {
         var query = db.GithubSubmissions.AsNoTracking()
             .Where(s => s.Status == GithubStatus.Pending)
-            .Join(db.InternProfiles.Include(p => p.User), s => s.InternProfileId, p => p.Id,
+            .Join(db.InternProfiles.Include(p => p.User).ThenInclude(u => u.Department), s => s.InternProfileId, p => p.Id,
                 (s, p) => new { Submission = s, Profile = p });
 
         if (currentUser.Role == UserRole.Mentor)
@@ -34,6 +34,7 @@ public sealed class GithubReviewService(
 
         return rows.Select(x => new GithubReviewQueueItemDto(
             x.Submission.Id, x.Profile.Id, x.Profile.User.FullName, x.Profile.InternCode,
+            x.Profile.User.DepartmentId, x.Profile.User.Department?.Name,
             x.Submission.RepositoryUrl, x.Submission.Version, x.Submission.SubmittedAtUtc)).ToList();
     }
 

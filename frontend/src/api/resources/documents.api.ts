@@ -54,6 +54,8 @@ export interface DocumentReviewQueueItemDto {
   internProfileId: number;
   internFullName: string;
   internCode: string;
+  departmentId: number | null;
+  departmentName: string | null;
   documentType: DocumentTypeKey;
   fileId: string | null;
   contentType: string | null;

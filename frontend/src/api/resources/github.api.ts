@@ -16,6 +16,8 @@ export interface GithubReviewQueueItemDto {
   internProfileId: number;
   internFullName: string;
   internCode: string;
+  departmentId: number | null;
+  departmentName: string | null;
   repositoryUrl: string;
   version: number;
   submittedAtUtc: string;

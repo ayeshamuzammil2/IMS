@@ -6,7 +6,7 @@ import { CheckSquare, Square, CheckCircle2, Send } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
-import { SelectField } from '../../components/forms/SelectField';
+import { FilterBar } from '../../components/filters/FilterBar';
 import { idCardsApi, type IdCardDto } from '../../api/resources/idcards.api';
 import { departmentsApi } from '../../api/resources/departments.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
@@ -34,16 +34,25 @@ export function IdCardOversightScreen() {
   const theme = useTheme();
   const queryClient = useQueryClient();
   const [departmentId, setDepartmentId] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const { data: departmentOptions = [] } = useQuery({ queryKey: ['departments', 'lookup'], queryFn: departmentsApi.lookup });
   const deptSelectOptions = useMemo(() => departmentOptions.map((d) => ({ value: d.id, label: d.name })), [departmentOptions]);
 
-  const { data: cards = [], isLoading } = useQuery({
+  const { data: allCards = [], isLoading } = useQuery({
     queryKey: ['idcards', 'list', departmentId],
     queryFn: () => idCardsApi.list(departmentId ?? undefined),
   });
+
+  const cards = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return allCards;
+    return allCards.filter(
+      (c) => (c.internFullName ?? '').toLowerCase().includes(term) || (c.internCode ?? '').toLowerCase().includes(term),
+    );
+  }, [allCards, search]);
 
   const approvedSelectedCount = cards.filter((c) => selected.has(c.internProfileId) && c.status === 'Approved').length;
 
@@ -165,9 +174,14 @@ export function IdCardOversightScreen() {
 
   return (
     <Screen scroll={false}>
-      <View style={s.filterRow}>
-        <SelectField label="Department" placeholder="All departments" value={departmentId} options={deptSelectOptions} onChange={setDepartmentId} />
-      </View>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search by intern name or code"
+        departmentOptions={deptSelectOptions}
+        departmentValue={departmentId}
+        onDepartmentChange={setDepartmentId}
+      />
 
       <View style={s.headerRow}>
         <Text variant="body" tone="secondary">
@@ -205,7 +219,6 @@ export function IdCardOversightScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
-  filterRow: { marginBottom: t.spacing.sm },
   headerRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,

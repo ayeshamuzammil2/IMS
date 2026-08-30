@@ -10,13 +10,18 @@ import { Input } from '../../components/primitives/Input';
 import { Button } from '../../components/primitives/Button';
 import { SelectField } from '../../components/forms/SelectField';
 import { DateField } from '../../components/forms/DateField';
+import { FilterBar } from '../../components/filters/FilterBar';
 import { internsApi } from '../../api/resources/interns.api';
 import { projectsApi } from '../../api/resources/projects.api';
+import { departmentsApi } from '../../api/resources/departments.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
+import { useAuth } from '../../providers/AuthProvider';
 import type { AppTheme } from '../../theme/types';
 
 export function AssignProjectScreen() {
   const s = useThemedStyles(makeStyles);
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
   const queryClient = useQueryClient();
   const [internProfileId, setInternProfileId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
@@ -25,8 +30,40 @@ export function AssignProjectScreen() {
   const [pickedFile, setPickedFile] = useState<{ uri: string; name: string; mimeType: string | null } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const [search, setSearch] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState<number | null>(null);
+
   const { data: interns = [] } = useQuery({ queryKey: ['interns'], queryFn: () => internsApi.list() });
-  const internOptions = useMemo(() => interns.map((i) => ({ value: i.id, label: `${i.fullName} (${i.internCode})` })), [interns]);
+
+  // Only Admin sees a department filter - a Mentor's intern list is already scoped by the
+  // backend to their own department, so a department picker would add nothing for them.
+  const { data: departmentOptions = [] } = useQuery({
+    queryKey: ['departments', 'lookup'],
+    queryFn: departmentsApi.lookup,
+    enabled: isAdmin,
+  });
+  const departmentSelectOptions = useMemo(() => departmentOptions.map((d) => ({ value: d.id, label: d.name })), [departmentOptions]);
+
+  const filteredInterns = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return interns.filter((i) => {
+      if (isAdmin && departmentFilter && i.departmentId !== departmentFilter) return false;
+      if (!term) return true;
+      return i.fullName.toLowerCase().includes(term) || i.internCode.toLowerCase().includes(term);
+    });
+  }, [interns, isAdmin, departmentFilter, search]);
+
+  const internOptions = useMemo(
+    () => filteredInterns.map((i) => ({ value: i.id, label: `${i.fullName} (${i.internCode})` })),
+    [filteredInterns],
+  );
+
+  const handleDepartmentChange = (value: number | null) => {
+    setDepartmentFilter(value);
+    if (internProfileId && !interns.some((i) => i.id === internProfileId && (!value || i.departmentId === value))) {
+      setInternProfileId(null);
+    }
+  };
 
   const { data: assignments = [], refetch } = useQuery({
     queryKey: ['projects', 'intern', internProfileId],
@@ -71,6 +108,15 @@ export function AssignProjectScreen() {
 
   return (
     <Screen scroll>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search by intern name or code"
+        departmentOptions={isAdmin ? departmentSelectOptions : undefined}
+        departmentValue={departmentFilter}
+        onDepartmentChange={isAdmin ? handleDepartmentChange : undefined}
+      />
+
       <SelectField
         label="Intern"
         required

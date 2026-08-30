@@ -20,7 +20,7 @@ public sealed class DocumentReviewService(
     {
         var query = db.InternDocuments.AsNoTracking()
             .Where(d => d.Status == DocumentStatus.Pending)
-            .Join(db.InternProfiles.Include(p => p.User), d => d.InternProfileId, p => p.Id,
+            .Join(db.InternProfiles.Include(p => p.User).ThenInclude(u => u.Department), d => d.InternProfileId, p => p.Id,
                 (d, p) => new { Document = d, Profile = p });
 
         if (currentUser.Role == UserRole.Mentor)
@@ -37,6 +37,7 @@ public sealed class DocumentReviewService(
 
         return rows.Select(x => new DocumentReviewQueueItemDto(
             x.Document.Id, x.Profile.Id, x.Profile.User.FullName, x.Profile.InternCode,
+            x.Profile.User.DepartmentId, x.Profile.User.Department?.Name,
             x.Document.DocumentType.ToString(), x.Document.FileId,
             x.Document.FileId.HasValue ? contentTypesByFileId.GetValueOrDefault(x.Document.FileId.Value) : null,
             x.Document.ExternalLinkUrl, x.Document.Version, x.Document.UploadedAtUtc)).ToList();

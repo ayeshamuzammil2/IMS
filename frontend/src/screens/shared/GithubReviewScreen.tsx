@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Pressable } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,9 +9,12 @@ import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
 import { Input } from '../../components/primitives/Input';
 import { FormModal } from '../../components/forms/FormModal';
+import { FilterBar } from '../../components/filters/FilterBar';
 import { githubApi, type GithubReviewQueueItemDto } from '../../api/resources/github.api';
+import { departmentsApi } from '../../api/resources/departments.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
+import { useAuth } from '../../providers/AuthProvider';
 import type { AppTheme } from '../../theme/types';
 
 type ReasonAction = 'Rejected' | 'ResubmitRequested';
@@ -19,15 +22,63 @@ type ReasonAction = 'Rejected' | 'ResubmitRequested';
 export function GithubReviewScreen() {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
   const queryClient = useQueryClient();
   const [reasonModal, setReasonModal] = useState<{ item: GithubReviewQueueItemDto; action: ReasonAction } | null>(null);
   const [reason, setReason] = useState('');
   const [busyId, setBusyId] = useState<number | null>(null);
 
+  const [search, setSearch] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState<number | null>(null);
+  const [internFilter, setInternFilter] = useState<number | null>(null);
+
   const { data: queue = [], isLoading, refetch } = useQuery({
     queryKey: ['github', 'review', 'queue'],
     queryFn: githubApi.review.getQueue,
   });
+
+  // Only Admin gets a department filter - a Mentor's queue is already scoped by the backend
+  // to their own department's interns, so showing them a department picker adds nothing.
+  const { data: departmentOptions = [] } = useQuery({
+    queryKey: ['departments', 'lookup'],
+    queryFn: departmentsApi.lookup,
+    enabled: isAdmin,
+  });
+  const departmentSelectOptions = useMemo(() => departmentOptions.map((d) => ({ value: d.id, label: d.name })), [departmentOptions]);
+
+  const departmentScopedQueue = useMemo(
+    () => (isAdmin && departmentFilter ? queue.filter((q) => q.departmentId === departmentFilter) : queue),
+    [queue, isAdmin, departmentFilter],
+  );
+
+  const internSelectOptions = useMemo(() => {
+    const seen = new Map<number, string>();
+    for (const q of departmentScopedQueue) {
+      if (!seen.has(q.internProfileId)) seen.set(q.internProfileId, `${q.internFullName} (${q.internCode})`);
+    }
+    return Array.from(seen.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [departmentScopedQueue]);
+
+  const filteredQueue = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return departmentScopedQueue.filter((q) => {
+      if (internFilter && q.internProfileId !== internFilter) return false;
+      if (!term) return true;
+      return (
+        q.internFullName.toLowerCase().includes(term) ||
+        q.internCode.toLowerCase().includes(term) ||
+        q.repositoryUrl.toLowerCase().includes(term)
+      );
+    });
+  }, [departmentScopedQueue, internFilter, search]);
+
+  const handleDepartmentChange = (value: number | null) => {
+    setDepartmentFilter(value);
+    setInternFilter(null);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -67,9 +118,21 @@ export function GithubReviewScreen() {
 
   return (
     <Screen scroll>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search by intern name, code, or repo URL"
+        departmentOptions={isAdmin ? departmentSelectOptions : undefined}
+        departmentValue={departmentFilter}
+        onDepartmentChange={isAdmin ? handleDepartmentChange : undefined}
+        internOptions={internSelectOptions}
+        internValue={internFilter}
+        onInternChange={setInternFilter}
+      />
+
       <View style={s.headerRow}>
         <Text variant="body" tone="secondary">
-          {queue.length} submission{queue.length === 1 ? '' : 's'} awaiting review
+          {filteredQueue.length} submission{filteredQueue.length === 1 ? '' : 's'} awaiting review
         </Text>
       </View>
 
@@ -77,15 +140,15 @@ export function GithubReviewScreen() {
         <Text variant="body" tone="muted">
           Loading...
         </Text>
-      ) : queue.length === 0 ? (
+      ) : filteredQueue.length === 0 ? (
         <View style={s.emptyContainer}>
           <GitBranch size={32} color={theme.colors.textMuted} />
           <Text variant="body" tone="muted">
-            Nothing to review right now.
+            {queue.length === 0 ? 'Nothing to review right now.' : 'No submissions match these filters.'}
           </Text>
         </View>
       ) : (
-        queue.map((item) => (
+        filteredQueue.map((item) => (
           <View key={item.submissionId} style={s.card}>
             <View style={s.cardMain}>
               <View style={{ flex: 1 }}>
@@ -95,6 +158,11 @@ export function GithubReviewScreen() {
                 <Text variant="caption" tone="muted">
                   {item.internCode} · v{item.version}
                 </Text>
+                {isAdmin && item.departmentName ? (
+                  <Text variant="caption" tone="secondary">
+                    {item.departmentName}
+                  </Text>
+                ) : null}
                 <Text variant="body" tone="brand" numberOfLines={1} style={{ marginTop: theme.spacing.xs }}>
                   {item.repositoryUrl}
                 </Text>
