@@ -70,7 +70,6 @@ export function GithubReviewScreen() {
   // Handle live search text updates
   const handleSearchChange = (text: string) => {
     setSearch(text);
-    // Jab user search field me likhe toh intern filter reset kar dein taake globally queue filtering chale
     if (text.trim() && internFilter) {
       setInternFilter(null);
     }
@@ -139,32 +138,45 @@ export function GithubReviewScreen() {
 
   return (
     <Screen scroll>
-      {/* 1. Department Dropdown (Admin Only) */}
-      {isAdmin && (
-        <View style={s.filterSpacing}>
-          <SelectField
-            label="Department"
-            placeholder="Select Department"
-            value={departmentFilter ? String(departmentFilter) : 'all'}
-            options={departmentSelectOptions}
-            onChange={handleDepartmentChange}
-          />
-        </View>
-      )}
+      {/* Filters Inside Clean White Card Wrapper */}
+      <View style={s.filterWrapper}>
+        {isAdmin && (
+          <View style={s.filterSpacing}>
+            <SelectField
+              label="Department"
+              placeholder="Select Department"
+              value={departmentFilter ? String(departmentFilter) : 'all'}
+              options={departmentSelectOptions}
+              onChange={handleDepartmentChange}
+            />
+          </View>
+        )}
 
-      {/* 2. Intern Dropdown */}
-      <SelectField
-        label="Intern"
-        placeholder="Select Intern"
-        value={internFilter ? String(internFilter) : 'all'}
-        options={internSelectOptions}
-        onChange={(val) => {
-          setInternFilter(val === 'all' ? null : Number(val));
-          if (val !== 'all') setSearch(''); // Dropdown pick karne par active search clear ho jaye
-        }}
-      />
+        <SelectField
+          label="Intern"
+          placeholder="Select Intern"
+          value={internFilter ? String(internFilter) : 'all'}
+          options={internSelectOptions}
+          onChange={(val) => {
+            setInternFilter(val === 'all' ? null : Number(val));
+            if (val !== 'all') setSearch('');
+          }}
+        />
 
-      {/* 3. Search Icon directly BELOW Intern Filter */}
+        {showSearch && (
+          <View style={s.searchContainer}>
+            <Input
+              placeholder="Search by intern name, code, or repo URL..."
+              value={search}
+              onChangeText={handleSearchChange}
+              autoCapitalize="none"
+              autoFocus
+            />
+          </View>
+        )}
+      </View>
+
+      {/* Search Icon OUTSIDE of White Card */}
       <View style={s.searchIconRow}>
         <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
           {showSearch ? (
@@ -174,19 +186,6 @@ export function GithubReviewScreen() {
           )}
         </Pressable>
       </View>
-
-      {/* 4. Expandable Search Input field below icon */}
-      {showSearch && (
-        <View style={s.searchContainer}>
-          <Input
-            placeholder="Search by intern name, code, or repo URL..."
-            value={search}
-            onChangeText={handleSearchChange}
-            autoCapitalize="none"
-            autoFocus
-          />
-        </View>
-      )}
 
       <View style={s.headerRow}>
         <Text variant="body" tone="secondary">
@@ -290,13 +289,22 @@ export function GithubReviewScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  filterWrapper: {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.lg,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    padding: t.spacing.md,
+    marginBottom: t.spacing.xs,
+    ...t.shadows.sm,
+  },
   filterSpacing: {
     marginBottom: t.spacing.sm,
   },
   searchIconRow: {
     alignItems: 'flex-end' as const,
     marginTop: t.spacing.xs,
-    marginBottom: t.spacing.xs,
+    marginBottom: t.spacing.sm,
   },
   iconButton: {
     padding: 10,
@@ -308,14 +316,13 @@ const makeStyles = (t: AppTheme) => ({
     justifyContent: 'center' as const,
   },
   searchContainer: {
-    marginBottom: t.spacing.sm,
+    marginTop: t.spacing.sm,
   },
   headerRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
     marginBottom: t.spacing.md,
-    marginTop: t.spacing.xs,
   },
   emptyContainer: {
     alignItems: 'center' as const,

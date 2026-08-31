@@ -112,18 +112,21 @@ export function AttendanceHistoryScreen() {
 
   return (
     <Screen scroll>
-      <View style={s.filterRow}>
-        <View style={s.dateField}>
-          <DateField label="From" value={startDate} onChange={(v) => v && setStartDate(v)} />
-        </View>
-        <View style={s.dateField}>
-          <DateField label="To" value={endDate} onChange={(v) => v && setEndDate(v)} />
-        </View>
-        {isAdmin ? (
-          <View style={s.deptField}>
-            <SelectField label="Department" placeholder="All" value={departmentId} options={deptSelectOptions} onChange={setDepartmentId} />
+      {/* Enhanced Clean White Wrapper for Filters */}
+      <View style={s.filterWrapper}>
+        <View style={s.filterRow}>
+          <View style={s.dateField}>
+            <DateField label="From" value={startDate} onChange={(v) => v && setStartDate(v)} />
           </View>
-        ) : null}
+          <View style={s.dateField}>
+            <DateField label="To" value={endDate} onChange={(v) => v && setEndDate(v)} />
+          </View>
+          {isAdmin ? (
+            <View style={s.deptField}>
+              <SelectField label="Department" placeholder="All" value={departmentId} options={deptSelectOptions} onChange={setDepartmentId} />
+            </View>
+          ) : null}
+        </View>
       </View>
 
       {/* Search Icon Trigger & Expandable Input Bar */}
@@ -238,10 +241,18 @@ export function AttendanceHistoryScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  filterWrapper: {
+    backgroundColor: t.colors.surface, // Pure clean white surface
+    borderRadius: t.radii.lg,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    padding: t.spacing.md,
+    marginBottom: t.spacing.sm,
+    ...t.shadows.sm,
+  },
   filterRow: {
     flexDirection: 'row' as const,
     gap: t.spacing.sm,
-    marginBottom: t.spacing.xs,
     flexWrap: 'wrap' as const,
   },
   dateField: { flex: 1, minWidth: 130 },
@@ -283,10 +294,10 @@ const makeStyles = (t: AppTheme) => ({
     ...t.shadows.sm,
   },
   cardMain: {
-  flexDirection: 'row' as const,
-  justifyContent: 'space-between' as const,
-  alignItems: 'flex-start' as const,
-},
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'flex-start' as const,
+  },
   cardInfo: { flex: 1 },
   nameText: { fontSize: 16, fontWeight: '600' as const },
   deptText: { marginTop: 2 },

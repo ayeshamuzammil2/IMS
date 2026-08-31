@@ -132,30 +132,43 @@ export function AssignProjectScreen() {
 
   return (
     <Screen scroll>
-      {/* Department Filter Dropdown (Admin Only) */}
-      {isAdmin && (
-        <View style={s.filterSpacing}>
-          <SelectField
-            label="Department"
-            placeholder="Select Department"
-            value={departmentFilter ? String(departmentFilter) : 'all'}
-            options={departmentSelectOptions}
-            onChange={handleDepartmentChange}
-          />
-        </View>
-      )}
+      {/* Solid White Card Wrapper for Filters */}
+      <View style={s.filterWrapper}>
+        {isAdmin && (
+          <View style={s.filterSpacing}>
+            <SelectField
+              label="Department"
+              placeholder="Select Department"
+              value={departmentFilter ? String(departmentFilter) : 'all'}
+              options={departmentSelectOptions}
+              onChange={handleDepartmentChange}
+            />
+          </View>
+        )}
 
-      {/* Intern Filter Dropdown */}
-      <SelectField
-        label="Intern"
-        required
-        placeholder="Select an intern"
-        value={internProfileId ? String(internProfileId) : ''}
-        options={internOptions}
-        onChange={(val) => setInternProfileId(val ? Number(val) : null)}
-      />
+        <SelectField
+          label="Intern"
+          required
+          placeholder="Select an intern"
+          value={internProfileId ? String(internProfileId) : ''}
+          options={internOptions}
+          onChange={(val) => setInternProfileId(val ? Number(val) : null)}
+        />
 
-      {/* Search Icon directly BELOW Intern Dropdown */}
+        {showSearch && (
+          <View style={s.searchContainer}>
+            <Input
+              placeholder="Search by intern name or code..."
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="none"
+              autoFocus
+            />
+          </View>
+        )}
+      </View>
+
+      {/* Search Icon OUTSIDE of White Card */}
       <View style={s.searchIconRow}>
         <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
           {showSearch ? (
@@ -165,19 +178,6 @@ export function AssignProjectScreen() {
           )}
         </Pressable>
       </View>
-
-      {/* Search Input */}
-      {showSearch && (
-        <View style={s.searchContainer}>
-          <Input
-            placeholder="Search by intern name or code..."
-            value={search}
-            onChangeText={setSearch}
-            autoCapitalize="none"
-            autoFocus
-          />
-        </View>
-      )}
 
       {internProfileId ? (
         <>
@@ -231,13 +231,22 @@ export function AssignProjectScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  filterWrapper: {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.lg,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    padding: t.spacing.md,
+    marginBottom: t.spacing.xs,
+    ...t.shadows.sm,
+  },
   filterSpacing: {
     marginBottom: t.spacing.sm,
   },
   searchIconRow: {
     alignItems: 'flex-end' as const,
     marginTop: t.spacing.xs,
-    marginBottom: t.spacing.xs,
+    marginBottom: t.spacing.sm,
   },
   iconButton: {
     padding: 10,
@@ -249,7 +258,7 @@ const makeStyles = (t: AppTheme) => ({
     justifyContent: 'center' as const,
   },
   searchContainer: {
-    marginBottom: t.spacing.sm,
+    marginTop: t.spacing.sm,
   },
   card: {
     backgroundColor: t.colors.surface,
@@ -258,8 +267,8 @@ const makeStyles = (t: AppTheme) => ({
     borderColor: t.colors.border,
     padding: t.spacing.lg,
     gap: t.spacing.md,
-    marginTop: t.spacing.xs,
     marginBottom: t.spacing.lg,
+    ...t.shadows.sm,
   },
   attachButton: { alignSelf: 'flex-start' as const },
   sectionLabel: { marginBottom: t.spacing.xs, marginLeft: t.spacing.xs },

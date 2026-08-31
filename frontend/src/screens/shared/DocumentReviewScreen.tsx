@@ -146,15 +146,17 @@ export function DocumentReviewScreen() {
 
   return (
     <Screen scroll>
-      {/* FilterBar without default text search */}
-      <FilterBar
-        departmentOptions={isAdmin ? departmentSelectOptions : undefined}
-        departmentValue={departmentFilter}
-        onDepartmentChange={isAdmin ? handleDepartmentChange : undefined}
-        internOptions={internSelectOptions}
-        internValue={internFilter}
-        onInternChange={setInternFilter}
-      />
+      {/* Enhanced Clean White Card Container for FilterBar */}
+      <View style={s.filterBarWrapper}>
+        <FilterBar
+          departmentOptions={isAdmin ? departmentSelectOptions : undefined}
+          departmentValue={departmentFilter}
+          onDepartmentChange={isAdmin ? handleDepartmentChange : undefined}
+          internOptions={internSelectOptions}
+          internValue={internFilter}
+          onInternChange={setInternFilter}
+        />
+      </View>
 
       <View style={s.headerContainer}>
         <View style={s.headerRow}>
@@ -162,7 +164,7 @@ export function DocumentReviewScreen() {
             {filteredQueue.length} document{filteredQueue.length === 1 ? '' : 's'} awaiting review
           </Text>
 
-          {/* Search Icon Trigger placed on top-right */}
+          {/* Search Icon Trigger */}
           <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
             {showSearch ? (
               <X size={20} color={theme.colors.textSecondary} />
@@ -172,7 +174,7 @@ export function DocumentReviewScreen() {
           </Pressable>
         </View>
 
-        {/* Expandable Search Input Input field */}
+        {/* Expandable Search Input field */}
         {showSearch && (
           <View style={s.searchContainer}>
             <Input
@@ -281,6 +283,15 @@ export function DocumentReviewScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  filterBarWrapper: {
+    backgroundColor: t.colors.surface, // Solid clean white surface
+    borderRadius: t.radii.lg,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    padding: t.spacing.md,
+    marginBottom: t.spacing.md,
+    ...t.shadows.sm,
+  },
   headerContainer: {
     marginBottom: t.spacing.md,
   },

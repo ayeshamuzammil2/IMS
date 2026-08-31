@@ -113,6 +113,7 @@ public static class DependencyInjection
 
         services.AddScoped<IChallengeGenerator, ChallengeGenerator>();
         services.AddSingleton<IFaceVerificationProvider, OnnxFaceVerificationProvider>();
+        services.AddSingleton<IFaceDetector, OnnxFaceDetector>();
         services.AddScoped<IParallaxResidualDetector, ParallaxResidualDetector>();
         services.AddScoped<ISpecularTemporalAnalyzer, SpecularTemporalAnalyzer>();
         services.AddScoped<IRollingShutterBandingDetector, RollingShutterBandingDetector>();

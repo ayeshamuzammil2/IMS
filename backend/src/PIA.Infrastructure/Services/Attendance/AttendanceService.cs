@@ -381,7 +381,7 @@ public sealed class AttendanceService(
                 var embedBbox = bestFrame.Source.Telemetry.BoundingBox;
                 if (embedBbox is not null)
                 {
-                    var embedCrop = FaceCropper.CropAligned(bestFrame.Bitmap, embedBbox, Face.PadCropScale);
+                    var embedCrop = FaceCropper.CropAligned(bestFrame.Bitmap, embedBbox, Face.EmbeddingCropScale);
                     if (embedCrop is not null)
                     {
                         var embedding = await faceProvider.ExtractEmbeddingAsync(embedCrop, ct);

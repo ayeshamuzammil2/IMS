@@ -155,26 +155,16 @@ export function IdCardManagementScreen() {
 
   return (
     <Screen scroll>
-      <SelectField
-        label="Intern"
-        required
-        placeholder="Select an intern"
-        value={internProfileId ? String(internProfileId) : ''}
-        options={internOptions}
-        onChange={setInternProfileId}
-      />
-
-      {/* Search Icon Trigger & Expandable Input under Intern SelectField */}
-      <View style={s.searchBarSection}>
-        <View style={s.searchIconRow}>
-          <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
-            {showSearch ? (
-              <X size={20} color={theme.colors.textSecondary} />
-            ) : (
-              <Search size={20} color={theme.colors.textSecondary} />
-            )}
-          </Pressable>
-        </View>
+      {/* Solid White Container Wrapper for Dropdown & Search Input */}
+      <View style={s.filterWrapper}>
+        <SelectField
+          label="Intern"
+          required
+          placeholder="Select an intern"
+          value={internProfileId ? String(internProfileId) : ''}
+          options={internOptions}
+          onChange={setInternProfileId}
+        />
 
         {showSearch && (
           <View style={s.searchContainer}>
@@ -187,6 +177,17 @@ export function IdCardManagementScreen() {
             />
           </View>
         )}
+      </View>
+
+      {/* Search Icon OUTSIDE of White Card */}
+      <View style={s.searchIconRow}>
+        <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
+          {showSearch ? (
+            <X size={20} color={theme.colors.textSecondary} />
+          ) : (
+            <Search size={20} color={theme.colors.textSecondary} />
+          )}
+        </Pressable>
       </View>
 
       {internProfileId ? (
@@ -235,22 +236,31 @@ export function IdCardManagementScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
-  searchBarSection: {
-    marginTop: t.spacing.xs,
-    marginBottom: t.spacing.sm,
+  filterWrapper: {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.lg,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    padding: t.spacing.md,
+    marginBottom: t.spacing.xs,
+    ...t.shadows.sm,
   },
   searchIconRow: {
     alignItems: 'flex-end' as const,
+    marginTop: t.spacing.xs,
+    marginBottom: t.spacing.sm,
   },
   iconButton: {
-    padding: 8,
+    padding: 10,
     borderRadius: t.radii.md,
     backgroundColor: t.colors.surface,
     borderWidth: 1,
     borderColor: t.colors.border,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   searchContainer: {
-    marginTop: t.spacing.xs,
+    marginTop: t.spacing.sm,
   },
   card: {
     backgroundColor: t.colors.surface,
@@ -259,6 +269,7 @@ const makeStyles = (t: AppTheme) => ({
     borderColor: t.colors.border,
     padding: t.spacing.lg,
     gap: t.spacing.md,
-    marginTop: t.spacing.md,
+    marginTop: t.spacing.xs,
+    ...t.shadows.sm,
   },
 });

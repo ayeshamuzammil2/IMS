@@ -31,6 +31,7 @@ public sealed class FaceEnrollmentService(
     IClock clock,
     IChallengeGenerator challengeGenerator,
     IFaceVerificationProvider faceProvider,
+    IFaceDetector faceDetector,
     IOptions<AttendanceOptions> attendanceOptions,
     IOptions<FaceOptions> faceOptions,
     ILogger<FaceEnrollmentService> logger) : IFaceEnrollmentService
@@ -181,14 +182,17 @@ public sealed class FaceEnrollmentService(
                 frame.Telemetry.Index, bitmap.Width, bitmap.Height, bbox.X, bbox.Y, bbox.Width, bbox.Height);
 
             var blur = ComputeBlurVariance(bitmap);
-            var crop = FaceCropper.CropAligned(bitmap, bbox, faceOptions.Value.PadCropScale);
-            if (crop is null)
+            var padCrop = FaceCropper.CropAligned(bitmap, bbox, faceOptions.Value.PadCropScale);
+            if (padCrop is null)
             {
                 logger.LogWarning("Enrollment frame {Index}: crop rejected (too small/out of bounds after clamping).", frame.Telemetry.Index);
                 continue;
             }
+            // Separate, tighter crop for the embedding model - see FaceOptions.EmbeddingCropScale's
+            // doc comment for why reusing PadCropScale here silently breaks face matching.
+            var embeddingCrop = FaceCropper.CropAligned(bitmap, bbox, faceOptions.Value.EmbeddingCropScale) ?? padCrop;
 
-            var embedding = await faceProvider.ExtractEmbeddingAsync(crop, ct);
+            var embedding = await faceProvider.ExtractEmbeddingAsync(embeddingCrop, ct);
             if (embedding is null)
             {
                 logger.LogWarning("Enrollment frame {Index}: embedding extraction returned null (model not configured?).", frame.Telemetry.Index);
@@ -200,7 +204,7 @@ public sealed class FaceEnrollmentService(
             {
                 bestBlur = blur;
                 bestIndex = frame.Telemetry.Index;
-                bestCrop = crop;
+                bestCrop = padCrop;
             }
         }
 
@@ -257,7 +261,8 @@ public sealed class FaceEnrollmentService(
         // Cross-match gate: the strongest anti-impersonation control - the live capture must
         // match the mentor-approved static photo, not just be internally self-consistent.
         var approvedPhotoBytes = await ReadApprovedPhotoAsync(profile.ApprovedPhotoFileId!.Value, ct);
-        var approvedEmbedding = await faceProvider.ExtractEmbeddingAsync(approvedPhotoBytes, ct);
+        var approvedPhotoCrop = await CropApprovedPhotoFaceAsync(approvedPhotoBytes, ct);
+        var approvedEmbedding = await faceProvider.ExtractEmbeddingAsync(approvedPhotoCrop, ct);
         double crossMatchScore = 0;
         if (approvedEmbedding is not null)
         {
@@ -321,6 +326,33 @@ public sealed class FaceEnrollmentService(
         using var buffer = new MemoryStream();
         await stream.CopyToAsync(buffer, ct);
         return buffer.ToArray();
+    }
+
+    /// <summary>
+    /// The approved profile photo is uploaded once through a plain file picker - it never goes
+    /// through the live-camera + on-device face-detector pipeline that produces a bounding box for
+    /// every enrollment/attendance capture. Without this, the photo was previously fed to the
+    /// embedding model completely uncropped while live captures were cropped tightly around the
+    /// face - a framing mismatch severe enough to fail a genuine same-person match on its own (see
+    /// FaceOptions.EmbeddingCropScale's doc comment for the measured numbers). Detecting the face
+    /// here and cropping it the same way closes that gap. If detection isn't available or finds
+    /// nothing, falls back to the whole photo rather than failing enrollment outright - degraded
+    /// matching accuracy is preferable to blocking every intern whenever the detector is down.
+    /// </summary>
+    private async Task<byte[]> CropApprovedPhotoFaceAsync(byte[] approvedPhotoBytes, CancellationToken ct)
+    {
+        var bbox = await faceDetector.DetectFaceAsync(approvedPhotoBytes, ct);
+        if (bbox is null)
+        {
+            logger.LogWarning("Could not detect a face in the approved profile photo - using the whole photo for cross-match, which may reduce match accuracy.");
+            return approvedPhotoBytes;
+        }
+
+        using var bitmap = SKBitmap.Decode(approvedPhotoBytes);
+        if (bitmap is null) return approvedPhotoBytes;
+
+        var crop = FaceCropper.CropAligned(bitmap, bbox, faceOptions.Value.EmbeddingCropScale);
+        return crop ?? approvedPhotoBytes;
     }
 
     private async Task<InternProfile> LoadProfileAsync(CancellationToken ct)
