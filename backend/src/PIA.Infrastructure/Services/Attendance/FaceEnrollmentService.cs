@@ -268,12 +268,19 @@ public sealed class FaceEnrollmentService(
         {
             var bestEmbedding = frameEmbeddings.First(f => f.Index == bestIndex).Embedding;
             crossMatchScore = FaceMath.CosineSimilarity(bestEmbedding, approvedEmbedding.Embedding);
+            logger.LogInformation(
+                "Enrollment cross-match score for intern {InternProfileId}: {Score:F4} (threshold {Threshold:F2})",
+                profile.Id, crossMatchScore, faceOptions.Value.EnrollmentCrossMatchThreshold);
             if (crossMatchScore < faceOptions.Value.EnrollmentCrossMatchThreshold)
             {
                 await HardFailAsync(session, ct);
                 throw new BusinessRuleException(BusinessRuleCodes.FaceMismatch,
                     "Your live capture does not match your approved profile photo closely enough. Please contact your mentor if this repeats.");
             }
+        }
+        else
+        {
+            logger.LogWarning("Enrollment cross-match: approved photo embedding extraction returned null for intern {InternProfileId}.", profile.Id);
         }
 
         var bestResult = frameEmbeddings.First(f => f.Index == bestIndex);
@@ -344,12 +351,16 @@ public sealed class FaceEnrollmentService(
         var bbox = await faceDetector.DetectFaceAsync(approvedPhotoBytes, ct);
         if (bbox is null)
         {
-            logger.LogWarning("Could not detect a face in the approved profile photo - using the whole photo for cross-match, which may reduce match accuracy.");
+            logger.LogWarning("Could not detect a face in the approved profile photo ({ByteCount} bytes) - using the whole photo for cross-match, which may reduce match accuracy.", approvedPhotoBytes.Length);
             return approvedPhotoBytes;
         }
 
         using var bitmap = SKBitmap.Decode(approvedPhotoBytes);
         if (bitmap is null) return approvedPhotoBytes;
+
+        logger.LogInformation(
+            "Approved photo face detected: photo={PhotoW}x{PhotoH}, bbox=({BX:F0},{BY:F0},{BW:F0},{BH:F0})",
+            bitmap.Width, bitmap.Height, bbox.X, bbox.Y, bbox.Width, bbox.Height);
 
         var crop = FaceCropper.CropAligned(bitmap, bbox, faceOptions.Value.EmbeddingCropScale);
         return crop ?? approvedPhotoBytes;

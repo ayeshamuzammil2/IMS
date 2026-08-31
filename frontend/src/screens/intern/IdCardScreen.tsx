@@ -3,13 +3,14 @@ import { View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import * as Sharing from 'expo-sharing';
 import { IdCard as IdCardIcon, Clock, XCircle, Lock, ShieldCheck } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
 import { idCardsApi, type IdCardStatusKey } from '../../api/resources/idcards.api';
 import { IdCardPreview } from '../../components/media/IdCardPreview';
+import { buildIdCardA4Pdf } from '../../lib/idCardPdf';
+import { openFileDirect } from '../../lib/downloadAndShare';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
 import type { AppTheme } from '../../theme/types';
@@ -17,7 +18,7 @@ import type { AppTheme } from '../../theme/types';
 const STATUS_CONFIG: Record<
   IdCardStatusKey,
   {
-    tone: 'success' | 'warning' | 'error' | 'muted';
+    tone: Tone;
     title: string;
     description: string;
     Icon: typeof IdCardIcon;
@@ -57,6 +58,28 @@ const STATUS_CONFIG: Record<
 
 const DOWNLOADABLE_STATUSES: ReadonlySet<IdCardStatusKey> = new Set(['Approved', 'Issued']);
 
+// Maps a status "tone" to the matching pre-defined style keys below (card_success, card_warning,
+// etc.) - avoids indexing the styles object with a dynamic template-literal string, which
+// TypeScript can't type-check (it would otherwise report an implicit "any" element access).
+type Tone = 'success' | 'warning' | 'error' | 'muted';
+
+const CARD_TONE_STYLES: Record<Tone, 'card_success' | 'card_warning' | 'card_error' | 'card_muted'> = {
+  success: 'card_success',
+  warning: 'card_warning',
+  error: 'card_error',
+  muted: 'card_muted',
+};
+
+const ICON_WRAPPER_TONE_STYLES: Record<
+  Tone,
+  'iconWrapper_success' | 'iconWrapper_warning' | 'iconWrapper_error' | 'iconWrapper_muted'
+> = {
+  success: 'iconWrapper_success',
+  warning: 'iconWrapper_warning',
+  error: 'iconWrapper_error',
+  muted: 'iconWrapper_muted',
+};
+
 export function IdCardScreen() {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
@@ -76,7 +99,8 @@ export function IdCardScreen() {
     }, [refetch]),
   );
 
-  // Exact UI capture download handler
+  // Captures the on-screen ID card, lays it out on a white A4 page (bottom-left corner), and
+  // downloads that PDF directly - no "share via..." app chooser.
   const handleDownload = async () => {
     if (!cardShotRef.current?.capture) {
       Toast.show({ type: 'error', text1: 'ID Card preview not ready' });
@@ -84,18 +108,11 @@ export function IdCardScreen() {
     }
     setDownloading(true);
     try {
-      const uri = await cardShotRef.current.capture();
-      const available = await Sharing.isAvailableAsync();
-      if (available) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'image/png',
-          dialogTitle: 'Save or share ID Card',
-        });
-      } else {
-        Toast.show({ type: 'error', text1: 'Sharing is not available on this device' });
-      }
+      const cardImageUri = await cardShotRef.current.capture();
+      const pdfUri = await buildIdCardA4Pdf(cardImageUri);
+      await openFileDirect(pdfUri, 'application/pdf');
     } catch (error: any) {
-      Toast.show({ type: 'error', text1: 'Could not save ID card', text2: error?.message });
+      Toast.show({ type: 'error', text1: 'Could not download ID card', text2: error?.message });
     } finally {
       setDownloading(false);
     }
@@ -114,6 +131,8 @@ export function IdCardScreen() {
   const config = STATUS_CONFIG[data.status];
   const IconComponent = config.Icon;
   const canDownload = DOWNLOADABLE_STATUSES.has(data.status);
+  const cardToneStyle = CARD_TONE_STYLES[config.tone];
+  const iconWrapperToneStyle = ICON_WRAPPER_TONE_STYLES[config.tone];
 
   return (
     <Screen scroll>
@@ -132,8 +151,8 @@ export function IdCardScreen() {
       ) : null}
 
       {/* Main Status Banner Card */}
-      <View style={[s.card, s[`card_${config.tone}`]]}>
-        <View style={[s.iconWrapper, s[`iconWrapper_${config.tone}`]]}>
+      <View style={[s.card, s[cardToneStyle]]}>
+        <View style={[s.iconWrapper, s[iconWrapperToneStyle]]}>
           <IconComponent size={32} color={getIconColor(config.tone, theme)} />
         </View>
 
@@ -187,7 +206,7 @@ export function IdCardScreen() {
   );
 }
 
-function getIconColor(tone: 'success' | 'warning' | 'error' | 'muted', theme: AppTheme) {
+function getIconColor(tone: Tone, theme: AppTheme) {
   switch (tone) {
     case 'success':
       return theme.colors.success;
