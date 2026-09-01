@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -32,6 +33,13 @@ public sealed class ProjectAssignmentsController(IProjectAssignmentService proje
             if (stream is not null) await stream.DisposeAsync();
         }
     }
+
+    [HttpDelete("assignment/{assignmentId:int}")]
+    public async Task<IActionResult> Delete(int assignmentId, CancellationToken ct)
+    {
+        await projectService.DeleteAsync(assignmentId, ct);
+        return NoContent();
+    }
 }
 
 public sealed class AssignProjectForm
@@ -40,4 +48,21 @@ public sealed class AssignProjectForm
     public string? Description { get; set; }
     public DateOnly? DueDate { get; set; }
     public IFormFile? File { get; set; }
+}
+
+/// <summary>
+/// Title, Description, DueDate, and File are all mandatory - a mentor can't leave a project
+/// half-specified. Picked up automatically by FluentValidationActionFilter (runs against every
+/// action argument with a registered IValidator&lt;T&gt;), even though AssignProjectForm is
+/// [FromForm]-bound multipart data rather than a JSON body.
+/// </summary>
+public sealed class AssignProjectFormValidator : AbstractValidator<AssignProjectForm>
+{
+    public AssignProjectFormValidator()
+    {
+        RuleFor(x => x.Title).NotEmpty().WithMessage("Title is required.");
+        RuleFor(x => x.Description).NotEmpty().WithMessage("Description is required.");
+        RuleFor(x => x.DueDate).NotNull().WithMessage("Due date is required.");
+        RuleFor(x => x.File).NotNull().WithMessage("A file attachment is required.");
+    }
 }

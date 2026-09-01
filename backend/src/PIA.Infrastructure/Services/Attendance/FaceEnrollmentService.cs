@@ -147,7 +147,7 @@ public sealed class FaceEnrollmentService(
             }
         }
 
-        var frameEmbeddings = new List<(int Index, float[] Embedding, double Blur)>();
+        var frameEmbeddings = new List<(int Index, float[] Embedding, double Blur, byte[] EmbeddingCrop)>();
         double bestBlur = -1;
         int bestIndex = -1;
         byte[]? bestCrop = null;
@@ -199,7 +199,7 @@ public sealed class FaceEnrollmentService(
                 continue;
             }
 
-            frameEmbeddings.Add((frame.Telemetry.Index, embedding.Embedding, blur));
+            frameEmbeddings.Add((frame.Telemetry.Index, embedding.Embedding, blur, embeddingCrop));
             if (blur > bestBlur)
             {
                 bestBlur = blur;
@@ -262,6 +262,19 @@ public sealed class FaceEnrollmentService(
         // match the mentor-approved static photo, not just be internally self-consistent.
         var approvedPhotoBytes = await ReadApprovedPhotoAsync(profile.ApprovedPhotoFileId!.Value, ct);
         var approvedPhotoCrop = await CropApprovedPhotoFaceAsync(approvedPhotoBytes, ct);
+        var bestLiveCrop = frameEmbeddings.First(f => f.Index == bestIndex).EmbeddingCrop;
+        try
+        {
+            var debugDir = Path.Combine(AppContext.BaseDirectory, "debug-crops");
+            Directory.CreateDirectory(debugDir);
+            await File.WriteAllBytesAsync(Path.Combine(debugDir, $"enrollment-{session.Id}-approved-photo-crop.jpg"), approvedPhotoCrop, ct);
+            await File.WriteAllBytesAsync(Path.Combine(debugDir, $"enrollment-{session.Id}-live-capture-crop.jpg"), bestLiveCrop, ct);
+            logger.LogWarning("DEBUG: wrote both crops to {Dir} - open enrollment-{SessionId}-approved-photo-crop.jpg and enrollment-{SessionId}-live-capture-crop.jpg to compare them directly.", debugDir, session.Id, session.Id);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "DEBUG: could not write debug crops to disk.");
+        }
         var approvedEmbedding = await faceProvider.ExtractEmbeddingAsync(approvedPhotoCrop, ct);
         double crossMatchScore = 0;
         if (approvedEmbedding is not null)

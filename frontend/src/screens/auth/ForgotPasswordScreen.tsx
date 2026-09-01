@@ -36,6 +36,7 @@ export function ForgotPasswordScreen() {
     control,
     handleSubmit,
     watch,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<ForgotPasswordValues>({
     resolver: zodResolver(forgotPasswordSchema),
@@ -63,10 +64,18 @@ export function ForgotPasswordScreen() {
 
       navigation.goBack();
     } catch (err: any) {
+      // "Email does not exist" comes back as a field-level error from the server - show it
+      // right under the Email input, same as any other validation error, instead of just a toast.
+      const emailError = err?.fieldErrors?.email?.[0];
+      if (emailError) {
+        setError('email', { message: emailError });
+        return;
+      }
+
       Toast.show({
         type: 'error',
         text1: 'Could not reset password',
-        text2: err?.response?.data?.message ?? err?.message ?? 'Something went wrong. Please try again.',
+        text2: err?.message ?? 'Something went wrong. Please try again.',
       });
     }
   };
@@ -152,6 +161,7 @@ const makeStyles = (t: AppTheme) => ({
   subtitle: {
     marginBottom: 12,
     fontSize: 14,
+    fontWeight: '500' as const,
   },
   card: {
     backgroundColor: t.colors.surface,

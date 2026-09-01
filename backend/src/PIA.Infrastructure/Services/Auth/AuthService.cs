@@ -102,8 +102,11 @@ public sealed class AuthService(
         var email = request.Email.Trim().ToLowerInvariant();
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email && u.IsActive, ct);
 
-        // Always behave as if it succeeded - do not reveal whether the account exists.
-        if (user is null) return;
+        // Requested behavior: reject unknown/inactive emails explicitly instead of silently
+        // succeeding. Note this trades away the usual "don't reveal whether an account exists"
+        // protection against email enumeration - acceptable here since this is an internal
+        // staff/intern system, not a public consumer product.
+        if (user is null) throw new ValidationException("email", "This email address is not registered.");
 
         var tempPassword = tempPasswordGenerator.Generate();
         user.PasswordHash = hasher.Hash(tempPassword);

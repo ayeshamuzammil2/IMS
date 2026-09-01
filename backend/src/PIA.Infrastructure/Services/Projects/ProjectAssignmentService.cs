@@ -69,6 +69,24 @@ public sealed class ProjectAssignmentService(
         return ToDto(assignment, profile.User.FullName, profile.InternCode);
     }
 
+    public async Task DeleteAsync(int assignmentId, CancellationToken ct)
+    {
+        var assignment = await db.ProjectAssignments.FirstOrDefaultAsync(a => a.Id == assignmentId, ct)
+            ?? throw new NotFoundException(nameof(ProjectAssignment), assignmentId);
+
+        // Reuses the same scope check as assigning: a Mentor may only delete assignments that
+        // belong to their own mentees; Admin can delete any.
+        await LoadProfileWithScopeCheckAsync(assignment.InternProfileId, ct);
+
+        if (assignment.FileId is not null)
+        {
+            await fileStorage.SoftDeleteAsync(assignment.FileId.Value, ct);
+        }
+
+        db.ProjectAssignments.Remove(assignment);
+        await db.SaveChangesAsync(ct);
+    }
+
     private async Task<InternProfile> LoadProfileWithScopeCheckAsync(int internProfileId, CancellationToken ct)
     {
         var profile = await db.InternProfiles.Include(p => p.User).FirstOrDefaultAsync(p => p.Id == internProfileId, ct)

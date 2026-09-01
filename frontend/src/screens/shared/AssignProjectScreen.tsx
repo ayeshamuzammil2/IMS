@@ -1,9 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Pressable } from 'react-native';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { View, Pressable, Alert } from 'react-native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import Toast from 'react-native-toast-message';
-import { Paperclip, Search, X } from 'lucide-react-native';
+import { Paperclip, Search, X, Trash2 } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
@@ -11,7 +11,7 @@ import { Button } from '../../components/primitives/Button';
 import { SelectField } from '../../components/forms/SelectField';
 import { DateField } from '../../components/forms/DateField';
 import { internsApi } from '../../api/resources/interns.api';
-import { projectsApi } from '../../api/resources/projects.api';
+import { projectsApi, type ProjectAssignmentDto } from '../../api/resources/projects.api';
 import { departmentsApi } from '../../api/resources/departments.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
@@ -30,6 +30,7 @@ export function AssignProjectScreen() {
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [pickedFile, setPickedFile] = useState<{ uri: string; name: string; mimeType: string | null } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [touched, setTouched] = useState(false);
 
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
@@ -107,15 +108,20 @@ export function AssignProjectScreen() {
     setDescription('');
     setDueDate(null);
     setPickedFile(null);
+    setTouched(false);
   };
 
   const handleAssign = async () => {
-    if (!internProfileId || !title.trim()) return;
+    setTouched(true);
+    if (!internProfileId || !title.trim() || !description.trim() || !dueDate || !pickedFile) {
+      Toast.show({ type: 'error', text1: 'Please fill in Title, Description, Due Date, and attach a file' });
+      return;
+    }
     setSubmitting(true);
     try {
       await projectsApi.assign(internProfileId, {
         title: title.trim(),
-        description: description.trim() || null,
+        description: description.trim(),
         dueDate,
         file: pickedFile,
       });
@@ -128,6 +134,23 @@ export function AssignProjectScreen() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const deleteMutation = useMutation({
+    mutationFn: (assignmentId: number) => projectsApi.delete(assignmentId),
+    onSuccess: () => {
+      Toast.show({ type: 'success', text1: 'Project deleted' });
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ['projects', 'intern', internProfileId] });
+    },
+    onError: (error: any) => Toast.show({ type: 'error', text1: 'Could not delete project', text2: error?.message }),
+  });
+
+  const confirmDelete = (assignment: ProjectAssignmentDto) => {
+    Alert.alert('Delete project', `Delete "${assignment.title}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(assignment.id) },
+    ]);
   };
 
   return (
@@ -182,17 +205,41 @@ export function AssignProjectScreen() {
       {internProfileId ? (
         <>
           <View style={s.card}>
-            <Input label="Title" required value={title} onChangeText={setTitle} />
-            <Input label="Description" value={description} onChangeText={setDescription} multiline />
-            <DateField label="Due Date" value={dueDate} onChange={setDueDate} />
+            <Input
+              label="Title"
+              required
+              value={title}
+              onChangeText={setTitle}
+              error={touched && !title.trim() ? 'Title is required.' : undefined}
+            />
+            <Input
+              label="Description"
+              required
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              error={touched && !description.trim() ? 'Description is required.' : undefined}
+            />
+            <DateField
+              label="Due Date"
+              required
+              value={dueDate}
+              onChange={setDueDate}
+              error={touched && !dueDate ? 'Due date is required.' : undefined}
+            />
             <Button
-              label={pickedFile ? pickedFile.name : 'Attach File (PDF/JPG/PNG)'}
+              label={pickedFile ? pickedFile.name : 'Attach File (PDF/JPG/PNG) *'}
               variant="outline"
               size="sm"
               onPress={handlePickFile}
               style={s.attachButton}
             />
-            <Button label="Assign Project" onPress={handleAssign} loading={submitting} disabled={!title.trim()} fullWidth />
+            {touched && !pickedFile ? (
+              <Text variant="caption" tone="error">
+                A file attachment is required.
+              </Text>
+            ) : null}
+            <Button label="Assign Project" onPress={handleAssign} loading={submitting} fullWidth />
           </View>
 
           <Text variant="overline" tone="muted" style={s.sectionLabel}>
@@ -203,26 +250,32 @@ export function AssignProjectScreen() {
               No projects assigned to this intern yet.
             </Text>
           ) : (
-            assignments.map((a) => (
-              <View key={a.id} style={s.assignmentCard}>
-                <View style={s.assignmentHeader}>
-                  <Text variant="bodyStrong" style={s.assignmentTitle}>
-                    {a.title}
-                  </Text>
-                  <Text variant="caption" tone="muted">
-                    {a.status}
-                  </Text>
-                </View>
-                {a.fileId ? (
-                  <View style={s.fileIndicator}>
-                    <Paperclip size={14} />
-                    <Text variant="caption" tone="muted">
-                      Has attachment
+            assignments.map((a) => {
+              const busyDelete = deleteMutation.isPending && deleteMutation.variables === a.id;
+              return (
+                <View key={a.id} style={s.assignmentCard}>
+                  <View style={s.assignmentHeader}>
+                    <Text variant="bodyStrong" style={s.assignmentTitle}>
+                      {a.title}
                     </Text>
+                    <Text variant="caption" tone="muted">
+                      {a.status}
+                    </Text>
+                    <Pressable onPress={() => confirmDelete(a)} disabled={busyDelete} hitSlop={8} style={s.deleteButton}>
+                      <Trash2 size={18} color={theme.colors.error} />
+                    </Pressable>
                   </View>
-                ) : null}
-              </View>
-            ))
+                  {a.fileId ? (
+                    <View style={s.fileIndicator}>
+                      <Paperclip size={14} />
+                      <Text variant="caption" tone="muted">
+                        Has attachment
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })
           )}
         </>
       ) : null}
@@ -281,7 +334,8 @@ const makeStyles = (t: AppTheme) => ({
     marginBottom: t.spacing.sm,
     gap: t.spacing.xs,
   },
-  assignmentHeader: { flexDirection: 'row' as const, justifyContent: 'space-between' as const },
+  assignmentHeader: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const },
   assignmentTitle: { flex: 1 },
+  deleteButton: { marginLeft: t.spacing.sm },
   fileIndicator: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4 },
 });

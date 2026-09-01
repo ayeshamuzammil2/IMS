@@ -85,6 +85,7 @@ export const endpoints = {
     mine: '/projects/mine',
     forIntern: (internProfileId: number) => `/projects/intern/${internProfileId}`,
     assign: (internProfileId: number) => `/projects/intern/${internProfileId}`,
+    delete: (assignmentId: number) => `/projects/intern/assignment/${assignmentId}`,
   },
   certificates: {
     mine: '/certificates/mine',

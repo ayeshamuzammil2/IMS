@@ -41,6 +41,9 @@ builder.Services.AddControllers(options =>
     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
 builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
+// Some validators (e.g. for [FromForm]-bound multipart request types) live in the API project
+// itself rather than PIA.Application, so they need their own assembly scan to be picked up.
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();

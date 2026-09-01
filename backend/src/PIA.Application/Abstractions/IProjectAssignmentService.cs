@@ -11,4 +11,8 @@ public interface IProjectAssignmentService
     Task<IReadOnlyList<ProjectAssignmentDto>> GetForInternAsync(int internProfileId, CancellationToken ct);
 
     Task<ProjectAssignmentDto> AssignAsync(int internProfileId, AssignProjectRequest request, CancellationToken ct);
+
+    /// <summary>Mentor/Admin-facing - a mentor may only delete assignments belonging to their own
+    /// mentees. Used to undo a mistaken assignment (wrong intern, wrong project, etc.).</summary>
+    Task DeleteAsync(int assignmentId, CancellationToken ct);
 }

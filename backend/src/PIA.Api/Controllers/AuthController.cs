@@ -71,8 +71,9 @@ public sealed class AuthController(IAuthService authService, ICurrentUser curren
     [EnableRateLimiting("auth-forgot")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken ct)
     {
+        // Throws a 400 ValidationException (handled by GlobalExceptionHandler) if the email
+        // isn't registered - see AuthService.ForgotPasswordAsync.
         await authService.ForgotPasswordAsync(request, ct);
-        // Always 200, regardless of whether the account exists - no enumeration.
-        return Ok(new { message = "If that email is registered, a new password has been sent to it." });
+        return Ok(new { message = "A new password has been sent to your email." });
     }
 }

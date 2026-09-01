@@ -44,4 +44,6 @@ export const projectsApi = {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       .then((r) => r.data),
+
+  delete: (assignmentId: number) => client.delete(endpoints.projects.delete(assignmentId)),
 };
