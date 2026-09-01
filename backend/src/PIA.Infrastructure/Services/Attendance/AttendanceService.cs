@@ -264,13 +264,24 @@ public sealed class AttendanceService(
             }
 
             var recentMedia = await db.AttendanceMedia.AsNoTracking()
+                .Where(m => m.InternProfileId == profile.Id)
                 .OrderByDescending(m => m.CreatedAtUtc)
-                .Take(5000)
+                .Take(500)
                 .Select(m => new { m.Sha256, m.Phash })
                 .ToListAsync(ct);
 
+            // Exact-byte match (SHA256) is a hard signal - it means the literal same file was
+            // submitted before, which is exactly what this check exists to catch. The perceptual
+            // hash is a much softer, fuzzier signal meant to catch a photo of a screen showing an
+            // old selfie (which re-compresses/re-photographs the image, changing its exact bytes
+            // but not its overall visual structure) - it is NOT meant to catch two genuinely
+            // different live captures that simply look similar because they were taken by the same
+            // person, in the same spot, under the same lighting, a few hours apart (arrival vs
+            // departure is exactly this scenario). A Hamming distance of <=6 was catching that
+            // legitimate case; <=2 keeps only near-exact visual duplicates, which is what an actual
+            // replay attack produces.
             var isReplay = decodedFrames.Any(f => recentMedia.Any(m =>
-                m.Sha256.AsSpan().SequenceEqual(f.Sha256) || PerceptualHash.HammingDistance(m.Phash, f.Phash) <= 6));
+                m.Sha256.AsSpan().SequenceEqual(f.Sha256) || PerceptualHash.HammingDistance(m.Phash, f.Phash) <= 2));
             if (isReplay)
             {
                 await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedReplayDetected, ct);
