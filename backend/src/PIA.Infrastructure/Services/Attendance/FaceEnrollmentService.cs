@@ -154,13 +154,6 @@ public sealed class FaceEnrollmentService(
 
         foreach (var frame in request.Frames.OrderBy(f => f.Telemetry.Index))
         {
-            var bbox = frame.Telemetry.BoundingBox;
-            if (bbox is null)
-            {
-                logger.LogWarning("Enrollment frame {Index}: no bounding box in telemetry, skipped.", frame.Telemetry.Index);
-                continue;
-            }
-
             using var buffer = new MemoryStream();
             await frame.Content.CopyToAsync(buffer, ct);
             var bytes = buffer.ToArray();
@@ -171,14 +164,33 @@ public sealed class FaceEnrollmentService(
                 continue;
             }
 
-            // TEMP DIAGNOSTIC: logs the raw photo dimensions against the bounding box the client
-            // reported. If BoundingBox was measured against a different frame size than this photo
-            // (e.g. a downscaled face-detector analysis frame vs. the full-resolution capture),
-            // Width/Height here will look wildly out of proportion to bitmap.Width/Height and the
-            // crop below will zoom into the wrong region instead of the face - this line is what
-            // will make that visible without guessing.
+            // CONFIRMED BUG (was a TEMP DIAGNOSTIC comment here): frame.Telemetry.BoundingBox is
+            // measured by the client's on-device face detector against VisionCamera's face-detector
+            // analysis frame, which runs at a different resolution than the still photo produced by
+            // photoOutput.capturePhotoToFile() (e.g. bbox ~350x350 reported against a captured photo
+            // that is 2448x3264). Cropping the full-resolution bitmap with that bbox lands on an
+            // unrelated patch of the frame instead of the face - confirmed by comparing the
+            // debug-crops output, where the "live capture" crop was a piece of background, not a
+            // face. The client bbox is in the wrong coordinate space for this bitmap and cannot be
+            // used to crop it. Detect the face directly in the actual captured photo instead, so the
+            // bbox is always in the same coordinate space as the bitmap it crops - the same approach
+            // already used for the approved profile photo in CropApprovedPhotoFaceAsync below.
+            var bbox = await faceDetector.DetectFaceAsync(bytes, ct);
+            if (bbox is null)
+            {
+                // Only reachable if the server detector model isn't installed - fall back to the
+                // client-reported box rather than dropping the frame outright.
+                bbox = frame.Telemetry.BoundingBox;
+                if (bbox is null)
+                {
+                    logger.LogWarning("Enrollment frame {Index}: server-side face detector found nothing and telemetry had no bounding box, skipped.", frame.Telemetry.Index);
+                    continue;
+                }
+                logger.LogWarning("Enrollment frame {Index}: server-side face detector unavailable - falling back to the client-reported bounding box, which may be misaligned.", frame.Telemetry.Index);
+            }
+
             logger.LogInformation(
-                "Enrollment frame {Index}: photo={PhotoW}x{PhotoH}, bbox=({BX},{BY},{BW},{BH})",
+                "Enrollment frame {Index}: photo={PhotoW}x{PhotoH}, bbox=({BX:F0},{BY:F0},{BW:F0},{BH:F0})",
                 frame.Telemetry.Index, bitmap.Width, bitmap.Height, bbox.X, bbox.Y, bbox.Width, bbox.Height);
 
             var blur = ComputeBlurVariance(bitmap);
@@ -262,19 +274,6 @@ public sealed class FaceEnrollmentService(
         // match the mentor-approved static photo, not just be internally self-consistent.
         var approvedPhotoBytes = await ReadApprovedPhotoAsync(profile.ApprovedPhotoFileId!.Value, ct);
         var approvedPhotoCrop = await CropApprovedPhotoFaceAsync(approvedPhotoBytes, ct);
-        var bestLiveCrop = frameEmbeddings.First(f => f.Index == bestIndex).EmbeddingCrop;
-        try
-        {
-            var debugDir = Path.Combine(AppContext.BaseDirectory, "debug-crops");
-            Directory.CreateDirectory(debugDir);
-            await File.WriteAllBytesAsync(Path.Combine(debugDir, $"enrollment-{session.Id}-approved-photo-crop.jpg"), approvedPhotoCrop, ct);
-            await File.WriteAllBytesAsync(Path.Combine(debugDir, $"enrollment-{session.Id}-live-capture-crop.jpg"), bestLiveCrop, ct);
-            logger.LogWarning("DEBUG: wrote both crops to {Dir} - open enrollment-{SessionId}-approved-photo-crop.jpg and enrollment-{SessionId}-live-capture-crop.jpg to compare them directly.", debugDir, session.Id, session.Id);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "DEBUG: could not write debug crops to disk.");
-        }
         var approvedEmbedding = await faceProvider.ExtractEmbeddingAsync(approvedPhotoCrop, ct);
         double crossMatchScore = 0;
         if (approvedEmbedding is not null)

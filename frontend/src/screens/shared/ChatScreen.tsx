@@ -1,8 +1,17 @@
-import React, { useRef, useState } from 'react';
-import { View, ScrollView, TextInput, Pressable, Linking, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import {
+  View,
+  TextInput,
+  Pressable,
+  Linking,
+  FlatList,
+  Keyboard,
+  Platform,
+  useWindowDimensions,
+  ScrollView,
+} from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Send, Mail, ChevronLeft, MessageCircle, User } from 'lucide-react-native';
-import { Screen } from '../../components/layout/Screen';
+import { Send, Mail, ChevronLeft, MessageCircle } from 'lucide-react-native';
 import { Text } from '../../components/primitives/Text';
 import { chatApi, type ChatContactDto } from '../../api/resources/chat.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
@@ -15,7 +24,24 @@ export function ChatScreen() {
   const queryClient = useQueryClient();
   const [manuallySelected, setSelected] = useState<ChatContactDto | null>(null);
   const [draft, setDraft] = useState('');
-  const scrollRef = useRef<ScrollView>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
+
+  // Keyboard height dynamically capture karne ke liye listener
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const contactsQuery = useQuery({ queryKey: ['chat', 'contacts'], queryFn: chatApi.getContacts, refetchInterval: 8000 });
   const contacts = contactsQuery.data ?? [];
@@ -45,7 +71,7 @@ export function ChatScreen() {
 
   if (!selected) {
     return (
-      <Screen scroll={false}>
+      <View style={{ flex: 1, backgroundColor: theme.colors.background, padding: theme.spacing.md }}>
         {contactsQuery.isLoading ? (
           <Text variant="body" tone="muted">
             Loading...
@@ -63,7 +89,7 @@ export function ChatScreen() {
             </Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={s.contactsListContent}>
+          <ScrollView contentContainerStyle={s.contactsListContent} keyboardShouldPersistTaps="handled">
             {contacts.map((c) => (
               <Pressable key={c.userId} style={s.contactCard} onPress={() => setSelected(c)}>
                 <View style={s.avatarWrapper}>
@@ -86,7 +112,7 @@ export function ChatScreen() {
                     ) : null}
                   </View>
                   <Text variant="caption" tone="muted" numberOfLines={1} style={s.lastMessage}>
-                    {c.lastMessageBody ?? `Start a conversation with this ${c.role.toLowerCase()}.`}
+                    {c.lastMessageBody ?? `Start a conversation with this ${c.role?.toLowerCase() ?? 'user'}.`}
                   </Text>
                 </View>
 
@@ -101,116 +127,115 @@ export function ChatScreen() {
             ))}
           </ScrollView>
         )}
-      </Screen>
+      </View>
     );
   }
 
   const messages = messagesQuery.data ?? [];
 
   return (
-    <Screen scroll={false} padded={false}>
-      <KeyboardAvoidingView
-        style={s.flexFill}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        {/* Chat Header */}
-        <View style={s.header}>
-          {contacts.length > 1 ? (
-            <Pressable onPress={() => setSelected(null)} hitSlop={8} style={s.headerIconButton}>
-              <ChevronLeft size={22} color={theme.colors.textPrimary} />
-            </Pressable>
-          ) : null}
+    <View style={[s.mainWrapper, { paddingBottom: keyboardHeight }]}>
+      {/* Chat Header */}
+      <View style={s.header}>
+        {contacts.length > 1 ? (
+          <Pressable onPress={() => setSelected(null)} hitSlop={8} style={s.headerIconButton}>
+            <ChevronLeft size={22} color={theme.colors.textPrimary} />
+          </Pressable>
+        ) : null}
 
-          <View style={s.headerAvatar}>
-            <Text variant="bodyStrong" style={s.headerAvatarText}>
-              {selected.fullName?.charAt(0)?.toUpperCase() ?? 'U'}
+        <View style={s.headerAvatar}>
+          <Text variant="bodyStrong" style={s.headerAvatarText}>
+            {selected.fullName?.charAt(0)?.toUpperCase() ?? 'U'}
+          </Text>
+        </View>
+
+        <View style={s.headerInfo}>
+          <Text variant="bodyStrong" style={s.headerName} numberOfLines={1}>
+            {selected.fullName}
+          </Text>
+          {selected.role ? (
+            <Text variant="caption" tone="muted">
+              {selected.role}
             </Text>
-          </View>
-
-          <View style={s.headerInfo}>
-            <Text variant="bodyStrong" style={s.headerName} numberOfLines={1}>
-              {selected.fullName}
-            </Text>
-            {selected.role ? (
-              <Text variant="caption" tone="muted">
-                {selected.role}
-              </Text>
-            ) : null}
-          </View>
-
-          {selected.email ? (
-            <Pressable
-              onPress={() => Linking.openURL(`mailto:${selected.email}`)}
-              hitSlop={8}
-              style={s.headerIconButton}
-            >
-              <Mail size={20} color={theme.colors.primary} />
-            </Pressable>
           ) : null}
         </View>
 
-        {/* Chat Thread */}
-        <ScrollView
-          ref={scrollRef}
-          style={s.thread}
-          contentContainerStyle={s.threadContent}
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
-        >
-          {messages.map((m) => (
-            <View
-              key={m.id}
+        {selected.email ? (
+          <Pressable
+            onPress={() => Linking.openURL(`mailto:${selected.email}`)}
+            hitSlop={8}
+            style={s.headerIconButton}
+          >
+            <Mail size={20} color={theme.colors.primary} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      {/* Chat Thread */}
+      <FlatList
+        ref={flatListRef}
+        data={messages}
+        keyExtractor={(m) => String(m.id)}
+        style={s.thread}
+        contentContainerStyle={s.threadContent}
+        keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        renderItem={({ item: m }) => (
+          <View
+            style={[
+              s.bubble,
+              m.isMine ? s.bubbleMine : s.bubbleTheirs,
+              { backgroundColor: m.isMine ? theme.colors.primary : theme.colors.surfaceSunken },
+            ]}
+          >
+            <Text variant="body" style={{ color: m.isMine ? theme.colors.onPrimary : theme.colors.textPrimary, lineHeight: 20 }}>
+              {m.body}
+            </Text>
+            <Text
+              variant="overline"
               style={[
-                s.bubble,
-                m.isMine ? s.bubbleMine : s.bubbleTheirs,
-                { backgroundColor: m.isMine ? theme.colors.primary : theme.colors.surfaceSunken },
+                s.bubbleTime,
+                { color: m.isMine ? theme.colors.textOnDarkMuted : theme.colors.textMuted },
               ]}
             >
-              <Text variant="body" style={{ color: m.isMine ? theme.colors.onPrimary : theme.colors.textPrimary, lineHeight: 20 }}>
-                {m.body}
-              </Text>
-              <Text
-                variant="overline"
-                style={[
-                  s.bubbleTime,
-                  { color: m.isMine ? theme.colors.textOnDarkMuted : theme.colors.textMuted },
-                ]}
-              >
-                {new Date(m.sentAtUtc).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-              </Text>
-            </View>
-          ))}
-        </ScrollView>
+              {new Date(m.sentAtUtc).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+            </Text>
+          </View>
+        )}
+      />
 
-        {/* Input Composer */}
-        <View style={s.composerRow}>
-          <TextInput
-            style={s.composerInput}
-            value={draft}
-            onChangeText={setDraft}
-            placeholder="Type a message..."
-            placeholderTextColor={theme.colors.textMuted}
-            multiline
-          />
-          <Pressable
-            onPress={handleSend}
-            disabled={!draft.trim() || sendMutation.isPending}
-            style={[
-              s.sendButton,
-              { backgroundColor: draft.trim() ? theme.colors.primary : theme.colors.surfaceSunken },
-            ]}
-            hitSlop={8}
-          >
-            <Send size={20} color={draft.trim() ? theme.colors.onPrimary : theme.colors.textMuted} />
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
-    </Screen>
+      {/* Input Composer */}
+      <View style={s.composerRow}>
+        <TextInput
+          style={s.composerInput}
+          value={draft}
+          onChangeText={setDraft}
+          placeholder="Type a message..."
+          placeholderTextColor={theme.colors.textMuted}
+          multiline
+        />
+        <Pressable
+          onPress={handleSend}
+          disabled={!draft.trim() || sendMutation.isPending}
+          style={[
+            s.sendButton,
+            { backgroundColor: draft.trim() ? theme.colors.primary : theme.colors.surfaceSunken },
+          ]}
+          hitSlop={8}
+        >
+          <Send size={20} color={draft.trim() ? theme.colors.onPrimary : theme.colors.textMuted} />
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
 const makeStyles = (t: AppTheme) => ({
-  flexFill: { flex: 1 },
+  mainWrapper: {
+    flex: 1,
+    backgroundColor: t.colors.background,
+  },
 
   // Empty State
   emptyCard: {
@@ -337,10 +362,14 @@ const makeStyles = (t: AppTheme) => ({
   },
 
   // Thread Styling
-  thread: { flex: 1 },
+  thread: {
+    flex: 1,
+  },
   threadContent: {
     padding: t.spacing.md,
     gap: t.spacing.sm,
+    flexGrow: 1,
+    justifyContent: 'flex-end' as const,
   },
   bubble: {
     maxWidth: '78%' as const,

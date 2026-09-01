@@ -132,6 +132,7 @@ const makeStyles = (t: AppTheme) => ({
   subtitle: {
     marginBottom: 12,
     fontSize: 14,
+    fontWeight: '500' as const,
   },
   card: {
     backgroundColor: t.colors.surface,

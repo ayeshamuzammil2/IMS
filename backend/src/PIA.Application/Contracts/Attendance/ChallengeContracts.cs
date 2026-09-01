@@ -13,9 +13,12 @@ public sealed record BoundingBoxDto(double X, double Y, double Width, double Hei
 /// <summary>Per-frame telemetry as reported by the client's on-device MLKit frame processor -
 /// informational only. The server never trusts this for a pass/fail decision by itself; it is
 /// cross-checked against what was actually requested and against the server's own pixel analysis.
-/// BoundingBox is the one exception used for something load-bearing: it only decides WHERE to crop
-/// for PAD/embedding, never whether the attempt passes, so a manipulated value just produces a bad
-/// crop (caught by the quality gate) rather than a security bypass.</summary>
+/// BoundingBox is measured against MLKit's own analysis-frame resolution, not the still photo
+/// submitted alongside it, so it is NOT in the right coordinate space to crop that photo directly
+/// (confirmed bug: doing so cropped background instead of the face). The server re-detects the face
+/// in the actual submitted photo via IFaceDetector for cropping, and only falls back to this field
+/// if that server-side detector is unavailable - so a manipulated or misaligned value here just
+/// produces a degraded crop (caught by the quality gate) rather than a security bypass.</summary>
 public sealed record ChallengeFrameTelemetryDto(
     int Index,
     double TimestampMs,

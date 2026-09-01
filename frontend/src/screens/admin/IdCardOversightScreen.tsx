@@ -148,7 +148,7 @@ export function IdCardOversightScreen() {
               {c.internFullName}
             </Text>
             <Text variant="caption" tone="muted">
-              {c.internCode} · {c.cardNumber}
+              {c.internCode} 
             </Text>
           </View>
         </View>

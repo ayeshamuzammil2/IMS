@@ -81,7 +81,7 @@ export const IdCardPreview = forwardRef<View, Props>(function IdCardPreview(
           {cardNumber ? (
             <View style={s.idBadge}>
               <Text variant="caption" style={s.idBadgeText}>
-                ID: {cardNumber}
+                {cardNumber}
               </Text>
             </View>
           ) : null}

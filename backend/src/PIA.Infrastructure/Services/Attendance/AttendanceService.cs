@@ -23,6 +23,7 @@ public sealed class AttendanceService(
     IClock clock,
     IChallengeGenerator challengeGenerator,
     IFaceVerificationProvider faceProvider,
+    IFaceDetector faceDetector,
     IParallaxResidualDetector parallaxDetector,
     ISpecularTemporalAnalyzer specularAnalyzer,
     IRollingShutterBandingDetector bandingDetector,
@@ -234,7 +235,7 @@ public sealed class AttendanceService(
         // Stage 6: attestation - stubbed until Phase 9 wires Play Integrity (graded Off first).
 
         // Read + decode every frame once; stage 7 (pHash replay) and stage 8 (decode) apply per frame.
-        var decodedFrames = new List<(SubmitChallengeFrame Source, byte[] Bytes, SKBitmap Bitmap, ulong Phash, byte[] Sha256)>();
+        var decodedFrames = new List<(SubmitChallengeFrame Source, byte[] Bytes, SKBitmap Bitmap, ulong Phash, byte[] Sha256, BoundingBoxDto? ResolvedBbox)>();
         try
         {
             foreach (var frame in request.Frames.OrderBy(f => f.Telemetry.Index))
@@ -249,7 +250,17 @@ public sealed class AttendanceService(
                     throw new BusinessRuleException(BusinessRuleCodes.CorruptFile, "One of the submitted frames could not be processed. Please try again.");
                 }
 
-                decodedFrames.Add((frame, bytes, bitmap, PerceptualHash.Compute(bitmap), SHA256.HashData(bytes)));
+                // frame.Telemetry.BoundingBox is measured against VisionCamera's face-detector
+                // analysis frame, not the still photo in `bytes`/`bitmap` - the two are captured at
+                // different resolutions, so the telemetry box is in the wrong coordinate space to
+                // crop this bitmap with (confirmed via FaceEnrollmentService's debug crops: cropping
+                // with it landed on background, not the face). Detect the face directly in the
+                // actual captured photo so the box used for cropping always matches the bitmap it's
+                // applied to; fall back to the telemetry box only if the server detector model isn't
+                // installed.
+                var resolvedBbox = await faceDetector.DetectFaceAsync(bytes, ct) ?? frame.Telemetry.BoundingBox;
+
+                decodedFrames.Add((frame, bytes, bitmap, PerceptualHash.Compute(bitmap), SHA256.HashData(bytes), resolvedBbox));
             }
 
             var recentMedia = await db.AttendanceMedia.AsNoTracking()
@@ -339,7 +350,7 @@ public sealed class AttendanceService(
                 var padScores = new List<PadResult>();
                 foreach (var f in decodedFrames)
                 {
-                    var bbox = f.Source.Telemetry.BoundingBox;
+                    var bbox = f.ResolvedBbox;
                     if (bbox is null) continue;
                     var crop = FaceCropper.CropAligned(f.Bitmap, bbox, Face.PadCropScale);
                     if (crop is null) continue;
@@ -378,7 +389,7 @@ public sealed class AttendanceService(
                 }
 
                 var bestFrame = decodedFrames[sharpestIndex];
-                var embedBbox = bestFrame.Source.Telemetry.BoundingBox;
+                var embedBbox = bestFrame.ResolvedBbox;
                 if (embedBbox is not null)
                 {
                     var embedCrop = FaceCropper.CropAligned(bestFrame.Bitmap, embedBbox, Face.EmbeddingCropScale);

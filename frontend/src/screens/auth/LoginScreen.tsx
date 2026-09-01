@@ -81,10 +81,10 @@ export function LoginScreen() {
       />
 
       <Pressable onPress={() => navigation.navigate('ForgotPassword')} style={s.forgotLink}>
-        <Text variant="caption" tone="brand">
+        <Text variant="caption" tone="brand" style={{ fontWeight: '600' }}>
           Forgot Password?
-        </Text>
-      </Pressable>
+          </Text>
+          </Pressable>
 
       {error ? (
         <Text variant="caption" tone="error" style={s.error}>
@@ -144,6 +144,7 @@ const makeStyles = (t: AppTheme) => ({
   forgotLink: {
     alignSelf: 'flex-end' as const,
     marginBottom: t.spacing.lg,
+    
   },
   error: {
     marginBottom: t.spacing.md,

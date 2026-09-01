@@ -3,18 +3,24 @@ using PIA.Application.Contracts.Attendance;
 namespace PIA.Application.Abstractions;
 
 /// <summary>
-/// Server-side face detection for images that don't already carry a client-supplied bounding box -
-/// most importantly the static, mentor-approved profile photo, which is uploaded once through a
-/// plain file picker rather than the live-camera + on-device face-detector pipeline that live
-/// attendance/enrollment captures go through.
+/// Server-side face detection, run directly against the actual image bytes being cropped so the
+/// resulting bounding box is always in the same coordinate space as the bitmap it's used on.
 ///
-/// This exists specifically to fix a real bug: without it, the approved photo was fed to
+/// Originally added for just the static, mentor-approved profile photo (uploaded once through a
+/// plain file picker, so it never carries a client-reported bounding box the way live captures do)
+/// to fix a real bug: without it, the approved photo was fed to
 /// IFaceVerificationProvider.ExtractEmbeddingAsync completely uncropped, while every live capture
-/// was cropped tightly around the detected face. Embedding models are highly sensitive to how much
-/// of the frame the face fills - comparing an uncropped photo against a tightly-cropped live frame
-/// can score a genuine same-person match well below any reasonable threshold, purely from the
-/// framing mismatch, with nothing wrong with either photo. Detecting the face here lets the caller
-/// crop both images with FaceCropper using the same scale before ever calling ExtractEmbeddingAsync.
+/// was cropped tightly around the detected face - a framing mismatch severe enough to fail a
+/// genuine same-person match on its own.
+///
+/// Now also used for live enrollment/attendance captures themselves: the client-reported bounding
+/// box in ChallengeFrameTelemetryDto is measured against VisionCamera's face-detector analysis
+/// frame, which runs at a different resolution than the still photo captured alongside it. Using
+/// that box to crop the still photo lands on an unrelated region of the image instead of the face
+/// (confirmed via mismatched crop dimensions and a debug crop that showed background, not a face).
+/// Detecting the face directly in each submitted photo avoids that coordinate-space mismatch
+/// entirely, regardless of what resolution the client's preview/analysis frame happened to be. The
+/// client-reported box is kept only as a fallback for when this detector's model isn't installed.
 /// </summary>
 public interface IFaceDetector
 {
