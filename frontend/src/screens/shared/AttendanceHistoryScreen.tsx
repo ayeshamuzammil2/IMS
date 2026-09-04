@@ -17,6 +17,8 @@ import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
 import { useAuth } from '../../providers/AuthProvider';
 import type { AppTheme } from '../../theme/types';
+import { useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 
 function isoDaysAgo(days: number): string {
   const d = new Date();
@@ -53,6 +55,16 @@ export function AttendanceHistoryScreen() {
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
 
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        // Jab bhi user is screen se baahar jayega, search reset ho jayegi
+        setShowSearch(false);
+        setSearch('');
+      };
+    }, [])
+  );
+  
   const { data: departmentOptions = [] } = useQuery({
     queryKey: ['departments', 'lookup'],
     queryFn: departmentsApi.lookup,

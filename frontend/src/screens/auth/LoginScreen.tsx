@@ -22,34 +22,18 @@ import type { AppTheme } from '../../theme/types';
 import type { AuthStackParamList } from '../../navigation/AuthNavigator';
 
 export function LoginScreen() {
-  /* ----------------------------------------- */
-  /* THEME */
-  /* ----------------------------------------- */
-
   const theme = useTheme();
   const s = makeStyles(theme);
-
-  /* ----------------------------------------- */
-  /* AUTH */
-  /* ----------------------------------------- */
 
   const { signIn } = useAuth();
 
   const navigation =
     useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
 
-  /* ----------------------------------------- */
-  /* STATE */
-  /* ----------------------------------------- */
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  /* ----------------------------------------- */
-  /* LOGIN */
-  /* ----------------------------------------- */
 
   const onSubmit = async () => {
     if (!email.trim() || !password) {
@@ -78,23 +62,13 @@ export function LoginScreen() {
     }
   };
 
-  /* ----------------------------------------- */
-  /* UI */
-  /* ----------------------------------------- */
-
   return (
     <Screen scroll style={s.screen}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={s.keyboardArea}
       >
-
-        {/* ================================= */}
-        {/* BRANDING */}
-        {/* ================================= */}
-
         <View style={s.brandSection}>
-
           <Image
             source={require('../../../assets/pia-logo.png')}
             style={s.logo}
@@ -112,19 +86,10 @@ export function LoginScreen() {
           >
             INTERNSHIP MANAGEMENT & OPERATIONS PORTAL
           </Text>
-
         </View>
 
-        {/* ================================= */}
-        {/* LOGIN CARD */}
-        {/* ================================= */}
-
         <View style={s.loginCard}>
-
-          {/* HEADER */}
-
           <View style={s.loginHeader}>
-
             <Text style={s.welcomeTitle}>
               Welcome back
             </Text>
@@ -136,10 +101,7 @@ export function LoginScreen() {
             >
               Sign in to continue to your dashboard
             </Text>
-
           </View>
-
-          {/* EMAIL */}
 
           <View style={s.inputContainer}>
             <Input
@@ -160,8 +122,6 @@ export function LoginScreen() {
             />
           </View>
 
-          {/* PASSWORD */}
-
           <View style={s.inputContainer}>
             <Input
               label="Password"
@@ -180,8 +140,6 @@ export function LoginScreen() {
             />
           </View>
 
-          {/* FORGOT PASSWORD */}
-
           <View style={s.forgotContainer}>
             <Pressable
               onPress={() =>
@@ -199,8 +157,6 @@ export function LoginScreen() {
             </Pressable>
           </View>
 
-          {/* ERROR */}
-
           {error ? (
             <View style={s.errorContainer}>
               <Text
@@ -213,8 +169,6 @@ export function LoginScreen() {
             </View>
           ) : null}
 
-          {/* SIGN IN */}
-
           <Button
             label="Sign In"
             onPress={onSubmit}
@@ -222,15 +176,9 @@ export function LoginScreen() {
             fullWidth
             style={s.submitButton}
           />
-
         </View>
 
-        {/* ================================= */}
-        {/* FOOTER */}
-        {/* ================================= */}
-
         <View style={s.footer}>
-
           <Text
             variant="caption"
             tone="secondary"
@@ -246,17 +194,11 @@ export function LoginScreen() {
           >
             Internship Management System
           </Text>
-
         </View>
-
       </KeyboardAvoidingView>
     </Screen>
   );
 }
-
-/* ================================================= */
-/* STYLES */
-/* ================================================= */
 
 interface Styles {
   screen: ViewStyle;
@@ -281,10 +223,6 @@ interface Styles {
 }
 
 const makeStyles = (t: AppTheme): Styles => ({
-  /* --------------------------------------------- */
-  /* SCREEN */
-  /* --------------------------------------------- */
-
   screen: {
     paddingHorizontal: t.spacing.xl,
   },
@@ -292,10 +230,6 @@ const makeStyles = (t: AppTheme): Styles => ({
   keyboardArea: {
     width: '100%',
   },
-
-  /* --------------------------------------------- */
-  /* BRANDING */
-  /* --------------------------------------------- */
 
   brandSection: {
     alignItems: 'center',
@@ -306,7 +240,7 @@ const makeStyles = (t: AppTheme): Styles => ({
   logo: {
     width: 180,
     height: 150,
-    marginBottom: -16, // Logo ki extra whitespace reduce ki hai
+    marginBottom: -16,
   },
 
   appName: {
@@ -331,20 +265,16 @@ const makeStyles = (t: AppTheme): Styles => ({
     maxWidth: 290,
   },
 
-  /* --------------------------------------------- */
-  /* LOGIN CARD */
-  /* --------------------------------------------- */
-
   loginCard: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: t.colors.surface,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#C8E6C9',
+    borderColor: t.colors.border,
     paddingHorizontal: 22,
     paddingVertical: 26,
 
-    shadowColor: '#0F3D13',
+    shadowColor: t.colors.textPrimary,
     shadowOffset: {
       width: 0,
       height: 8,
@@ -353,10 +283,6 @@ const makeStyles = (t: AppTheme): Styles => ({
     shadowRadius: 16,
     elevation: 4,
   },
-
-  /* --------------------------------------------- */
-  /* LOGIN HEADER */
-  /* --------------------------------------------- */
 
   loginHeader: {
     marginBottom: t.spacing.lg,
@@ -378,17 +304,9 @@ const makeStyles = (t: AppTheme): Styles => ({
     fontWeight: '400',
   },
 
-  /* --------------------------------------------- */
-  /* INPUTS */
-  /* --------------------------------------------- */
-
   inputContainer: {
     marginBottom: t.spacing.md,
   },
-
-  /* --------------------------------------------- */
-  /* FORGOT PASSWORD */
-  /* --------------------------------------------- */
 
   forgotContainer: {
     alignItems: 'flex-end',
@@ -402,10 +320,6 @@ const makeStyles = (t: AppTheme): Styles => ({
     fontWeight: '600',
     letterSpacing: 0.1,
   },
-
-  /* --------------------------------------------- */
-  /* ERROR */
-  /* --------------------------------------------- */
 
   errorContainer: {
     backgroundColor: t.colors.errorBg,
@@ -423,17 +337,9 @@ const makeStyles = (t: AppTheme): Styles => ({
     lineHeight: 17,
   },
 
-  /* --------------------------------------------- */
-  /* BUTTON */
-  /* --------------------------------------------- */
-
   submitButton: {
     marginTop: t.spacing.xs,
   },
-
-  /* --------------------------------------------- */
-  /* FOOTER */
-  /* --------------------------------------------- */
 
   footer: {
     alignItems: 'center',

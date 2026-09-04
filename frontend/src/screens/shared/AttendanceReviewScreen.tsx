@@ -13,6 +13,7 @@ import { SelectField } from '../../components/forms/SelectField';
 import { DateField } from '../../components/forms/DateField';
 import { TimeField } from '../../components/forms/TimeField';
 import { AuthImage } from '../../components/media/AuthImage';
+
 import {
   attendanceReviewApi,
   type ReviewQueueItemDto,
@@ -47,6 +48,15 @@ export function AttendanceReviewScreen() {
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
 
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        // Jab bhi user is screen se baahar jayega, search reset ho jayegi
+        setShowSearch(false);
+        setSearch('');
+      };
+    }, [])
+  );
   const { data: queue = [], isLoading: queueLoading, refetch: refetchQueue } = useQuery({
     queryKey: ['attendance', 'review', 'queue'],
     queryFn: attendanceReviewApi.getQueue,

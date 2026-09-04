@@ -19,6 +19,9 @@ import { mentorsApi, type MentorDto } from '../../api/resources/mentors.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
 import type { AppTheme } from '../../theme/types';
+import { useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+
 
 const passwordFields = {
   password: passwordSchema,
@@ -64,6 +67,15 @@ export function MentorsScreen() {
 
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setShowSearch(false);
+        setSearch('');
+      };
+    }, [])
+  );
 
   const { data: mentors = [], isLoading } = useQuery({ queryKey: ['mentors'], queryFn: () => mentorsApi.list() });
   const { data: departmentOptions = [] } = useQuery({

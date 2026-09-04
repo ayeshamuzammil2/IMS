@@ -16,6 +16,8 @@ import { departmentsApi, type DepartmentDto } from '../../api/resources/departme
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
 import type { AppTheme } from '../../theme/types';
+import { useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required.').max(150),
@@ -46,6 +48,16 @@ export function DepartmentsScreen() {
   // Search state
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        // Jab bhi user is screen se baahar jayega, search reset ho jayegi
+        setShowSearch(false);
+        setSearch('');
+      };
+    }, [])
+  );
 
   const { data: departments = [], isLoading } = useQuery({
     queryKey: ['departments'],

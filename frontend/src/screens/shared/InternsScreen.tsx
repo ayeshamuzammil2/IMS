@@ -22,6 +22,8 @@ import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
 import { useAuth } from '../../providers/AuthProvider';
 import type { AppTheme } from '../../theme/types';
+import { useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 
 // Helper: Format Phone (+92 3XX XXXXXXX)
 function formatPhoneInput(text: string): string {
@@ -129,6 +131,16 @@ export function InternsScreen() {
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
 
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        // Jab bhi user is screen se baahar jayega, search reset ho jayegi
+        setShowSearch(false);
+        setSearch('');
+      };
+    }, [])
+  );
+  
   const toggleSearch = () => {
     if (showSearch) {
       setSearch('');

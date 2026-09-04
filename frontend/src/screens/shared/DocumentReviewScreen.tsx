@@ -51,6 +51,7 @@ export function DocumentReviewScreen() {
 
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
+
   const [departmentFilter, setDepartmentFilter] = useState<number | null>(null);
   const [internFilter, setInternFilter] = useState<number | null>(null);
 
@@ -110,15 +111,15 @@ export function DocumentReviewScreen() {
     useCallback(() => {
       refetch();
       return () => {
-      setShowSearch(false);
-      setSearch('');
-      setDepartmentFilter(null);
-      setInternFilter(null);
-      setPreviewItem(null);
-      setRejectTarget(null);
-    };
-  }, [refetch]),
-);
+        setShowSearch(false);
+        setSearch('');
+        setDepartmentFilter(null);
+        setInternFilter(null);
+        setPreviewItem(null);
+        setRejectTarget(null);
+      };
+    }, [refetch]),
+  );
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['documents', 'review', 'queue'] });
 
@@ -189,17 +190,6 @@ export function DocumentReviewScreen() {
           </Pressable>
         </View>
 
-        <View style={s.filterWrapper}>
-          <FilterBar
-            departmentOptions={isAdmin ? departmentSelectOptions : undefined}
-            departmentValue={departmentFilter}
-            onDepartmentChange={isAdmin ? handleDepartmentChange : undefined}
-            internOptions={internSelectOptions}
-            internValue={internFilter}
-            onInternChange={setInternFilter}
-          />
-        </View>
-
         {showSearch ? (
           <View style={s.searchContainer}>
             <Input
@@ -211,6 +201,17 @@ export function DocumentReviewScreen() {
             />
           </View>
         ) : null}
+
+        <View style={s.filterWrapper}>
+          <FilterBar
+            departmentOptions={isAdmin ? departmentSelectOptions : undefined}
+            departmentValue={departmentFilter}
+            onDepartmentChange={isAdmin ? handleDepartmentChange : undefined}
+            internOptions={internSelectOptions}
+            internValue={internFilter}
+            onInternChange={setInternFilter}
+          />
+        </View>
       </View>
 
       {filteredQueue.length === 0 ? (
@@ -358,7 +359,7 @@ const makeStyles = (t: AppTheme) => ({
   filterWrapper: {
     marginTop: t.spacing.xs,
   },
-  iconButton: {
+ iconButton: {
     width: 36,
     height: 36,
     borderRadius: 10,
@@ -373,7 +374,8 @@ const makeStyles = (t: AppTheme) => ({
     backgroundColor: `${t.colors.primary}10`,
   },
   searchContainer: {
-    marginTop: t.spacing.sm,
+    marginTop: t.spacing.xs,
+    marginBottom: t.spacing.xs,
   },
   emptyBox: {
     paddingVertical: t.spacing.xl * 2,

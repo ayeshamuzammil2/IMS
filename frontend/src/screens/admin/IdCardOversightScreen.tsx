@@ -13,6 +13,8 @@ import { departmentsApi } from '../../api/resources/departments.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
 import type { AppTheme } from '../../theme/types';
+import { useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 
 const statusTone: Record<string, 'muted' | 'success' | 'warning' | 'error'> = {
   Draft: 'muted',
@@ -39,6 +41,16 @@ export function IdCardOversightScreen() {
   const [internProfileId, setInternProfileId] = useState<number | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        // Jab bhi user is screen se baahar jayega, search reset ho jayegi
+        setShowSearch(false);
+        setSearch('');
+      };
+    }, [])
+  );
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busyId, setBusyId] = useState<number | null>(null);
 

@@ -38,6 +38,15 @@ export function TeamAttendanceScreen() {
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
 
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        // Jab bhi user is screen se baahar jayega, search reset ho jayegi
+        setShowSearch(false);
+        setSearch('');
+      };
+    }, [])
+  );
   const { data: rows = [], isLoading, refetch } = useQuery({
     queryKey: ['attendance', 'team-today', departmentId],
     queryFn: () => attendanceApi.teamToday(departmentId ?? undefined),
