@@ -63,4 +63,6 @@ public sealed record InternDto(
     string? EmergencyContactPhone,
     string? BloodGroup,
     bool AttendanceReady,
-    bool IsLockedForUnofficialActivity);
+    bool IsLockedForUnofficialActivity,
+    string FaceEnrollmentStatus,
+    bool FaceReEnrollmentAllowed);

@@ -115,4 +115,10 @@ public static class NotificationTemplates
         "Face enrollment reset",
         "An administrator has erased your face enrollment data ({{ reason }}). Please enroll again before marking biometric attendance.",
         NotificationType.Warning, NotificationCategory.Account, null, null);
+
+    public static readonly NotificationTemplate FaceReEnrollmentUnlocked = new(
+        "biometric.reenrollment_unlocked",
+        "Face re-enrollment unlocked",
+        "An administrator has unlocked one face re-enrollment for you ({{ reason }}). You can update your enrolled face once from the Face Enrollment screen; it will lock again automatically afterward.",
+        NotificationType.Info, NotificationCategory.Account, null, null);
 }

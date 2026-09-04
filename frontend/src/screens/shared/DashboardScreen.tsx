@@ -40,27 +40,33 @@ export function DashboardScreen() {
   }
 
   return (
-    <Screen scroll>
+    <Screen scroll style={s.container}>
       <View style={s.heroCard}>
-        <Text variant="overline" tone="muted" style={s.heroLabel}>
-          {isAdmin ? 'TOTAL INTERNS (ORG-WIDE)' : 'MY INTERNS'}
-        </Text>
-        <Text variant="h1" style={s.heroNumber}>
-          {data.totalInterns}
-        </Text>
+        <View style={s.heroContent}>
+          <Text variant="overline" tone="muted" style={s.heroLabel}>
+            {isAdmin ? 'TOTAL INTERNS (ORG-WIDE)' : 'MY INTERNS'}
+          </Text>
+          <Text variant="h1" style={s.heroNumber}>
+            {data.totalInterns}
+          </Text>
+        </View>
+        <View style={s.heroAccentBadge}>
+          <View style={s.heroPulseDot} />
+          <Text variant="caption" style={s.heroBadgeText}>Live</Text>
+        </View>
       </View>
 
       <View style={s.tileGrid}>
-        <KpiTile label="Present Today" value={data.presentTodayCount} tone="success" />
-        <KpiTile label="Late Today" value={data.lateTodayCount} tone="warning" />
-        <KpiTile label="Absent Today" value={data.absentTodayCount} tone="error" />
-        <KpiTile label="On Leave" value={data.onLeaveTodayCount} tone="muted" />
+        <KpiTile label="Present Today" value={data.presentTodayCount} color={theme.colors.success} />
+        <KpiTile label="Late Today" value={data.lateTodayCount} color={theme.colors.warning} />
+        <KpiTile label="Absent Today" value={data.absentTodayCount} color={theme.colors.error} />
+        <KpiTile label="On Leave" value={data.onLeaveTodayCount} color={theme.colors.textMuted} />
       </View>
 
       {isAdmin ? (
         <View style={s.tileGrid}>
-          <KpiTile label="Mentors" value={data.totalMentors} tone="primary" />
-          <KpiTile label="Departments" value={data.totalDepartments} tone="primary" />
+          <KpiTile label="Mentors" value={data.totalMentors} color={theme.colors.primary} />
+          <KpiTile label="Departments" value={data.totalDepartments} color={theme.colors.primary} />
         </View>
       ) : null}
 
@@ -78,13 +84,14 @@ export function DashboardScreen() {
                 { data: data.sevenDayTrend.map((p) => ({ value: p.lateCount, label: shortDate(p.date) })), color: theme.colors.warning },
                 { data: data.sevenDayTrend.map((p) => ({ value: p.absentCount, label: shortDate(p.date) })), color: theme.colors.error },
               ]}
-              yAxisColor={theme.charts.axis}
-              xAxisColor={theme.charts.axis}
-              rulesColor={theme.charts.gridline}
-              yAxisTextStyle={{ color: theme.colors.textMuted }}
-              xAxisLabelTextStyle={{ color: theme.colors.textMuted }}
+              yAxisColor="transparent"
+              xAxisColor={theme.colors.border}
+              rulesColor={theme.colors.border}
+              rulesType="dashed"
+              yAxisTextStyle={{ color: theme.colors.textSecondary, fontSize: 10 }}
+              xAxisLabelTextStyle={{ color: theme.colors.textSecondary, fontSize: 10 }}
               curved
-              thickness={2}
+              thickness={2.5}
               noOfSections={4}
             />
           )
@@ -104,13 +111,15 @@ export function DashboardScreen() {
                   value: d.count,
                   label: d.departmentName,
                   frontColor: theme.charts.categorical[i % theme.charts.categorical.length],
+                  labelTextStyle: { color: theme.colors.textSecondary, fontSize: 10 },
                 }))}
                 horizontal
                 height={Math.max(120, data.internsByDepartment.length * 36)}
-                barWidth={22}
-                yAxisTextStyle={{ color: theme.colors.textMuted }}
-                xAxisColor={theme.charts.axis}
-                yAxisColor={theme.charts.axis}
+                barWidth={18}
+                barBorderRadius={4}
+                yAxisTextStyle={{ color: theme.colors.textSecondary, fontSize: 10 }}
+                xAxisColor={theme.colors.border}
+                yAxisColor="transparent"
               />
             )
           }
@@ -130,9 +139,10 @@ export function DashboardScreen() {
                   value: v.count,
                   color: theme.charts.categorical[i % theme.charts.categorical.length],
                   text: String(v.count),
+                  textColor: theme.colors.textPrimary,
                 }))}
                 donut
-                radius={64}
+                radius={60}
                 innerRadius={42}
                 innerCircleColor={theme.colors.surface}
               />
@@ -143,7 +153,7 @@ export function DashboardScreen() {
                     <Text variant="caption" style={s.legendText} numberOfLines={1}>
                       {v.status}
                     </Text>
-                    <Text variant="caption" tone="muted">
+                    <Text variant="caption" style={s.legendCount}>
                       {v.count}
                     </Text>
                   </View>
@@ -162,14 +172,25 @@ function shortDate(iso: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-function KpiTile({ label, value, tone }: { label: string; value: number; tone: 'success' | 'warning' | 'error' | 'muted' | 'primary' }) {
+function KpiTile({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number;
+  color: string;
+}) {
   const s = useThemedStyles(makeStyles);
+
   return (
     <View style={s.tile}>
-      <Text variant="h3" tone={tone === 'primary' ? 'brand' : tone}>
-        {value}
-      </Text>
-      <Text variant="caption" tone="muted">
+      <View style={s.tileIconBadge}>
+        <Text variant="h3" style={{ color }}>
+          {value}
+        </Text>
+      </View>
+      <Text variant="caption" tone="muted" style={s.tileLabel}>
         {label}
       </Text>
     </View>
@@ -183,11 +204,14 @@ function ChartSection({ title, children }: { title: string; children: (showTable
   return (
     <View style={s.card}>
       <View style={s.cardHeader}>
-        <Text variant="overline" tone="muted">
-          {title}
-        </Text>
+        <View style={s.cardTitleContainer}>
+          <View style={s.cardTitleIndicator} />
+          <Text variant="overline" tone="muted" style={s.cardTitle}>
+            {title}
+          </Text>
+        </View>
         <Pressable onPress={() => setShowTable((v) => !v)} hitSlop={8} style={s.actionIcon}>
-          <Table size={16} color={showTable ? theme.colors.primary : theme.colors.textMuted} />
+          <Table size={15} color={showTable ? theme.colors.primary : theme.colors.textMuted} />
         </Pressable>
       </View>
       {children(showTable)}
@@ -196,10 +220,13 @@ function ChartSection({ title, children }: { title: string; children: (showTable
 }
 
 function EmptyChartNote() {
+  const s = useThemedStyles(makeStyles);
   return (
-    <Text variant="body" tone="muted">
-      No data yet.
-    </Text>
+    <View style={s.emptyBox}>
+      <Text variant="body" tone="muted">
+        No data yet.
+      </Text>
+    </View>
   );
 }
 
@@ -207,10 +234,10 @@ function TrendTable({ data }: { data: DashboardSummaryDto['sevenDayTrend'] }) {
   const s = useThemedStyles(makeStyles);
   if (data.length === 0) return <EmptyChartNote />;
   return (
-    <View>
+    <View style={s.tableContainer}>
       {data.map((p) => (
         <View key={p.date} style={s.tableRow}>
-          <Text variant="caption" style={s.tableCell}>
+          <Text variant="caption" style={s.tableCellMain}>
             {new Date(p.date).toLocaleDateString()}
           </Text>
           <Text variant="caption" tone="success" style={s.tableCell}>
@@ -232,7 +259,7 @@ function DepartmentTable({ data }: { data: DashboardSummaryDto['internsByDepartm
   const s = useThemedStyles(makeStyles);
   if (data.length === 0) return <EmptyChartNote />;
   return (
-    <View>
+    <View style={s.tableContainer}>
       {data.map((d) => (
         <View key={d.departmentName} style={s.tableRow}>
           <Text variant="caption" style={s.tableCellWide} numberOfLines={1}>
@@ -251,7 +278,7 @@ function VerificationTable({ data }: { data: DashboardSummaryDto['verificationBr
   const s = useThemedStyles(makeStyles);
   if (data.length === 0) return <EmptyChartNote />;
   return (
-    <View>
+    <View style={s.tableContainer}>
       {data.map((v) => (
         <View key={v.status} style={s.tableRow}>
           <Text variant="caption" style={s.tableCellWide} numberOfLines={1}>
@@ -267,19 +294,54 @@ function VerificationTable({ data }: { data: DashboardSummaryDto['verificationBr
 }
 
 const makeStyles = (t: AppTheme) => ({
+  container: {
+    paddingHorizontal: t.spacing.md,
+    paddingTop: t.spacing.sm,
+  },
   heroCard: {
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: t.colors.border,
-    paddingVertical: t.spacing.xl,
+    paddingVertical: t.spacing.lg,
     paddingHorizontal: t.spacing.lg,
+    flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    marginBottom: t.spacing.lg,
-    ...t.shadows.sm,
+    justifyContent: 'space-between' as const,
+    marginBottom: t.spacing.md,
+    elevation: 2,
   },
-  heroLabel: { letterSpacing: 0.6, marginBottom: t.spacing.xs },
-  heroNumber: { color: t.colors.primary },
+  heroContent: {
+    flex: 1,
+  },
+  heroLabel: {
+    letterSpacing: 1,
+    marginBottom: 2,
+    color: t.colors.textSecondary,
+  },
+  heroNumber: {
+    color: t.colors.primary,
+  },
+  heroAccentBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    backgroundColor: t.colors.surfaceSunken,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 9999,
+  },
+  heroPulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: t.colors.success,
+  },
+  heroBadgeText: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+    color: t.colors.textSecondary,
+  },
   tileGrid: {
     flexDirection: 'row' as const,
     flexWrap: 'wrap' as const,
@@ -287,26 +349,40 @@ const makeStyles = (t: AppTheme) => ({
     marginBottom: t.spacing.md,
   },
   tile: {
-    flexBasis: '48%' as const,
+    flexBasis: '47%' as const,
     flexGrow: 1,
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: t.colors.border,
-    paddingVertical: t.spacing.md,
-    paddingHorizontal: t.spacing.sm,
+    padding: t.spacing.md,
+    flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    gap: 2,
-    ...t.shadows.sm,
+    gap: t.spacing.sm,
+    elevation: 1,
+  },
+  tileIconBadge: {
+    minWidth: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: t.colors.surfaceSunken,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingHorizontal: 4,
+  },
+  tileLabel: {
+    flex: 1,
+    flexWrap: 'wrap' as const,
+    color: t.colors.textSecondary,
   },
   card: {
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: t.colors.border,
     padding: t.spacing.lg,
-    marginBottom: t.spacing.lg,
-    ...t.shadows.sm,
+    marginBottom: t.spacing.md,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row' as const,
@@ -314,17 +390,64 @@ const makeStyles = (t: AppTheme) => ({
     alignItems: 'center' as const,
     marginBottom: t.spacing.md,
   },
-  actionIcon: { padding: t.spacing.xs },
+  cardTitleContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  cardTitleIndicator: {
+    width: 3,
+    height: 12,
+    borderRadius: 2,
+    backgroundColor: t.colors.primary,
+  },
+  cardTitle: {
+    letterSpacing: 0.8,
+    color: t.colors.textSecondary,
+  },
+  actionIcon: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: t.colors.surfaceSunken,
+  },
+  emptyBox: {
+    paddingVertical: t.spacing.md,
+    alignItems: 'center' as const,
+  },
   donutRow: {
     flexDirection: 'row' as const,
     flexWrap: 'wrap' as const,
     alignItems: 'center' as const,
-    gap: t.spacing.lg,
+    justifyContent: 'space-around' as const,
+    gap: t.spacing.md,
   },
-  legendCol: { gap: t.spacing.sm, flexShrink: 1, minWidth: 120 },
-  legendRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: t.spacing.xs },
-  legendDot: { width: 10, height: 10, borderRadius: t.radii.full },
-  legendText: { flex: 1 },
+  legendCol: {
+    gap: t.spacing.xs,
+    flexShrink: 1,
+    minWidth: 120,
+  },
+  legendRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    paddingVertical: 2,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    flex: 1,
+    color: t.colors.textPrimary,
+  },
+  legendCount: {
+    fontWeight: '600' as const,
+    color: t.colors.textSecondary,
+  },
+  tableContainer: {
+    marginTop: t.spacing.xs,
+  },
   tableRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
@@ -334,7 +457,20 @@ const makeStyles = (t: AppTheme) => ({
     borderBottomColor: t.colors.border,
     gap: t.spacing.sm,
   },
-  tableCell: { minWidth: 60 },
-  tableCellWide: { flex: 1 },
-  tableCellNumber: { minWidth: 28, textAlign: 'right' as const },
+  tableCellMain: {
+    minWidth: 80,
+    color: t.colors.textPrimary,
+  },
+  tableCell: {
+    minWidth: 50,
+  },
+  tableCellWide: {
+    flex: 1,
+    color: t.colors.textPrimary,
+  },
+  tableCellNumber: {
+    minWidth: 28,
+    textAlign: 'right' as const,
+    color: t.colors.textPrimary,
+  },
 });

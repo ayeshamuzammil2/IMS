@@ -6,7 +6,7 @@ import Constants from 'expo-constants';
 import { useFocusEffect } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { MapPin } from 'lucide-react-native';
+import { Navigation, Clock, AlertCircle, CheckCircle2, ShieldAlert } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
@@ -65,9 +65,6 @@ export function AttendanceScreen() {
   const [cooldownSecondsLeft, setCooldownSecondsLeft] = useState(0);
   const watchSubscription = useRef<Location.LocationSubscription | null>(null);
 
-  // Mandatory 15s retry cooldown after a face-verification failure - the server independently
-  // enforces the same window (CreateSessionAsync rejects a new session within 15s of
-  // LastFaceFailureAtUtc), this is just the client-side countdown UI for it.
   useEffect(() => {
     if (!cooldownEndsAt) return;
     const tick = () => {
@@ -106,8 +103,7 @@ export function AttendanceScreen() {
         watchSubscription.current?.remove();
         watchSubscription.current = null;
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [startWatching]),
+    }, [startWatching, refetch]),
   );
 
   const distance = position && today ? distanceInMeters(today.departmentLatitude, today.departmentLongitude, position.coords.latitude, position.coords.longitude) : null;
@@ -195,113 +191,163 @@ export function AttendanceScreen() {
 
   if (isLoading || !today) {
     return (
-      <Screen>
-        <ActivityIndicator />
+      <Screen scroll={false}>
+        <View style={s.centerLoading}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text variant="caption" style={s.loadingText}>Fetching attendance status...</Text>
+        </View>
       </Screen>
     );
   }
 
+  const activeToneColor = geofenceState ? theme.colors[stateTone[geofenceState]] : theme.colors.textMuted;
+
   return (
-    <Screen scroll>
-      <View style={[s.statusCard, geofenceState ? { borderColor: theme.colors[stateTone[geofenceState]] } : null]}>
-        <MapPin size={28} color={geofenceState ? theme.colors[stateTone[geofenceState]] : theme.colors.textMuted} />
-        <Text variant="h2" style={s.distanceText}>
-          {distance !== null ? `${distance.toFixed(0)} m` : '...'}
+    <Screen scroll style={s.container}>
+      <View style={[s.statusCard, { borderColor: geofenceState ? activeToneColor : theme.colors.border }]}>
+        <View style={[s.iconBadge, { backgroundColor: geofenceState ? `${activeToneColor}15` : theme.colors.surfaceSunken }]}>
+          <Navigation size={28} color={activeToneColor} />
+        </View>
+        <Text variant="h1" style={s.distanceText}>
+          {distance !== null ? `${distance.toFixed(0)}m` : '--'}
         </Text>
-        <Text variant="body" tone="secondary">
-          from {today.departmentName}
+        <Text variant="caption" style={s.departmentText}>
+          Distance from <Text variant="caption" style={s.deptName}>{today.departmentName}</Text>
         </Text>
-        {locationError ? (
-          <Text variant="caption" tone="error" style={s.locationError}>
-            {locationError}
-          </Text>
-        ) : geofenceState === 'Outside' ? (
-          <Text variant="caption" tone="error">
-            Move within {today.geofenceRadiusMeters} m to mark attendance.
-          </Text>
-        ) : geofenceState === 'Uncertain' ? (
-          <Text variant="caption" tone="warning">
-            Close to the boundary - this will be flagged for mentor review.
-          </Text>
-        ) : geofenceState === 'Inside' ? (
-          <Text variant="caption" tone="success">
-            You are inside {today.departmentName}.
-          </Text>
-        ) : null}
+
+        <View style={s.badgeContainer}>
+          {locationError ? (
+            <View style={[s.statusBanner, { backgroundColor: `${theme.colors.error}15` }]}>
+              <ShieldAlert size={14} color={theme.colors.error} />
+              <Text variant="caption" style={{ color: theme.colors.error }}>{locationError}</Text>
+            </View>
+          ) : geofenceState === 'Outside' ? (
+            <View style={[s.statusBanner, { backgroundColor: `${theme.colors.error}15` }]}>
+              <AlertCircle size={14} color={theme.colors.error} />
+              <Text variant="caption" style={{ color: theme.colors.error }}>
+                Move within {today.geofenceRadiusMeters}m to mark attendance
+              </Text>
+            </View>
+          ) : geofenceState === 'Uncertain' ? (
+            <View style={[s.statusBanner, { backgroundColor: `${theme.colors.warning}15` }]}>
+              <AlertCircle size={14} color={theme.colors.warning} />
+              <Text variant="caption" style={{ color: theme.colors.warning }}>
+                Close to boundary - flagged for mentor review
+              </Text>
+            </View>
+          ) : geofenceState === 'Inside' ? (
+            <View style={[s.statusBanner, { backgroundColor: `${theme.colors.success}15` }]}>
+              <CheckCircle2 size={14} color={theme.colors.success} />
+              <Text variant="caption" style={{ color: theme.colors.success }}>
+                Inside {today.departmentName} radius
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <View style={s.card}>
-        <Text variant="overline" tone="muted">
-          TODAY - {today.status.toUpperCase()}
-        </Text>
-        <Row label="Arrival" value={today.arrivalMarked ? formatTime(today.arrivalAtUtc) + (today.arrivalIsLate ? ' (Late)' : '') : 'Not marked'} />
-        <Row label="Departure" value={today.departureMarked ? formatTime(today.departureAtUtc) + (today.departureIsEarly ? ' (Early)' : '') : 'Not marked'} />
+        <View style={s.cardHeader}>
+          <Clock size={16} color={theme.colors.primary} />
+          <Text variant="overline" style={s.cardTitle}>
+            TODAY'S TIMINGS ({today.status.toUpperCase()})
+          </Text>
+        </View>
+
+        <View style={s.metricsRow}>
+          <MetricBox
+            label="Arrival"
+            value={today.arrivalMarked ? formatTime(today.arrivalAtUtc) : 'Not marked'}
+            badge={today.arrivalIsLate ? 'Late' : today.arrivalMarked ? 'On Time' : null}
+            isLate={today.arrivalIsLate}
+          />
+          <View style={s.metricDivider} />
+          <MetricBox
+            label="Departure"
+            value={today.departureMarked ? formatTime(today.departureAtUtc) : 'Not marked'}
+            badge={today.departureIsEarly ? 'Early' : today.departureMarked ? 'Done' : null}
+            isLate={today.departureIsEarly}
+          />
+        </View>
       </View>
 
-      <Button
-        label={startingEvent === 'Arrival' ? 'Starting...' : 'Mark Arrival'}
-        onPress={() => onStart('Arrival')}
-        disabled={arrivalBlocked || startingEvent !== null}
-        loading={startingEvent === 'Arrival'}
-        fullWidth
-        style={s.actionButton}
-      />
-      {arrivalReason ? (
-        <Text variant="caption" tone="muted" style={s.reasonText}>
-          {arrivalReason}
-        </Text>
-      ) : null}
+      <View style={s.actionsGroup}>
+        <Button
+          label={startingEvent === 'Arrival' ? 'Initializing...' : 'Mark Arrival'}
+          onPress={() => onStart('Arrival')}
+          disabled={arrivalBlocked || startingEvent !== null}
+          loading={startingEvent === 'Arrival'}
+          fullWidth
+          style={s.actionButton}
+        />
+        {arrivalReason ? (
+          <View style={s.reasonBox}>
+            <AlertCircle size={14} color={theme.colors.textSecondary} />
+            <Text variant="caption" style={s.reasonText}>
+              {arrivalReason}
+            </Text>
+          </View>
+        ) : null}
 
-      <Button
-        label={startingEvent === 'Departure' ? 'Starting...' : 'Mark Departure'}
-        variant="outline"
-        onPress={() => onStart('Departure')}
-        disabled={departureBlocked || startingEvent !== null}
-        loading={startingEvent === 'Departure'}
-        fullWidth
-        style={s.actionButton}
-      />
-      {departureReason ? (
-        <Text variant="caption" tone="muted" style={s.reasonText}>
-          {departureReason}
-        </Text>
-      ) : null}
+        <Button
+          label={startingEvent === 'Departure' ? 'Initializing...' : 'Mark Departure'}
+          variant="outline"
+          onPress={() => onStart('Departure')}
+          disabled={departureBlocked || startingEvent !== null}
+          loading={startingEvent === 'Departure'}
+          fullWidth
+          style={s.actionButton}
+        />
+        {departureReason ? (
+          <View style={s.reasonBox}>
+            <AlertCircle size={14} color={theme.colors.textSecondary} />
+            <Text variant="caption" style={s.reasonText}>
+              {departureReason}
+            </Text>
+          </View>
+        ) : null}
+      </View>
 
-         <Modal visible={activeSession !== null} animationType="slide" onRequestClose={() => setActiveSession(null)}>
-  {activeSession ? (
-    <ChallengeCaptureView
-      key={activeSession.session.sessionId}
-      challenge={activeSession.session.challenge}
-      onComplete={(frames) => {
-        // Close the camera modal right away - the submit is a background network call, there's
-        // no reason to keep the camera session alive (and racing against it) while it's in flight.
-        setActiveSession(null);
-        submitMutation.mutate(frames);
-      }}
-      onCancel={() => setActiveSession(null)}
-      onTimeout={() => {
-        Toast.show({
-          type: 'error',
-          text1: 'Verification timed out',
-          text2: 'You took too long on a step. Please try again.',
-        });
-        setActiveSession(null);
-      }}
-    />
-  ) : null}
-</Modal>
+      <Modal visible={activeSession !== null} animationType="slide" onRequestClose={() => setActiveSession(null)}>
+        {activeSession ? (
+          <ChallengeCaptureView
+            key={activeSession.session.sessionId}
+            challenge={activeSession.session.challenge}
+            onComplete={(frames) => {
+              setActiveSession(null);
+              submitMutation.mutate(frames);
+            }}
+            onCancel={() => setActiveSession(null)}
+            onTimeout={() => {
+              Toast.show({
+                type: 'error',
+                text1: 'Verification timed out',
+                text2: 'You took too long on a step. Please try again.',
+              });
+              setActiveSession(null);
+            }}
+          />
+        ) : null}
+      </Modal>
     </Screen>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function MetricBox({ label, value, badge, isLate }: { label: string; value: string; badge: string | null; isLate?: boolean }) {
   const s = useThemedStyles(makeStyles);
+  const theme = useTheme();
+
   return (
-    <View style={s.row}>
-      <Text variant="body" tone="secondary">
-        {label}
-      </Text>
-      <Text variant="bodyStrong">{value}</Text>
+    <View style={s.metricBox}>
+      <Text variant="caption" style={s.metricLabel}>{label}</Text>
+      <Text variant="body" style={s.metricValue}>{value}</Text>
+      {badge ? (
+        <View style={[s.badge, { backgroundColor: isLate ? `${theme.colors.warning}20` : `${theme.colors.success}20` }]}>
+          <Text variant="caption" style={{ color: isLate ? theme.colors.warning : theme.colors.success, fontSize: 10, fontWeight: '700' }}>
+            {badge}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -312,28 +358,135 @@ function formatTime(iso: string | null): string {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  container: {
+    paddingHorizontal: 22, // Extra breathing space on both left & right edges
+    paddingTop: t.spacing.md,
+    paddingBottom: t.spacing.xl,
+  },
+  centerLoading: {
+    flex: 1,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    gap: t.spacing.sm,
+  },
+  loadingText: {
+    color: t.colors.textSecondary,
+  },
   statusCard: {
     alignItems: 'center' as const,
-    gap: t.spacing.xs,
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
-    borderWidth: 2,
-    borderColor: t.colors.border,
-    padding: t.spacing.lg,
+    borderWidth: 1.5,
+    paddingVertical: t.spacing.lg,
+    paddingHorizontal: t.spacing.md,
     marginBottom: t.spacing.md,
+    shadowColor: t.colors.textPrimary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  distanceText: { marginTop: t.spacing.xs },
-  locationError: { marginTop: t.spacing.xs, textAlign: 'center' as const },
+  iconBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginBottom: t.spacing.xs,
+  },
+  distanceText: {
+    fontSize: 32,
+    fontWeight: '800' as const,
+    color: t.colors.textPrimary,
+    letterSpacing: -0.5,
+  },
+  departmentText: {
+    color: t.colors.textSecondary,
+    fontSize: 13,
+  },
+  deptName: {
+    color: t.colors.textPrimary,
+    fontWeight: '600' as const,
+  },
+  badgeContainer: {
+    marginTop: t.spacing.md,
+    width: '100%' as const,
+  },
+  statusBanner: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: t.radii.full,
+  },
   card: {
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
     borderWidth: 1,
     borderColor: t.colors.border,
     padding: t.spacing.lg,
-    gap: t.spacing.sm,
     marginBottom: t.spacing.lg,
   },
-  row: { flexDirection: 'row' as const, justifyContent: 'space-between' as const },
-  actionButton: { marginTop: t.spacing.sm },
-  reasonText: { textAlign: 'center' as const, marginTop: t.spacing.xs },
+  cardHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    marginBottom: t.spacing.md,
+  },
+  cardTitle: {
+    color: t.colors.textSecondary,
+    fontWeight: '700' as const,
+    letterSpacing: 0.8,
+    fontSize: 11,
+  },
+  metricsRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+  },
+  metricBox: {
+    flex: 1,
+    alignItems: 'center' as const,
+    gap: 2,
+  },
+  metricDivider: {
+    width: 1,
+    height: '70%' as const,
+    backgroundColor: t.colors.border,
+  },
+  metricLabel: {
+    color: t.colors.textSecondary,
+    fontSize: 12,
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: t.colors.textPrimary,
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: t.radii.full,
+    marginTop: 4,
+  },
+  actionsGroup: {
+    gap: t.spacing.xs,
+  },
+  actionButton: {
+    marginTop: t.spacing.xs,
+  },
+  reasonBox: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 6,
+    paddingHorizontal: t.spacing.sm,
+    marginBottom: t.spacing.sm,
+  },
+  reasonText: {
+    textAlign: 'center' as const,
+    color: t.colors.textSecondary,
+    fontSize: 12,
+  },
 });

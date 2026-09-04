@@ -1,9 +1,9 @@
 import React, { useCallback, useState } from 'react';
-import { View } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { Award, Clock, XCircle, Lock, ShieldCheck, Download, AlertCircle } from 'lucide-react-native';
+import { Award, Clock, XCircle, Lock, ShieldCheck, AlertCircle } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
@@ -14,10 +14,12 @@ import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
 import type { AppTheme } from '../../theme/types';
 
+type Tone = 'success' | 'warning' | 'error' | 'muted';
+
 const STATUS_CONFIG: Record<
   CertificateStatusKey,
   {
-    tone: 'success' | 'warning' | 'error' | 'muted';
+    tone: Tone;
     title: string;
     description: string;
     Icon: typeof Award;
@@ -55,6 +57,13 @@ const STATUS_CONFIG: Record<
   },
 };
 
+const stateTone: Record<Tone, 'success' | 'warning' | 'error'> = {
+  success: 'success',
+  warning: 'warning',
+  error: 'error',
+  muted: 'warning',
+};
+
 export function CertificateScreen() {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
@@ -85,154 +94,203 @@ export function CertificateScreen() {
 
   if (isLoading || !data) {
     return (
-      <Screen>
-        <Text variant="body" tone="muted">
-          Loading...
-        </Text>
+      <Screen scroll={false}>
+        <View style={s.centerLoading}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text variant="caption" style={s.loadingText}>Loading Certificate details...</Text>
+        </View>
       </Screen>
     );
   }
 
   const config = STATUS_CONFIG[data.status];
   const IconComponent = config.Icon;
+  const canDownload = data.status === 'Issued' && Boolean(data.generatedFileId);
+  const activeToneColor = config.tone === 'muted' ? theme.colors.textMuted : theme.colors[stateTone[config.tone]];
 
   return (
-    <Screen scroll>
-      {/* Main Status Banner Card */}
-      <View style={[s.card, s[`card_${config.tone}`]]}>
-        <View style={[s.iconWrapper, s[`iconWrapper_${config.tone}`]]}>
-          <IconComponent size={32} color={getIconColor(config.tone, theme)} />
+    <Screen scroll style={s.container}>
+      {/* Main Status Header Card */}
+      <View style={[s.statusCard, { borderColor: activeToneColor }]}>
+        <View style={[s.iconBadge, { backgroundColor: `${activeToneColor}15` }]}>
+          <IconComponent size={28} color={activeToneColor} />
         </View>
 
-        <Text variant="h3" style={s.cardTitle}>
+        <Text variant="h1" style={s.statusTitleText}>
           {config.title}
         </Text>
 
-        <Text variant="caption" tone="muted" style={s.cardDescription}>
+        <Text variant="caption" style={s.statusDescText}>
           {config.description}
         </Text>
+      </View>
 
-        {/* Dynamic Badges & Meta Info */}
-        {(data.certificateNumber || data.issueDate) && (
-          <View style={s.metaContainer}>
+      {/* Certificate Details Meta Card */}
+      {(data.certificateNumber || data.issueDate) && (
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <Award size={16} color={theme.colors.primary} />
+            <Text variant="overline" style={s.cardTitle}>
+              CERTIFICATE DETAILS
+            </Text>
+          </View>
+
+          <View style={s.detailsGroup}>
             {data.certificateNumber ? (
-              <View style={s.metaRow}>
-                <Text variant="caption" tone="muted">
-                  Certificate No:
-                </Text>
-                <Text variant="caption" style={s.metaValue}>
-                  {data.certificateNumber}
-                </Text>
+              <View style={s.detailRow}>
+                <Text variant="caption" style={s.detailLabel}>Certificate No</Text>
+                <Text variant="body" style={s.detailValue}>{data.certificateNumber}</Text>
               </View>
             ) : null}
 
+            {data.certificateNumber && data.issueDate ? <View style={s.rowDivider} /> : null}
+
             {data.issueDate ? (
-              <View style={s.metaRow}>
-                <Text variant="caption" tone="muted">
-                  Issued On:
-                </Text>
-                <Text variant="caption" style={s.metaValue}>
+              <View style={s.detailRow}>
+                <Text variant="caption" style={s.detailLabel}>Issued On</Text>
+                <Text variant="body" style={s.detailValue}>
                   {new Date(data.issueDate).toLocaleDateString()}
                 </Text>
               </View>
             ) : null}
           </View>
-        )}
+        </View>
+      )}
 
-        {/* Action Button for Issued State */}
-        {data.status === 'Issued' && data.generatedFileId ? (
-          <Button
-            label="Download Certificate"
-            onPress={handleDownload}
-            loading={downloading}
-            fullWidth
-            style={s.downloadButton}
-          />
+      {/* Actions Group */}
+      <View style={s.actionsGroup}>
+        <Button
+          label={downloading ? 'Downloading...' : 'Download Certificate'}
+          onPress={handleDownload}
+          disabled={!canDownload || downloading}
+          loading={downloading}
+          fullWidth
+          style={s.actionButton}
+        />
+
+        {!canDownload ? (
+          <View style={s.reasonBox}>
+            <AlertCircle size={14} color={theme.colors.textSecondary} />
+            <Text variant="caption" style={s.reasonText}>
+              Download unlocks after admin approval
+            </Text>
+          </View>
         ) : null}
       </View>
     </Screen>
   );
 }
 
-function getIconColor(tone: 'success' | 'warning' | 'error' | 'muted', theme: AppTheme) {
-  switch (tone) {
-    case 'success':
-      return theme.colors.success;
-    case 'warning':
-      return theme.colors.warning;
-    case 'error':
-      return theme.colors.error;
-    default:
-      return theme.colors.textMuted;
-  }
-}
-
 const makeStyles = (t: AppTheme) => ({
-  card: {
+  container: {
+    paddingHorizontal: 22,
+    paddingTop: t.spacing.md,
+    paddingBottom: t.spacing.xl,
+  },
+  centerLoading: {
+    flex: 1,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    gap: t.spacing.sm,
+  },
+  loadingText: {
+    color: t.colors.textSecondary,
+  },
+  statusCard: {
+    alignItems: 'center' as const,
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
     borderWidth: 1.5,
-    padding: t.spacing.xl,
-    alignItems: 'center' as const,
-    marginTop: t.spacing.md,
-  },
-  card_success: {
-    borderColor: t.colors.success,
-    backgroundColor: t.colors.successBg,
-  },
-  card_warning: {
-    borderColor: t.colors.warning,
-    backgroundColor: t.colors.warningBg,
-  },
-  card_error: {
-    borderColor: t.colors.error,
-    backgroundColor: t.colors.errorBg,
-  },
-  card_muted: {
-    borderColor: t.colors.border,
-    backgroundColor: t.colors.surface,
-  },
-
-  iconWrapper: {
-    padding: t.spacing.md,
-    borderRadius: 50,
+    paddingVertical: t.spacing.lg,
+    paddingHorizontal: t.spacing.md,
     marginBottom: t.spacing.md,
+    shadowColor: t.colors.textPrimary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  iconWrapper_success: { backgroundColor: 'rgba(34, 197, 94, 0.15)' },
-  iconWrapper_warning: { backgroundColor: 'rgba(234, 179, 8, 0.15)' },
-  iconWrapper_error: { backgroundColor: 'rgba(239, 68, 68, 0.15)' },
-  iconWrapper_muted: { backgroundColor: t.colors.surfaceSunken },
-
-  cardTitle: {
-    textAlign: 'center' as const,
+  iconBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     marginBottom: t.spacing.xs,
   },
-  cardDescription: {
+  statusTitleText: {
+    fontSize: 20,
+    fontWeight: '800' as const,
+    color: t.colors.textPrimary,
     textAlign: 'center' as const,
-    lineHeight: 18,
-    marginBottom: t.spacing.md,
+    marginTop: 4,
+    marginBottom: 4,
   },
-
-  metaContainer: {
-    width: '100%' as const,
+  statusDescText: {
+    color: t.colors.textSecondary,
+    fontSize: 13,
+    textAlign: 'center' as const,
+    paddingHorizontal: t.spacing.sm,
+  },
+  card: {
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.md,
-    padding: t.spacing.md,
-    gap: t.spacing.xs,
-    marginTop: t.spacing.xs,
+    borderRadius: t.radii.lg,
     borderWidth: 1,
     borderColor: t.colors.border,
+    padding: t.spacing.lg,
+    marginBottom: t.spacing.lg,
   },
-  metaRow: {
+  cardHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    marginBottom: t.spacing.md,
+  },
+  cardTitle: {
+    color: t.colors.textSecondary,
+    fontWeight: '700' as const,
+    letterSpacing: 0.8,
+    fontSize: 11,
+  },
+  detailsGroup: {
+    gap: 4,
+  },
+  detailRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
+    paddingVertical: 4,
   },
-  metaValue: {
-    fontWeight: '600' as const,
+  rowDivider: {
+    height: 1,
+    backgroundColor: t.colors.border,
+    marginVertical: 4,
   },
-
-  downloadButton: {
-    marginTop: t.spacing.lg,
+  detailLabel: {
+    color: t.colors.textSecondary,
+    fontSize: 13,
+  },
+  detailValue: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+    color: t.colors.textPrimary,
+  },
+  actionsGroup: {
+    gap: t.spacing.xs,
+  },
+  actionButton: {
+    marginTop: t.spacing.xs,
+  },
+  reasonBox: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 6,
+    marginTop: t.spacing.xs,
+  },
+  reasonText: {
+    textAlign: 'center' as const,
+    color: t.colors.textSecondary,
+    fontSize: 11.5,
   },
 });

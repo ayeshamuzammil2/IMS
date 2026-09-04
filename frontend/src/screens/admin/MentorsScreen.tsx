@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { Power, PowerOff, KeyRound, ArrowRightLeft, Trash2, ChevronRight, Search, X } from 'lucide-react-native';
+import { Power, PowerOff, KeyRound, ArrowRightLeft, Trash2, ChevronRight, Search, X, Users } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
@@ -227,24 +227,45 @@ export function MentorsScreen() {
     return (
       <Pressable style={s.card} onPress={() => openEdit(m)}>
         <View style={s.cardHeader}>
+          <View style={s.avatarBadge}>
+            <Text variant="bodyStrong" style={s.avatarText}>
+              {m.fullName?.charAt(0).toUpperCase() || 'M'}
+            </Text>
+          </View>
           <View style={s.cardHeaderText}>
-            <Text variant="bodyStrong" numberOfLines={1}>
+            <Text variant="bodyStrong" style={s.cardTitle} numberOfLines={1}>
               {m.fullName}
             </Text>
-            <Text variant="caption" tone="muted">
+            <Text variant="caption" tone="muted" style={s.emailText} numberOfLines={1}>
               {m.email}
             </Text>
           </View>
           <ChevronRight size={18} color={theme.colors.textMuted} />
         </View>
 
-        <Text variant="caption" tone="secondary" numberOfLines={1} style={s.cardSubline}>
-          {m.departmentName} · {m.internCount} Interns
-        </Text>
+        <View style={s.metaInfoRow}>
+          <View style={s.metaLeftGroup}>
+            <View style={s.metaChip}>
+              <Text variant="caption" tone="secondary" style={s.metaChipText}>
+                {m.departmentName || 'No Dept'}
+              </Text>
+            </View>
 
-        <View style={s.badgeRow}>
-          <View style={[s.badge, { backgroundColor: m.isActive ? theme.colors.successBg : theme.colors.errorBg }]}>
-            <Text variant="caption" tone={m.isActive ? 'success' : 'error'}>
+            <Text variant="caption" tone="muted" style={s.metaDot}>•</Text>
+
+            <View style={s.internCountBadge}>
+              <Users size={12} color={theme.colors.textMuted} />
+              <Text variant="caption" tone="muted" style={s.internCountText}>
+                {m.internCount} {m.internCount === 1 ? 'Intern' : 'Interns'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={s.statusRow}>
+          <View style={[s.badge, { backgroundColor: m.isActive ? (theme.colors.successBg || '#F0FDF4') : (theme.colors.errorBg || '#FEF2F2') }]}>
+            <View style={[s.badgeDot, { backgroundColor: m.isActive ? theme.colors.success : theme.colors.error }]} />
+            <Text variant="caption" tone={m.isActive ? 'success' : 'error'} style={s.badgeText}>
               {m.isActive ? 'Active' : 'Inactive'}
             </Text>
           </View>
@@ -261,7 +282,7 @@ export function MentorsScreen() {
               openTransfer(m);
             }}
           >
-            <ArrowRightLeft size={18} color={theme.colors.textSecondary} />
+            <ArrowRightLeft size={16} color={theme.colors.textMuted} />
           </Pressable>
           <Pressable
             hitSlop={8}
@@ -271,7 +292,7 @@ export function MentorsScreen() {
               openResetPassword(m);
             }}
           >
-            <KeyRound size={18} color={theme.colors.textSecondary} />
+            <KeyRound size={16} color={theme.colors.textMuted} />
           </Pressable>
           <Pressable
             hitSlop={8}
@@ -282,11 +303,11 @@ export function MentorsScreen() {
             }}
           >
             {busyToggle ? (
-              <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+              <ActivityIndicator size="small" color={theme.colors.textMuted} />
             ) : m.isActive ? (
-              <PowerOff size={18} color={theme.colors.error} />
+              <PowerOff size={16} color={theme.colors.error} />
             ) : (
-              <Power size={18} color={theme.colors.success} />
+              <Power size={16} color={theme.colors.success} />
             )}
           </Pressable>
           <Pressable
@@ -297,7 +318,7 @@ export function MentorsScreen() {
               confirmDelete(m);
             }}
           >
-            {busyDelete ? <ActivityIndicator size="small" color={theme.colors.error} /> : <Trash2 size={18} color={theme.colors.error} />}
+            {busyDelete ? <ActivityIndicator size="small" color={theme.colors.error} /> : <Trash2 size={16} color={theme.colors.error} />}
           </Pressable>
         </View>
       </Pressable>
@@ -305,28 +326,27 @@ export function MentorsScreen() {
   };
 
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} style={s.screenContainer}>
       <View style={s.headerContainer}>
-        {/* Main Header Row */}
         <View style={s.headerRow}>
-          <Text variant="body" tone="secondary">
-            {filteredMentors.length} mentor{filteredMentors.length === 1 ? '' : 's'}
-          </Text>
-          <Button label="Add Mentor" size="sm" onPress={openCreate} />
+          <View style={s.headerTitleContainer}>
+            <View style={s.titleIndicator} />
+            <Text variant="overline" tone="muted" style={s.headerLabel}>
+              {filteredMentors.length} {filteredMentors.length === 1 ? 'MENTOR' : 'MENTORS'} TOTAL
+            </Text>
+          </View>
+          <View style={s.headerActions}>
+            <Pressable onPress={toggleSearch} style={[s.iconButton, showSearch && s.iconButtonActive]} hitSlop={8}>
+              {showSearch ? (
+                <X size={18} color={theme.colors.primary} />
+              ) : (
+                <Search size={18} color={theme.colors.textMuted} />
+              )}
+            </Pressable>
+            <Button label="Add Mentor" size="sm" onPress={openCreate} />
+          </View>
         </View>
 
-        {/* Search Icon Trigger placed below Add Mentor */}
-        <View style={s.searchIconRow}>
-          <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
-            {showSearch ? (
-              <X size={20} color={theme.colors.textSecondary} />
-            ) : (
-              <Search size={20} color={theme.colors.textSecondary} />
-            )}
-          </Pressable>
-        </View>
-
-        {/* Expandable Search Input */}
         {showSearch && (
           <View style={s.searchContainer}>
             <Input
@@ -341,9 +361,12 @@ export function MentorsScreen() {
       </View>
 
       {isLoading ? (
-        <Text variant="body" tone="muted">
-          Loading...
-        </Text>
+        <View style={s.centerBox}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <Text variant="caption" tone="muted" style={{ marginTop: 12 }}>
+            Loading mentors...
+          </Text>
+        </View>
       ) : (
         <FlatList
           data={filteredMentors}
@@ -354,9 +377,11 @@ export function MentorsScreen() {
             filteredMentors.length === 0 ? s.emptyListContent : s.listContent
           }
           ListEmptyComponent={
-            <Text variant="body" tone="muted">
-              {search ? 'No mentors match your search.' : 'No mentors yet. Add one to get started.'}
-            </Text>
+            <View style={s.emptyBox}>
+              <Text variant="body" tone="muted">
+                {search ? 'No mentors match your search.' : 'No mentors yet. Add one to get started.'}
+              </Text>
+            </View>
           }
         />
       )}
@@ -587,47 +612,185 @@ export function MentorsScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  screenContainer: {
+    paddingHorizontal: t.spacing.lg,
+    paddingTop: t.spacing.md,
+  },
   headerContainer: {
-    marginBottom: 12,
+    marginBottom: t.spacing.lg,
   },
   headerRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
-    marginBottom: t.spacing.xs,
   },
-  searchIconRow: {
-    alignItems: 'flex-end' as const,
-    marginTop: 8,
+  headerTitleContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+  },
+  titleIndicator: {
+    width: 4,
+    height: 14,
+    borderRadius: 2,
+    backgroundColor: t.colors.primary,
+  },
+  headerLabel: {
+    letterSpacing: 1,
+  },
+  headerActions: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: t.spacing.sm,
   },
   iconButton: {
-    padding: 8,
-    borderRadius: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: t.colors.surface,
     borderWidth: 1,
     borderColor: t.colors.border,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  iconButtonActive: {
+    borderColor: t.colors.primary,
+    backgroundColor: t.colors.surfaceSunken,
   },
   searchContainer: {
-    marginTop: 8,
+    marginTop: t.spacing.md,
   },
   list: { flex: 1 },
-  listContent: { gap: t.spacing.sm, paddingBottom: t.spacing.lg },
-  emptyListContent: { flexGrow: 1, alignItems: 'center' as const, justifyContent: 'center' as const },
+  listContent: {
+    gap: t.spacing.md,
+    paddingBottom: t.spacing.xl * 1.5,
+  },
+  emptyListContent: {
+    flexGrow: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
   card: {
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: t.colors.border,
     padding: t.spacing.lg,
-    ...t.shadows.sm,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  cardHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, gap: t.spacing.sm },
-  cardHeaderText: { flex: 1 },
-  cardSubline: { marginTop: 2 },
-  badgeRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: t.spacing.xs, marginTop: t.spacing.sm },
-  badge: { paddingHorizontal: t.spacing.sm, paddingVertical: 3, borderRadius: t.radii.full },
-  divider: { height: 1, backgroundColor: t.colors.border, marginTop: t.spacing.md, marginBottom: t.spacing.sm },
-  actionsRow: { flexDirection: 'row' as const, gap: t.spacing.lg, justifyContent: 'flex-end' as const },
-  actionIcon: { padding: t.spacing.xs },
-  transferHint: { marginBottom: t.spacing.md },
+  cardHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: t.spacing.md,
+  },
+  avatarBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: t.colors.surfaceSunken,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  avatarText: {
+    color: t.colors.primary,
+    fontSize: 16,
+  },
+  cardHeaderText: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    flexShrink: 1,
+  },
+  emailText: {
+    marginTop: 3,
+  },
+  badge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 9999,
+  },
+  badgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+  },
+  metaInfoRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginTop: 14,
+    paddingLeft: 2,
+  },
+  metaLeftGroup: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    flexShrink: 1,
+  },
+  metaChip: {
+    backgroundColor: t.colors.surfaceSunken,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  metaChipText: {
+    fontSize: 12,
+  },
+  metaDot: {
+    fontSize: 12,
+  },
+  internCountBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+  },
+  internCountText: {
+    fontSize: 12,
+  },
+  statusRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'flex-end' as const,
+    marginTop: 8,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: t.colors.border,
+    marginTop: t.spacing.md,
+    marginBottom: t.spacing.sm,
+  },
+  actionsRow: {
+    flexDirection: 'row' as const,
+    gap: t.spacing.md,
+    justifyContent: 'flex-end' as const,
+    alignItems: 'center' as const,
+    paddingTop: 4,
+  },
+  actionIcon: {
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: t.colors.surfaceSunken,
+  },
+  transferHint: {
+    marginBottom: t.spacing.lg,
+  },
+  emptyBox: {
+    paddingVertical: t.spacing.xl * 2,
+    alignItems: 'center' as const,
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
 });

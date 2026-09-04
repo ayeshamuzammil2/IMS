@@ -15,4 +15,10 @@ public interface IFaceEnrollmentService
     /// any) and resets enrollment status to Revoked, forcing a fresh live enrollment (with a new
     /// cross-match against the approved photo) before biometric attendance can resume.</summary>
     Task RevokeAsync(int internProfileId, string reason, CancellationToken ct);
+
+    /// <summary>Admin-facing one-time unlock: enrollment is locked by default once a template is
+    /// Active (see InternProfile.FaceReEnrollmentAllowed), so this is the only way an already-
+    /// enrolled intern can submit a new enrollment. The unlock is consumed automatically by the
+    /// next successful SubmitAsync call - it does not stay open.</summary>
+    Task UnlockReEnrollmentAsync(int internProfileId, string reason, CancellationToken ct);
 }

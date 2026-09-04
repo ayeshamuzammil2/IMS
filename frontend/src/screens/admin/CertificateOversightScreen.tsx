@@ -35,12 +35,14 @@ export function CertificateOversightScreen() {
   const theme = useTheme();
   const queryClient = useQueryClient();
 
+  const [departmentId, setDepartmentId] = useState<number | null>(null);
+  const [internProfileId, setInternProfileId] = useState<number | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
-  const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busyId, setBusyId] = useState<number | null>(null);
 
+  // Departments Query
   const { data: departmentOptions = [] } = useQuery({
     queryKey: ['departments', 'lookup'],
     queryFn: departmentsApi.lookup,
@@ -51,24 +53,44 @@ export function CertificateOversightScreen() {
     return [{ value: 'all', label: 'All Departments' }, ...list];
   }, [departmentOptions]);
 
-  const { data: certificates = [], isLoading } = useQuery({
+  // Certificates Query
+  const { data: allCertificates = [], isLoading } = useQuery({
     queryKey: ['certificates', 'list', departmentId],
     queryFn: () => certificatesApi.list(departmentId ?? undefined),
   });
 
-  const filteredCertificates = useMemo(() => {
-    if (!search.trim()) return certificates;
-    const q = search.toLowerCase().trim();
-    return certificates.filter((c) => {
-      const nameMatch = c.internFullName?.toLowerCase().includes(q);
-      const codeMatch = c.internCode?.toLowerCase().includes(q);
-      const certMatch = c.certificateNumber?.toLowerCase().includes(q);
-      return nameMatch || codeMatch || certMatch;
-    });
-  }, [certificates, search]);
+  // Intern Options built dynamically from current certificates/department list
+  const internSelectOptions = useMemo(() => {
+    const list = allCertificates.map((c) => ({
+      value: String(c.internProfileId),
+      label: `${c.internFullName} (${c.internCode})`,
+    }));
+    return [{ value: 'all', label: 'All Interns' }, ...list];
+  }, [allCertificates]);
 
-  const approvedSelectedCount = certificates.filter(
-    (c) => selected.has(c.internProfileId) && c.status === 'Approved',
+  // Filtering Logic (Department, Intern Dropdown & Search Bar)
+  const filteredCertificates = useMemo(() => {
+    let result = allCertificates;
+
+    if (internProfileId) {
+      result = result.filter((c) => c.internProfileId === internProfileId);
+    }
+
+    const term = search.trim().toLowerCase();
+    if (term) {
+      result = result.filter(
+        (c) =>
+          (c.internFullName ?? '').toLowerCase().includes(term) ||
+          (c.internCode ?? '').toLowerCase().includes(term) ||
+          (c.certificateNumber ?? '').toLowerCase().includes(term)
+      );
+    }
+
+    return result;
+  }, [allCertificates, internProfileId, search]);
+
+  const approvedSelectedCount = filteredCertificates.filter(
+    (c) => selected.has(c.internProfileId) && c.status === 'Approved'
   ).length;
 
   const toggleSearch = () => {
@@ -78,21 +100,30 @@ export function CertificateOversightScreen() {
     setShowSearch((prev) => !prev);
   };
 
-  const toggleSelect = (internProfileId: number) => {
+  const toggleSelect = (profileId: number) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(internProfileId)) next.delete(internProfileId);
-      else next.add(internProfileId);
+      if (next.has(profileId)) next.delete(profileId);
+      else next.add(profileId);
       return next;
     });
   };
 
+  const handleDepartmentChange = (val: string) => {
+    setDepartmentId(val === 'all' ? null : Number(val));
+    setInternProfileId(null); // Reset intern selection on department change
+  };
+
+  const handleInternChange = (val: string) => {
+    setInternProfileId(val === 'all' ? null : Number(val));
+  };
+
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['certificates', 'list'] });
 
-  const handleApprove = async (internProfileId: number) => {
-    setBusyId(internProfileId);
+  const handleApprove = async (profileId: number) => {
+    setBusyId(profileId);
     try {
-      await certificatesApi.approve(internProfileId);
+      await certificatesApi.approve(profileId);
       Toast.show({ type: 'success', text1: 'Approved' });
       invalidate();
     } catch (error: any) {
@@ -102,10 +133,10 @@ export function CertificateOversightScreen() {
     }
   };
 
-  const handleIssue = async (internProfileId: number) => {
-    setBusyId(internProfileId);
+  const handleIssue = async (profileId: number) => {
+    setBusyId(profileId);
     try {
-      await certificatesApi.issue(internProfileId);
+      await certificatesApi.issue(profileId);
       Toast.show({ type: 'success', text1: 'Issued' });
       invalidate();
     } catch (error: any) {
@@ -116,8 +147,8 @@ export function CertificateOversightScreen() {
   };
 
   const handleBulkIssue = async () => {
-    const targets = certificates.filter(
-      (c) => selected.has(c.internProfileId) && c.status === 'Approved',
+    const targets = filteredCertificates.filter(
+      (c) => selected.has(c.internProfileId) && c.status === 'Approved'
     );
     if (targets.length === 0) return;
     setBusyId(-1);
@@ -160,27 +191,29 @@ export function CertificateOversightScreen() {
             )}
           </Pressable>
           <View style={s.cardHeaderText}>
-            <Text variant="bodyStrong" numberOfLines={1}>
+            <Text variant="bodyStrong" style={s.cardTitle} numberOfLines={1}>
               {c.internFullName}
             </Text>
-            <Text variant="caption" tone="muted">
-              {c.internCode} · {c.certificateNumber}
+            <Text variant="caption" tone="muted" style={s.subText} numberOfLines={1}>
+              {c.internCode} {c.certificateNumber ? `· ${c.certificateNumber}` : ''}
             </Text>
           </View>
         </View>
 
-        <Text variant="caption" tone="secondary" numberOfLines={1} style={s.cardSubline}>
-          {c.departmentName ?? 'Unassigned'}
-        </Text>
+        <View style={s.statusRow}>
+          <View style={s.metaLeftGroup}>
+            <Text variant="caption" tone="muted" style={s.countText} numberOfLines={1}>
+              {c.departmentName ?? 'Unassigned'}
+            </Text>
+          </View>
 
-        <View style={s.badgeRow}>
           <View
             style={[
               s.badge,
               { backgroundColor: theme.colors[statusBgKey[c.status] ?? 'surfaceSunken'] },
             ]}
           >
-            <Text variant="caption" tone={statusTone[c.status] ?? 'muted'}>
+            <Text variant="caption" tone={statusTone[c.status] ?? 'muted'} style={s.badgeText}>
               {c.status}
             </Text>
           </View>
@@ -191,7 +224,7 @@ export function CertificateOversightScreen() {
             <View style={s.divider} />
             <View style={s.actionsRow}>
               {c.status === 'PendingApproval' && (
-                <Pressable hitSlop={8} style={s.actionIcon} onPress={() => handleApprove(c.internProfileId)}>
+                <Pressable hitSlop={8} style={s.actionIconBtn} onPress={() => handleApprove(c.internProfileId)}>
                   {isBusy ? (
                     <ActivityIndicator size="small" color={theme.colors.primary} />
                   ) : (
@@ -200,7 +233,7 @@ export function CertificateOversightScreen() {
                 </Pressable>
               )}
               {c.status === 'Approved' && (
-                <Pressable hitSlop={8} style={s.actionIcon} onPress={() => handleIssue(c.internProfileId)}>
+                <Pressable hitSlop={8} style={s.actionIconBtn} onPress={() => handleIssue(c.internProfileId)}>
                   {isBusy ? (
                     <ActivityIndicator size="small" color={theme.colors.success} />
                   ) : (
@@ -217,43 +250,15 @@ export function CertificateOversightScreen() {
 
   return (
     <Screen scroll={false}>
-      {/* 1. Department Filter Dropdown */}
-      <SelectField
-        label="Department"
-        placeholder="Select Department"
-        value={departmentId ? String(departmentId) : 'all'}
-        options={deptSelectOptions}
-        onChange={(val) => setDepartmentId(val === 'all' ? null : Number(val))}
-      />
-
-      {/* 2. Search Icon directly BELOW Department Dropdown */}
-      <View style={s.searchIconRow}>
-        <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
-          {showSearch ? (
-            <X size={20} color={theme.colors.textSecondary} />
-          ) : (
-            <Search size={20} color={theme.colors.textSecondary} />
-          )}
-        </Pressable>
-      </View>
-
-      {/* 3. Expandable Search Input field below icon */}
-      {showSearch && (
-        <View style={s.searchContainer}>
-          <Input
-            placeholder="Search by name, code, or cert #..."
-            value={search}
-            onChangeText={setSearch}
-            autoCapitalize="none"
-            autoFocus
-          />
-        </View>
-      )}
-
+      {/* 1. Header Row (COUNT TEXT & BULK ISSUE) */}
       <View style={s.headerRow}>
-        <Text variant="body" tone="secondary">
-          {filteredCertificates.length} certificate{filteredCertificates.length === 1 ? '' : 's'}
-        </Text>
+        <View style={s.headerTitleContainer}>
+          <View style={s.titleIndicator} />
+          <Text variant="overline" tone="muted" style={s.headerLabel}>
+            {filteredCertificates.length} {filteredCertificates.length === 1 ? 'CERTIFICATE' : 'CERTIFICATES'} FOUND
+          </Text>
+        </View>
+
         <Button
           label={`Bulk Issue (${approvedSelectedCount})`}
           size="sm"
@@ -263,23 +268,74 @@ export function CertificateOversightScreen() {
         />
       </View>
 
+      {/* 2. Department Filter Dropdown */}
+      <View style={s.filterContainer}>
+        <SelectField
+          label="Department"
+          placeholder="Select Department"
+          value={departmentId ? String(departmentId) : 'all'}
+          options={deptSelectOptions}
+          onChange={handleDepartmentChange}
+        />
+      </View>
+
+      {/* 3. Intern Filter Dropdown */}
+      <View style={s.filterContainer}>
+        <SelectField
+          label="Intern"
+          placeholder="Select Intern"
+          value={internProfileId ? String(internProfileId) : 'all'}
+          options={internSelectOptions}
+          onChange={handleInternChange}
+        />
+      </View>
+
+      {/* 4. Search Bar Section */}
+      <View style={s.searchBarSection}>
+        <View style={s.searchIconRow}>
+          <Pressable onPress={toggleSearch} style={[s.iconButton, showSearch && s.iconButtonActive]} hitSlop={8}>
+            {showSearch ? (
+              <X size={18} color={theme.colors.primary} />
+            ) : (
+              <Search size={18} color={theme.colors.textMuted} />
+            )}
+          </Pressable>
+        </View>
+
+        {showSearch && (
+          <View style={s.searchContainer}>
+            <Input
+              placeholder="Search by name, code, or cert #..."
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="none"
+              autoFocus
+            />
+          </View>
+        )}
+      </View>
+
+      {/* 5. Main Cards List */}
       {isLoading ? (
-        <Text variant="body" tone="muted">
-          Loading...
-        </Text>
+        <View style={s.centerBox}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <Text variant="caption" tone="muted" style={{ marginTop: 12 }}>
+            Loading certificates...
+          </Text>
+        </View>
       ) : (
         <FlatList
           data={filteredCertificates}
           keyExtractor={(c) => String(c.internProfileId)}
           renderItem={renderCard}
           style={s.list}
-          contentContainerStyle={
-            filteredCertificates.length === 0 ? s.emptyListContent : s.listContent
-          }
+          contentContainerStyle={filteredCertificates.length === 0 ? s.emptyListContent : s.listContent}
           ListEmptyComponent={
-            <Text variant="body" tone="muted">
-              No certificates found.
-            </Text>
+            <View style={s.emptyBox}>
+              <Text variant="body" tone="muted">
+                {allCertificates.length === 0 ? 'No certificates generated yet.' : 'No certificates match your search.'}
+              </Text>
+            </View>
           }
         />
       )}
@@ -288,32 +344,59 @@ export function CertificateOversightScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
-  searchIconRow: {
-    alignItems: 'flex-end' as const,
+  headerRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: t.spacing.sm,
     marginTop: t.spacing.xs,
+  },
+  headerTitleContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  titleIndicator: {
+    width: 3,
+    height: 12,
+    borderRadius: 2,
+    backgroundColor: t.colors.primary,
+  },
+  headerLabel: {
+    letterSpacing: 0.8,
+  },
+  filterContainer: {
     marginBottom: t.spacing.xs,
   },
+  searchBarSection: {
+    marginBottom: t.spacing.sm,
+    marginTop: t.spacing.xs,
+  },
+  searchIconRow: {
+    alignItems: 'flex-end' as const,
+  },
   iconButton: {
-    padding: 10,
-    borderRadius: t.radii.md,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: t.colors.surface,
     borderWidth: 1,
     borderColor: t.colors.border,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
-  searchContainer: {
-    marginBottom: t.spacing.sm,
+  iconButtonActive: {
+    borderColor: t.colors.primary,
+    backgroundColor: t.colors.surfaceSunken,
   },
-  headerRow: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'center' as const,
-    marginBottom: t.spacing.md,
+  searchContainer: {
     marginTop: t.spacing.xs,
   },
   list: { flex: 1 },
-  listContent: { gap: t.spacing.sm, paddingBottom: t.spacing.lg },
+  listContent: {
+    gap: t.spacing.sm,
+    paddingBottom: t.spacing.xl,
+  },
   emptyListContent: {
     flexGrow: 1,
     alignItems: 'center' as const,
@@ -321,41 +404,83 @@ const makeStyles = (t: AppTheme) => ({
   },
   card: {
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: t.colors.border,
-    padding: t.spacing.lg,
-    ...t.shadows.sm,
+    padding: t.spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
   cardHeader: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: t.spacing.sm,
   },
-  checkboxContainer: { marginRight: 2 },
-  cardHeaderText: { flex: 1 },
-  cardSubline: { marginTop: 2 },
-  badgeRow: {
+  checkboxContainer: {
+    marginRight: 2,
+  },
+  cardHeaderText: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 15,
+    flexShrink: 1,
+  },
+  subText: {
+    marginTop: 2,
+  },
+  statusRow: {
     flexDirection: 'row' as const,
-    flexWrap: 'wrap' as const,
-    gap: t.spacing.xs,
-    marginTop: t.spacing.sm,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginTop: 10,
+  },
+  metaLeftGroup: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    flex: 1,
+  },
+  countText: {
+    fontSize: 12,
   },
   badge: {
-    paddingHorizontal: t.spacing.sm,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: t.radii.full,
+    borderRadius: 9999,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '600' as const,
   },
   divider: {
     height: 1,
     backgroundColor: t.colors.border,
-    marginTop: t.spacing.md,
-    marginBottom: t.spacing.sm,
+    marginTop: t.spacing.sm,
+    marginBottom: t.spacing.xs,
   },
   actionsRow: {
     flexDirection: 'row' as const,
-    gap: t.spacing.lg,
-    justify: 'flex-end' as const,
+    gap: t.spacing.md,
+    justifyContent: 'flex-end' as const,
   },
-  actionIcon: { padding: t.spacing.xs },
+  actionIconBtn: {
+    padding: 4,
+  },
+  emptyBox: {
+    paddingVertical: t.spacing.xl,
+    alignItems: 'center' as const,
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
 });
+
+export default CertificateOversightScreen;

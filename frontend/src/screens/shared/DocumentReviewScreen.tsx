@@ -1,9 +1,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Pressable, Linking } from 'react-native';
+import { View, Pressable, Linking, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { ExternalLink, FileText, ChevronRight, Check, X, Search } from 'lucide-react-native';
+import { ExternalLink, FileText, Search, X, FileCheck } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
@@ -31,7 +31,10 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 function isImage(item: DocumentReviewQueueItemDto): boolean {
-  return !!item.contentType?.startsWith('image/');
+  if (['ProfilePhoto', 'CnicFront', 'CnicBack'].includes(item.documentType)) {
+    return true;
+  }
+  return Boolean(item.contentType?.toLowerCase().startsWith('image/'));
 }
 
 export function DocumentReviewScreen() {
@@ -40,6 +43,7 @@ export function DocumentReviewScreen() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'Admin';
   const queryClient = useQueryClient();
+
   const [rejectTarget, setRejectTarget] = useState<DocumentReviewQueueItemDto | null>(null);
   const [remarks, setRemarks] = useState('');
   const [previewItem, setPreviewItem] = useState<DocumentReviewQueueItemDto | null>(null);
@@ -60,7 +64,11 @@ export function DocumentReviewScreen() {
     queryFn: departmentsApi.lookup,
     enabled: isAdmin,
   });
-  const departmentSelectOptions = useMemo(() => departmentOptions.map((d) => ({ value: d.id, label: d.name })), [departmentOptions]);
+
+  const departmentSelectOptions = useMemo(
+    () => departmentOptions.map((d) => ({ value: d.id, label: d.name })),
+    [departmentOptions],
+  );
 
   const departmentScopedQueue = useMemo(
     () => (isAdmin && departmentFilter ? queue.filter((q) => q.departmentId === departmentFilter) : queue),
@@ -101,8 +109,16 @@ export function DocumentReviewScreen() {
   useFocusEffect(
     useCallback(() => {
       refetch();
-    }, [refetch]),
-  );
+      return () => {
+      setShowSearch(false);
+      setSearch('');
+      setDepartmentFilter(null);
+      setInternFilter(null);
+      setPreviewItem(null);
+      setRejectTarget(null);
+    };
+  }, [refetch]),
+);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['documents', 'review', 'queue'] });
 
@@ -144,38 +160,47 @@ export function DocumentReviewScreen() {
     }
   };
 
-  return (
-    <Screen scroll>
-      {/* Enhanced Clean White Card Container for FilterBar */}
-      <View style={s.filterBarWrapper}>
-        <FilterBar
-          departmentOptions={isAdmin ? departmentSelectOptions : undefined}
-          departmentValue={departmentFilter}
-          onDepartmentChange={isAdmin ? handleDepartmentChange : undefined}
-          internOptions={internSelectOptions}
-          internValue={internFilter}
-          onInternChange={setInternFilter}
-        />
-      </View>
+  if (isLoading) {
+    return (
+      <Screen scroll={false}>
+        <View style={s.centerBox}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text variant="caption" tone="muted" style={s.loadingText}>
+            Loading review queue...
+          </Text>
+        </View>
+      </Screen>
+    );
+  }
 
+  return (
+    <Screen scroll style={s.screenContainer}>
       <View style={s.headerContainer}>
         <View style={s.headerRow}>
-          <Text variant="body" tone="secondary">
-            {filteredQueue.length} document{filteredQueue.length === 1 ? '' : 's'} awaiting review
-          </Text>
+          <View style={s.headerTitleContainer}>
+            <View style={s.titleIndicator} />
+            <Text variant="overline" tone="muted" style={s.headerLabel}>
+              {filteredQueue.length} {filteredQueue.length === 1 ? 'DOCUMENT' : 'DOCUMENTS'} AWAITING
+            </Text>
+          </View>
 
-          {/* Search Icon Trigger */}
-          <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
-            {showSearch ? (
-              <X size={20} color={theme.colors.textSecondary} />
-            ) : (
-              <Search size={20} color={theme.colors.textSecondary} />
-            )}
+          <Pressable onPress={toggleSearch} style={[s.iconButton, showSearch && s.iconButtonActive]} hitSlop={8}>
+            {showSearch ? <X size={18} color={theme.colors.primary} /> : <Search size={18} color={theme.colors.textMuted} />}
           </Pressable>
         </View>
 
-        {/* Expandable Search Input field */}
-        {showSearch && (
+        <View style={s.filterWrapper}>
+          <FilterBar
+            departmentOptions={isAdmin ? departmentSelectOptions : undefined}
+            departmentValue={departmentFilter}
+            onDepartmentChange={isAdmin ? handleDepartmentChange : undefined}
+            internOptions={internSelectOptions}
+            internValue={internFilter}
+            onInternChange={setInternFilter}
+          />
+        </View>
+
+        {showSearch ? (
           <View style={s.searchContainer}>
             <Input
               placeholder="Search by intern name or code..."
@@ -185,77 +210,95 @@ export function DocumentReviewScreen() {
               autoFocus
             />
           </View>
-        )}
+        ) : null}
       </View>
 
-      {isLoading ? (
-        <Text variant="body" tone="muted">
-          Loading...
-        </Text>
-      ) : filteredQueue.length === 0 ? (
-        <View style={s.emptyContainer}>
+      {filteredQueue.length === 0 ? (
+        <View style={s.emptyBox}>
           <Text variant="body" tone="muted">
             {queue.length === 0 ? 'Nothing to review right now.' : 'No documents match these filters.'}
           </Text>
         </View>
       ) : (
-        filteredQueue.map((item) => (
-          <View key={item.documentId} style={s.card}>
-            <View style={s.cardHeader}>
-              {item.externalLinkUrl ? (
-                <Pressable onPress={() => handleThumbnailPress(item)} style={[s.thumbIcon, { backgroundColor: theme.colors.surfaceSunken }]}>
-                  <ExternalLink size={24} color={theme.colors.primary} />
-                </Pressable>
-              ) : isImage(item) && item.fileId ? (
-                <AuthImage fileId={item.fileId} size={48} onPress={() => handleThumbnailPress(item)} />
-              ) : (
-                <Pressable onPress={() => handleThumbnailPress(item)} style={[s.thumbIcon, { backgroundColor: theme.colors.surfaceSunken }]}>
-                  <FileText size={24} color={theme.colors.textSecondary} />
-                </Pressable>
-              )}
-              <View style={s.cardHeaderText}>
-                <Text variant="bodyStrong" style={s.nameText} numberOfLines={1}>
-                  {item.internFullName}
-                </Text>
-                <Text variant="caption" tone="muted">
-                  {item.internCode} · {TYPE_LABELS[item.documentType] ?? item.documentType} (v{item.version})
-                </Text>
-                {isAdmin && item.departmentName ? (
-                  <Text variant="caption" tone="secondary">
-                    {item.departmentName}
-                  </Text>
-                ) : null}
+        <View style={s.listContainer}>
+          {filteredQueue.map((item) => {
+            const isImg = isImage(item);
+
+            return (
+              <View key={item.documentId} style={s.card}>
+                <View style={s.cardHeader}>
+                  <Pressable
+                    onPress={() => handleThumbnailPress(item)}
+                    style={[s.avatarBadge, !item.externalLinkUrl && !isImg && s.pdfAvatarBadge]}
+                  >
+                    {item.externalLinkUrl ? (
+                      <ExternalLink size={20} color={theme.colors.primary} />
+                    ) : isImg && item.fileId ? (
+                      <AuthImage fileId={item.fileId} size={44} style={s.avatarImage} />
+                    ) : item.fileId ? (
+                      <FileCheck size={20} color={theme.colors.primary} />
+                    ) : (
+                      <FileText size={20} color={theme.colors.textMuted} />
+                    )}
+                  </Pressable>
+
+                  <View style={s.cardHeaderText}>
+                    <Text variant="bodyStrong" style={s.cardTitle} numberOfLines={1}>
+                      {item.internFullName}
+                    </Text>
+                    <Text variant="caption" tone="muted" style={s.subText} numberOfLines={1}>
+                      {item.internCode} · {TYPE_LABELS[item.documentType] ?? item.documentType} (v{item.version})
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={s.statusRow}>
+                  <View style={s.metaLeftGroup}>
+                    {isAdmin && item.departmentName ? (
+                      <Text variant="caption" tone="muted" style={s.deptText} numberOfLines={1}>
+                        Dept: {item.departmentName}
+                      </Text>
+                    ) : (
+                      <Text variant="caption" tone="muted" style={s.deptText} numberOfLines={1}>
+                        Status
+                      </Text>
+                    )}
+                  </View>
+
+                  <View style={[s.badge, { backgroundColor: theme.colors.warningBg || '#FFFBEB' }]}>
+                    <Text variant="caption" style={[s.badgeText, { color: theme.colors.warning || '#D97706' }]}>
+                      Pending Review
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={s.divider} />
+
+                <View style={s.actionRow}>
+                  <Button
+                    label="Reject"
+                    size="sm"
+                    variant="danger"
+                    onPress={() => {
+                      setRemarks('');
+                      setRejectTarget(item);
+                    }}
+                    disabled={busyId === item.documentId}
+                    style={s.actionBtn}
+                  />
+                  <Button
+                    label="Approve"
+                    size="sm"
+                    variant="primary"
+                    onPress={() => handleApprove(item)}
+                    loading={busyId === item.documentId}
+                    style={s.actionBtn}
+                  />
+                </View>
               </View>
-              <ChevronRight size={18} color={theme.colors.textMuted} />
-            </View>
-
-            <View style={s.badgeRow}>
-              <View style={[s.badge, { backgroundColor: theme.colors.warningBg }]}>
-                <Text variant="caption" tone="warning">
-                  Pending Review
-                </Text>
-              </View>
-            </View>
-
-            <View style={s.divider} />
-
-            <View style={s.iconActionRow}>
-              <Pressable
-                onPress={() => {
-                  setRemarks('');
-                  setRejectTarget(item);
-                }}
-                disabled={busyId === item.documentId}
-                style={s.iconBtn}
-              >
-                <X size={20} color={theme.colors.error} />
-              </Pressable>
-              <Pressable onPress={() => handleApprove(item)} disabled={busyId === item.documentId} style={s.iconBtn}>
-                <Check size={20} color={theme.colors.primary} />
-              </Pressable>
-            </View>
-          </View>
-        ))
+            );
+          })}
+        </View>
       )}
 
       <FormModal
@@ -282,15 +325,12 @@ export function DocumentReviewScreen() {
   );
 }
 
+export default DocumentReviewScreen;
+
 const makeStyles = (t: AppTheme) => ({
-  filterBarWrapper: {
-    backgroundColor: t.colors.surface, // Solid clean white surface
-    borderRadius: t.radii.lg,
-    borderWidth: 1,
-    borderColor: t.colors.border,
-    padding: t.spacing.md,
-    marginBottom: t.spacing.md,
-    ...t.shadows.sm,
+  screenContainer: {
+    paddingHorizontal: t.spacing.lg,
+    paddingTop: t.spacing.lg,
   },
   headerContainer: {
     marginBottom: t.spacing.md,
@@ -299,72 +339,160 @@ const makeStyles = (t: AppTheme) => ({
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
+    marginBottom: t.spacing.xs,
+  },
+  headerTitleContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+  },
+  titleIndicator: {
+    width: 4,
+    height: 14,
+    borderRadius: 2,
+    backgroundColor: t.colors.primary,
+  },
+  headerLabel: {
+    letterSpacing: 1,
+  },
+  filterWrapper: {
+    marginTop: t.spacing.xs,
   },
   iconButton: {
-    padding: 8,
-    borderRadius: t.radii.md,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: t.colors.surface,
     borderWidth: 1,
     borderColor: t.colors.border,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  iconButtonActive: {
+    borderColor: t.colors.primary,
+    backgroundColor: `${t.colors.primary}10`,
   },
   searchContainer: {
     marginTop: t.spacing.sm,
   },
-  emptyContainer: {
+  emptyBox: {
+    paddingVertical: t.spacing.xl * 2,
     alignItems: 'center' as const,
-    padding: t.spacing.xl,
+    justifyContent: 'center' as const,
+  },
+  listContainer: {
+    gap: t.spacing.md,
+    paddingBottom: t.spacing.xl * 1.5,
   },
   card: {
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: t.colors.border,
     padding: t.spacing.lg,
-    marginBottom: t.spacing.md,
-    ...t.shadows.sm,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: t.spacing.md,
   },
-  cardHeaderText: { flex: 1 },
-  nameText: { fontSize: 16, fontWeight: '600' as const },
-  thumbIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: t.radii.md,
+  avatarBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: t.colors.surfaceSunken,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+    overflow: 'hidden' as const,
   },
-  badgeRow: {
+  pdfAvatarBadge: {
+    backgroundColor: `${t.colors.primary}12`,
+    borderWidth: 1,
+    borderColor: `${t.colors.primary}30`,
+  },
+  avatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+  },
+  cardHeaderText: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    flexShrink: 1,
+  },
+  subText: {
+    marginTop: 3,
+  },
+  statusRow: {
     flexDirection: 'row' as const,
-    marginTop: t.spacing.sm,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginTop: 12,
+    paddingLeft: 2,
+  },
+  metaLeftGroup: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    flex: 1,
+  },
+  deptText: {
+    fontSize: 12,
   },
   badge: {
-    paddingHorizontal: t.spacing.sm,
-    paddingVertical: 3,
-    borderRadius: t.radii.full,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 9999,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '600' as const,
   },
   divider: {
     height: 1,
     backgroundColor: t.colors.border,
     marginTop: t.spacing.md,
-    marginBottom: t.spacing.sm,
+    marginBottom: t.spacing.md,
   },
-  iconActionRow: {
+  actionRow: {
     flexDirection: 'row' as const,
     justifyContent: 'flex-end' as const,
-    gap: t.spacing.lg,
+    gap: t.spacing.sm,
   },
-  iconBtn: { padding: 4 },
+  actionBtn: {
+    minWidth: 90,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    padding: t.spacing.lg,
+  },
   previewImage: {
     alignSelf: 'center' as const,
     width: '100%' as const,
-    height: 220,
-    borderRadius: t.radii.md,
+    height: 250,
+    borderRadius: 12,
     marginTop: t.spacing.sm,
-    marginBottom: t.spacing.md,
     backgroundColor: t.colors.surface,
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: t.spacing.sm,
+  },
+  loadingText: {
+    marginTop: t.spacing.xs,
   },
 });

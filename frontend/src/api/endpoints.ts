@@ -33,6 +33,7 @@ export const endpoints = {
     reactivate: (id: number) => `/interns/${id}/reactivate`,
     resetPassword: (id: number) => `/interns/${id}/reset-password`,
     unlock: (id: number) => `/interns/${id}/unlock`,
+    unlockFaceEnrollment: (id: number) => `/interns/${id}/unlock-face-enrollment`,
   },
   notifications: {
     list: '/notifications',

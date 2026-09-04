@@ -32,6 +32,7 @@ public static class BusinessRuleCodes
     public const string MockLocationDetected = "MOCK_LOCATION_DETECTED";
     public const string RetryCooldownActive = "RETRY_COOLDOWN_ACTIVE";
     public const string UnofficialActivityLockout = "UNOFFICIAL_ACTIVITY_LOCKOUT";
+    public const string FaceEnrollmentLocked = "FACE_ENROLLMENT_LOCKED";
 
     public const string CertificateNotEligible = "CERTIFICATE_NOT_ELIGIBLE";
     public const string IdCardNoPhoto = "IDCARD_NO_PHOTO";

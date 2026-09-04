@@ -399,42 +399,70 @@ public sealed class AttendanceService(
                     }
                 }
 
-                var bestFrame = decodedFrames[sharpestIndex];
-                var embedBbox = bestFrame.ResolvedBbox;
-                if (embedBbox is not null)
+                // Cross-check against EVERY captured frame, not just the single sharpest one.
+                // Deciding identity off one frame meant one unlucky/lucky crop (odd angle, partial
+                // occlusion, a bounding box that grabbed some background) could flip accept/reject
+                // between two otherwise-identical attempts by the same wrong person - exactly the
+                // "rejected once, then accepted on retry with a visibly different face" failure
+                // mode this is closing. Every frame with a valid crop now casts its own vote, and
+                // both the average AND a majority of individual frames must clear the threshold.
+                var template = await db.FaceTemplates.AsNoTracking()
+                    .Where(t => t.InternProfileId == internProfileId && t.IsActive)
+                    .OrderByDescending(t => t.Version)
+                    .FirstOrDefaultAsync(ct);
+
+                if (template?.Embedding is null)
                 {
-                    var embedCrop = FaceCropper.CropAligned(bestFrame.Bitmap, embedBbox, Face.EmbeddingCropScale);
-                    if (embedCrop is not null)
-                    {
-                        var embedding = await faceProvider.ExtractEmbeddingAsync(embedCrop, ct);
-                        if (embedding is not null)
-                        {
-                            var template = await db.FaceTemplates.AsNoTracking()
-                                .Where(t => t.InternProfileId == internProfileId && t.IsActive)
-                                .OrderByDescending(t => t.Version)
-                                .FirstOrDefaultAsync(ct);
+                    // FaceEnrollmentStatus.Active is supposed to guarantee an active template
+                    // exists (ComputeBlockersAsync's FaceNotReady blocker gates on it) - if that
+                    // invariant is ever violated (e.g. a template revoked without the status
+                    // being flipped back), fail closed instead of silently skipping the identity
+                    // check and letting the attempt through as if it had passed.
+                    await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedFaceMismatch, ct);
+                    await HardFailSessionAsync(session, ct);
+                    throw new BusinessRuleException(BusinessRuleCodes.FaceVerificationUnavailable,
+                        "No enrolled face on record. Please contact your administrator.");
+                }
 
-                            if (template?.Embedding is not null)
-                            {
-                                var storedEmbedding = BytesToFloats(template.Embedding);
-                                var similarity = FaceMath.CosineSimilarity(embedding.Embedding, storedEmbedding);
-                                matchSimilarity = (decimal)similarity;
+                var storedEmbedding = BytesToFloats(template.Embedding);
+                var frameSimilarities = new List<double>();
+                foreach (var f in decodedFrames)
+                {
+                    var bbox = f.ResolvedBbox;
+                    if (bbox is null) continue;
+                    var embedCrop = FaceCropper.CropAligned(f.Bitmap, bbox, Face.EmbeddingCropScale);
+                    if (embedCrop is null) continue;
+                    var embedding = await faceProvider.ExtractEmbeddingAsync(embedCrop, ct);
+                    if (embedding is null) continue;
+                    frameSimilarities.Add(FaceMath.CosineSimilarity(embedding.Embedding, storedEmbedding));
+                }
 
-                                if (similarity < Face.MatchThreshold)
-                                {
-                                    await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedFaceMismatch, ct);
-                                    await HardFailSessionAsync(session, ct);
-                                    await ThrowFaceFailureAsync(profile, BusinessRuleCodes.FaceMismatch,
-                                        "Scanned face does not match your uploaded profile picture.", ct);
-                                }
-                                if (similarity < Face.MatchThreshold + 0.05)
-                                {
-                                    flags.Add("LowMatchMargin");
-                                    riskScore += 15;
-                                }
-                            }
-                        }
-                    }
+                if (frameSimilarities.Count == 0)
+                {
+                    // Not one frame produced a usable crop/embedding - there is nothing to verify
+                    // identity against, so this must never be treated as an implicit pass.
+                    await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedFaceMismatch, ct);
+                    await HardFailSessionAsync(session, ct);
+                    throw new BusinessRuleException(BusinessRuleCodes.FaceVerificationUnavailable,
+                        "Could not verify your face from the captured frames. Please try again with better lighting, facing the camera directly.");
+                }
+
+                var meanSimilarity = frameSimilarities.Average();
+                var passingFrames = frameSimilarities.Count(s => s >= Face.MatchThreshold);
+                var majorityPassed = passingFrames * 2 >= frameSimilarities.Count; // >= 50%
+                matchSimilarity = (decimal)meanSimilarity;
+
+                if (meanSimilarity < Face.MatchThreshold || !majorityPassed)
+                {
+                    await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedFaceMismatch, ct);
+                    await HardFailSessionAsync(session, ct);
+                    await ThrowFaceFailureAsync(profile, BusinessRuleCodes.FaceMismatch,
+                        "Scanned face does not match your uploaded profile picture.", ct);
+                }
+                if (meanSimilarity < Face.MatchThreshold + 0.05)
+                {
+                    flags.Add("LowMatchMargin");
+                    riskScore += 15;
                 }
 
                 verificationMode = VerificationMode.FullBiometric;

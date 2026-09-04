@@ -62,6 +62,25 @@ public sealed class FaceEnrollmentService(
             new Dictionary<string, object?> { ["reason"] = reason }, ct);
     }
 
+    /// <summary>Grants exactly one future enrollment past the normal one-time lock (see
+    /// InternProfile.FaceReEnrollmentAllowed's doc comment). Deliberately does not touch the
+    /// existing FaceTemplate/FaceEnrollmentStatus - RevokeAsync already covers "wipe and start
+    /// over"; this covers "let them re-capture without wiping today's attendance eligibility in
+    /// the meantime".</summary>
+    public async Task UnlockReEnrollmentAsync(int internProfileId, string reason, CancellationToken ct)
+    {
+        var profile = await db.InternProfiles.FirstOrDefaultAsync(p => p.Id == internProfileId, ct)
+            ?? throw new NotFoundException(nameof(InternProfile), internProfileId);
+
+        profile.FaceReEnrollmentAllowed = true;
+        await db.SaveChangesAsync(ct);
+
+        await auditLogger.LogAsync("Biometric.ReEnrollmentUnlocked", nameof(InternProfile), internProfileId.ToString(), null, ct);
+
+        await notifications.NotifyUserAsync(profile.UserId, NotificationTemplates.FaceReEnrollmentUnlocked,
+            new Dictionary<string, object?> { ["reason"] = reason }, ct);
+    }
+
     public async Task<EnrollmentSessionResponse> CreateSessionAsync(CreateEnrollmentSessionRequest request, CancellationToken ct)
     {
         var profile = await LoadProfileAsync(ct);
@@ -133,18 +152,17 @@ public sealed class FaceEnrollmentService(
             return new EnrollmentResult(false, "NotConfigured", "Face verification is not configured on this server yet.", null);
         }
 
-        var isRefresh = await db.FaceTemplates.AnyAsync(t => t.InternProfileId == profile.Id, ct);
-        if (isRefresh)
+        // One-time lock: enrollment is intentionally NOT self-service after the first successful
+        // capture. Without this gate, anyone holding an intern's unlocked phone/session could
+        // re-enroll their own face over a mismatched attendance attempt and have it "become" the
+        // enrolled identity going forward - re-enrollment must always be an explicit admin action
+        // (see IFaceEnrollmentService.UnlockReEnrollmentAsync), never a self-service retry.
+        var isRefresh = await db.FaceTemplates.AnyAsync(t => t.InternProfileId == profile.Id && t.IsActive, ct);
+        if (isRefresh && !profile.FaceReEnrollmentAllowed)
         {
-            var lastEnrollment = await db.FaceTemplates.Where(t => t.InternProfileId == profile.Id)
-                .OrderByDescending(t => t.CreatedAtUtc).FirstAsync(ct);
-            var cooldownEnds = lastEnrollment.CreatedAtUtc.AddDays(faceOptions.Value.EnrollmentRefreshCooldownDays);
-            if (clock.UtcNow < cooldownEnds)
-            {
-                await HardFailAsync(session, ct);
-                throw new BusinessRuleException("ENROLLMENT_COOLDOWN",
-                    $"You can refresh your face enrollment again after {clock.ToPakistan(cooldownEnds):d MMM yyyy}.");
-            }
+            await HardFailAsync(session, ct);
+            throw new BusinessRuleException(BusinessRuleCodes.FaceEnrollmentLocked,
+                "Your face is already enrolled and locked. Ask an administrator to unlock re-enrollment if you genuinely need to update it.");
         }
 
         var frameEmbeddings = new List<(int Index, float[] Embedding, double Blur, byte[] EmbeddingCrop)>();
@@ -330,6 +348,9 @@ public sealed class FaceEnrollmentService(
 
         var trackedProfile = await db.InternProfiles.FirstAsync(p => p.Id == profile.Id, ct);
         trackedProfile.FaceEnrollmentStatus = FaceEnrollmentStatus.Active;
+        // Consume the one-time admin unlock (if this was a refresh) so the lock re-engages
+        // immediately after this enrollment - it is never a standing "always unlocked" toggle.
+        trackedProfile.FaceReEnrollmentAllowed = false;
         await db.SaveChangesAsync(ct);
 
         session.State = ChallengeSessionState.Passed;

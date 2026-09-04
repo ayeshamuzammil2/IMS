@@ -35,6 +35,13 @@ public class InternProfile
 
     public FaceEnrollmentStatus FaceEnrollmentStatus { get; set; } = FaceEnrollmentStatus.None;
 
+    /// <summary>Face enrollment is one-time and locked by default once a template is Active - an
+    /// intern (or anyone using their device) cannot silently re-enroll their own captured face
+    /// over a mismatched attendance attempt. Only an admin flipping this to true (via
+    /// IFaceEnrollmentService.UnlockReEnrollmentAsync) allows exactly one more enrollment; a
+    /// successful enrollment resets it back to false automatically.</summary>
+    public bool FaceReEnrollmentAllowed { get; set; }
+
     public string? GithubRepoUrl { get; set; }
     public GithubStatus GithubStatus { get; set; } = GithubStatus.NotSubmitted;
 

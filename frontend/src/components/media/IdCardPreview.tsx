@@ -25,11 +25,9 @@ export const IdCardPreview = forwardRef<View, Props>(function IdCardPreview(
   return (
     <ViewShot ref={ref as any} options={{ format: 'png', quality: 1 }}>
       <View style={s.cardWrapper}>
-        {/* Top Metallic Gold Accent Bar */}
         <View style={s.topBar} />
 
         <View style={s.cardBody}>
-          {/* Header Section */}
           <View style={s.headerContainer}>
             <Image source={require('../../../assets/pia-logo.png')} style={s.logo} resizeMode="contain" />
             <Text variant="overline" style={s.brand} numberOfLines={1}>
@@ -42,7 +40,6 @@ export const IdCardPreview = forwardRef<View, Props>(function IdCardPreview(
             </View>
           </View>
 
-          {/* Photo Frame Section */}
           <View style={s.photoContainer}>
             {photoFileId ? (
               <AuthImage fileId={photoFileId} style={s.photo} />
@@ -51,7 +48,6 @@ export const IdCardPreview = forwardRef<View, Props>(function IdCardPreview(
             )}
           </View>
 
-          {/* User Primary Details */}
           <Text variant="bodyStrong" style={s.name} numberOfLines={1}>
             {fullName}
           </Text>
@@ -62,10 +58,8 @@ export const IdCardPreview = forwardRef<View, Props>(function IdCardPreview(
             </Text>
           ) : null}
 
-          {/* Elegant Gradient Divider */}
           <View style={s.divider} />
 
-          {/* Card Meta Details */}
           {departmentName ? (
             <Text variant="caption" style={s.deptText}>
               {departmentName}
@@ -104,13 +98,13 @@ const makeStyles = (t: AppTheme) => ({
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg ?? 16,
     borderWidth: 1.5,
-    borderColor: '#d1fae5',
+    borderColor: t.colors.border,
     overflow: 'hidden' as const,
     ...t.shadows.md,
   },
   topBar: {
     height: 7,
-    backgroundColor: '#047857',
+    backgroundColor: t.colors.primary,
     width: '100%' as const,
   },
   cardBody: {
@@ -118,7 +112,7 @@ const makeStyles = (t: AppTheme) => ({
     paddingTop: t.spacing.xs,
     paddingBottom: t.spacing.lg,
     alignItems: 'center' as const,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: t.colors.surface,
   },
   headerContainer: {
     alignItems: 'center' as const,
@@ -130,7 +124,7 @@ const makeStyles = (t: AppTheme) => ({
     marginBottom: -6,
   },
   brand: {
-    color: '#065f46',
+    color: t.colors.primary,
     fontWeight: '900' as const,
     fontSize: 18,
     lineHeight: 22,
@@ -138,16 +132,16 @@ const makeStyles = (t: AppTheme) => ({
     marginTop: -4,
   },
   badge: {
-    backgroundColor: 'rgba(4, 120, 87, 0.15)',
+    backgroundColor: t.colors.border,
     paddingHorizontal: 12,
     paddingVertical: 2,
     borderRadius: 20,
     marginTop: 3,
     borderWidth: 0.8,
-    borderColor: 'rgba(4, 120, 87, 0.25)',
+    borderColor: t.colors.border,
   },
   badgeText: {
-    color: '#047857',
+    color: t.colors.textPrimary,
     fontSize: 9.5,
     fontWeight: '800' as const,
     letterSpacing: 0.8,
@@ -155,10 +149,10 @@ const makeStyles = (t: AppTheme) => ({
   photoContainer: {
     marginVertical: 6,
     padding: 3,
-    backgroundColor: '#ffffff',
+    backgroundColor: t.colors.surface,
     borderRadius: t.radii.md ?? 10,
     borderWidth: 2,
-    borderColor: '#059669',
+    borderColor: t.colors.primary,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -176,7 +170,7 @@ const makeStyles = (t: AppTheme) => ({
   name: {
     fontSize: 16.5,
     fontWeight: '800' as const,
-    color: '#0f172a',
+    color: t.colors.textPrimary,
     marginTop: 2,
     textAlign: 'center' as const,
     letterSpacing: 0.2,
@@ -184,30 +178,30 @@ const makeStyles = (t: AppTheme) => ({
   designation: {
     fontSize: 12,
     fontWeight: '700' as const,
-    color: '#059669',
+    color: t.colors.primary,
     marginTop: 1,
   },
   divider: {
     width: '85%' as const,
     height: 1.5,
-    backgroundColor: '#089a56',
+    backgroundColor: t.colors.border,
     marginVertical: 8,
     borderRadius: 1,
   },
   deptText: {
     fontSize: 11.5,
     fontWeight: '700' as const,
-    color: '#334155',
+    color: t.colors.textSecondary,
     marginBottom: 1,
   },
   email: {
     fontSize: 10.5,
-    color: '#64748b',
+    color: t.colors.textMuted,
     textAlign: 'center' as const,
     marginBottom: 4,
   },
   idBadge: {
-    backgroundColor: '#047857',
+    backgroundColor: t.colors.primary,
     paddingHorizontal: 14,
     paddingVertical: 4,
     borderRadius: 8,
@@ -215,7 +209,7 @@ const makeStyles = (t: AppTheme) => ({
     elevation: 1,
   },
   idBadgeText: {
-    color: '#ffffff',
+    color: t.colors.surface,
     fontSize: 11,
     fontWeight: '800' as const,
     letterSpacing: 0.8,
@@ -223,7 +217,7 @@ const makeStyles = (t: AppTheme) => ({
   emergencyText: {
     fontSize: 10,
     fontWeight: '600' as const,
-    color: '#64748b',
+    color: t.colors.textMuted,
     marginTop: 3,
   },
 });

@@ -7,9 +7,10 @@ import {
   FlatList,
   Keyboard,
   Platform,
-  useWindowDimensions,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Send, Mail, ChevronLeft, MessageCircle } from 'lucide-react-native';
 import { Text } from '../../components/primitives/Text';
@@ -21,13 +22,14 @@ import type { AppTheme } from '../../theme/types';
 export function ChatScreen() {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [manuallySelected, setSelected] = useState<ChatContactDto | null>(null);
   const [draft, setDraft] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
-  // Keyboard height dynamically capture karne ke liye listener
+  // Dynamic Keyboard Height Listener
   useEffect(() => {
     const showSub = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
@@ -69,17 +71,21 @@ export function ChatScreen() {
     sendMutation.mutate(body);
   };
 
+  // State 1: Contact Selection View
   if (!selected) {
     return (
-      <View style={{ flex: 1, backgroundColor: theme.colors.background, padding: theme.spacing.md }}>
+      <View style={s.contactsContainer}>
         {contactsQuery.isLoading ? (
-          <Text variant="body" tone="muted">
-            Loading...
-          </Text>
+          <View style={s.centerBox}>
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+            <Text variant="caption" tone="muted" style={{ marginTop: 12 }}>
+              Loading conversations...
+            </Text>
+          </View>
         ) : contacts.length === 0 ? (
           <View style={s.emptyCard}>
             <View style={s.emptyIconWrapper}>
-              <MessageCircle size={36} color={theme.colors.textMuted} />
+              <MessageCircle size={32} color={theme.colors.primary} />
             </View>
             <Text variant="bodyStrong" style={s.emptyTitle}>
               No Messages
@@ -90,6 +96,9 @@ export function ChatScreen() {
           </View>
         ) : (
           <ScrollView contentContainerStyle={s.contactsListContent} keyboardShouldPersistTaps="handled">
+            <Text variant="overline" tone="muted" style={s.contactsHeaderTitle}>
+              CONVERSATIONS
+            </Text>
             {contacts.map((c) => (
               <Pressable key={c.userId} style={s.contactCard} onPress={() => setSelected(c)}>
                 <View style={s.avatarWrapper}>
@@ -105,7 +114,7 @@ export function ChatScreen() {
                     </Text>
                     {c.role ? (
                       <View style={s.roleBadge}>
-                        <Text variant="caption" tone="muted" style={s.roleBadgeText}>
+                        <Text variant="caption" style={s.roleBadgeText}>
                           {c.role}
                         </Text>
                       </View>
@@ -117,8 +126,8 @@ export function ChatScreen() {
                 </View>
 
                 {c.unreadCount > 0 ? (
-                  <View style={[s.badge, { backgroundColor: theme.colors.primary }]}>
-                    <Text variant="overline" style={{ color: theme.colors.onPrimary, fontWeight: '700' }}>
+                  <View style={s.unreadBadge}>
+                    <Text variant="overline" style={s.unreadBadgeText}>
                       {c.unreadCount}
                     </Text>
                   </View>
@@ -131,33 +140,36 @@ export function ChatScreen() {
     );
   }
 
+  // State 2: Active Chat Thread View
   const messages = messagesQuery.data ?? [];
 
   return (
     <View style={[s.mainWrapper, { paddingBottom: keyboardHeight }]}>
       {/* Chat Header */}
       <View style={s.header}>
-        {contacts.length > 1 ? (
-          <Pressable onPress={() => setSelected(null)} hitSlop={8} style={s.headerIconButton}>
-            <ChevronLeft size={22} color={theme.colors.textPrimary} />
-          </Pressable>
-        ) : null}
-
-        <View style={s.headerAvatar}>
-          <Text variant="bodyStrong" style={s.headerAvatarText}>
-            {selected.fullName?.charAt(0)?.toUpperCase() ?? 'U'}
-          </Text>
-        </View>
-
-        <View style={s.headerInfo}>
-          <Text variant="bodyStrong" style={s.headerName} numberOfLines={1}>
-            {selected.fullName}
-          </Text>
-          {selected.role ? (
-            <Text variant="caption" tone="muted">
-              {selected.role}
-            </Text>
+        <View style={s.headerLeftSection}>
+          {contacts.length > 1 ? (
+            <Pressable onPress={() => setSelected(null)} hitSlop={8} style={s.headerIconButton}>
+              <ChevronLeft size={20} color={theme.colors.textPrimary} />
+            </Pressable>
           ) : null}
+
+          <View style={s.headerAvatar}>
+            <Text variant="bodyStrong" style={s.headerAvatarText}>
+              {selected.fullName?.charAt(0)?.toUpperCase() ?? 'U'}
+            </Text>
+          </View>
+
+          <View style={s.headerInfo}>
+            <Text variant="bodyStrong" style={s.headerName} numberOfLines={1}>
+              {selected.fullName}
+            </Text>
+            {selected.role ? (
+              <Text variant="caption" tone="muted" style={s.headerRole}>
+                {selected.role}
+              </Text>
+            ) : null}
+          </View>
         </View>
 
         {selected.email ? (
@@ -166,47 +178,74 @@ export function ChatScreen() {
             hitSlop={8}
             style={s.headerIconButton}
           >
-            <Mail size={20} color={theme.colors.primary} />
+            <Mail size={18} color={theme.colors.primary} />
           </Pressable>
         ) : null}
       </View>
 
-      {/* Chat Thread */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(m) => String(m.id)}
-        style={s.thread}
-        contentContainerStyle={s.threadContent}
-        keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        renderItem={({ item: m }) => (
-          <View
-            style={[
-              s.bubble,
-              m.isMine ? s.bubbleMine : s.bubbleTheirs,
-              { backgroundColor: m.isMine ? theme.colors.primary : theme.colors.surfaceSunken },
-            ]}
-          >
-            <Text variant="body" style={{ color: m.isMine ? theme.colors.onPrimary : theme.colors.textPrimary, lineHeight: 20 }}>
-              {m.body}
-            </Text>
-            <Text
-              variant="overline"
+      {/* Chat Messages Thread */}
+      {messagesQuery.isLoading ? (
+        <View style={s.centerBox}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(m) => String(m.id)}
+          style={s.thread}
+          contentContainerStyle={messages.length === 0 ? s.emptyThreadContent : s.threadContent}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          ListEmptyComponent={
+            <View style={s.emptyBox}>
+              <Text variant="caption" tone="muted">
+                No messages yet. Say hi!
+              </Text>
+            </View>
+          }
+          renderItem={({ item: m }) => (
+            <View
               style={[
-                s.bubbleTime,
-                { color: m.isMine ? theme.colors.textOnDarkMuted : theme.colors.textMuted },
+                s.bubble,
+                m.isMine ? s.bubbleMine : s.bubbleTheirs,
+                { backgroundColor: m.isMine ? theme.colors.primary : theme.colors.surface },
               ]}
             >
-              {new Date(m.sentAtUtc).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-            </Text>
-          </View>
-        )}
-      />
+              <Text
+                variant="body"
+                style={{
+                  color: m.isMine ? theme.colors.onPrimary : theme.colors.textPrimary,
+                  fontSize: 14,
+                  lineHeight: 20,
+                }}
+              >
+                {m.body}
+              </Text>
+              <Text
+                variant="overline"
+                style={[
+                  s.bubbleTime,
+                  { color: m.isMine ? theme.colors.textOnDarkMuted : theme.colors.textMuted },
+                ]}
+              >
+                {new Date(m.sentAtUtc).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              </Text>
+            </View>
+          )}
+        />
+      )}
 
-      {/* Input Composer */}
-      <View style={s.composerRow}>
+      {/* Input Composer - Lifted with safe area bottom padding */}
+      <View
+        style={[
+          s.composerRow,
+          {
+            paddingBottom: keyboardHeight > 0 ? 12 : Math.max(insets.bottom, 12) + 8,
+          },
+        ]}
+      >
         <TextInput
           style={s.composerInput}
           value={draft}
@@ -224,7 +263,11 @@ export function ChatScreen() {
           ]}
           hitSlop={8}
         >
-          <Send size={20} color={draft.trim() ? theme.colors.onPrimary : theme.colors.textMuted} />
+          {sendMutation.isPending ? (
+            <ActivityIndicator size="small" color={draft.trim() ? theme.colors.onPrimary : theme.colors.textMuted} />
+          ) : (
+            <Send size={18} color={draft.trim() ? theme.colors.onPrimary : theme.colors.textMuted} />
+          )}
         </Pressable>
       </View>
     </View>
@@ -235,23 +278,38 @@ const makeStyles = (t: AppTheme) => ({
   mainWrapper: {
     flex: 1,
     backgroundColor: t.colors.background,
+    paddingTop: t.spacing.sm,
+  },
+  contactsContainer: {
+    flex: 1,
+    backgroundColor: t.colors.background,
+    paddingHorizontal: t.spacing.md,
+    paddingTop: t.spacing.md,
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
 
   // Empty State
   emptyCard: {
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: t.colors.border,
     padding: t.spacing.xl,
     alignItems: 'center' as const,
     marginTop: t.spacing.md,
-    gap: t.spacing.xs,
+    gap: 6,
   },
   emptyIconWrapper: {
-    padding: t.spacing.md,
-    borderRadius: 50,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: t.colors.surfaceSunken,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     marginBottom: t.spacing.xs,
   },
   emptyTitle: {
@@ -261,25 +319,35 @@ const makeStyles = (t: AppTheme) => ({
     textAlign: 'center' as const,
   },
 
-  // Contact List
+  // Contacts List
+  contactsHeaderTitle: {
+    letterSpacing: 0.8,
+    marginBottom: t.spacing.xs,
+    marginTop: t.spacing.xs,
+  },
   contactsListContent: {
     gap: t.spacing.sm,
-    paddingTop: t.spacing.xs,
+    paddingBottom: t.spacing.xl,
   },
   contactCard: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: t.colors.border,
     padding: t.spacing.md,
     gap: t.spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
   avatarWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: t.colors.surfaceSunken,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
@@ -289,10 +357,10 @@ const makeStyles = (t: AppTheme) => ({
   avatarText: {
     fontSize: 16,
     color: t.colors.primary,
+    fontWeight: '600' as const,
   },
   contactInfo: {
     flex: 1,
-    gap: 2,
   },
   contactHeaderRow: {
     flexDirection: 'row' as const,
@@ -301,46 +369,68 @@ const makeStyles = (t: AppTheme) => ({
     gap: t.spacing.xs,
   },
   contactName: {
-    flex: 1,
     fontSize: 15,
+    flexShrink: 1,
   },
   roleBadge: {
     backgroundColor: t.colors.surfaceSunken,
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: t.radii.full,
+    borderRadius: 9999,
   },
   roleBadgeText: {
     fontSize: 10,
+    fontWeight: '600' as const,
+    color: t.colors.textMuted,
     textTransform: 'uppercase' as const,
   },
   lastMessage: {
-    marginTop: 2,
+    marginTop: 3,
+    fontSize: 13,
   },
-  badge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: t.radii.full,
+  unreadBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: t.colors.primary,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     paddingHorizontal: 6,
+  },
+  unreadBadgeText: {
+    color: t.colors.onPrimary,
+    fontWeight: '700' as const,
+    fontSize: 10,
   },
 
   // Header Styling
   header: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    gap: t.spacing.sm,
+    justifyContent: 'space-between' as const,
     paddingHorizontal: t.spacing.md,
     paddingVertical: t.spacing.sm,
     backgroundColor: t.colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: t.colors.border,
+    borderRadius: 12,
+    marginHorizontal: t.spacing.xs,
+  },
+  headerLeftSection: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: t.spacing.sm,
+    flex: 1,
   },
   headerIconButton: {
-    padding: t.spacing.xs,
-    borderRadius: t.radii.md,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: t.colors.surfaceSunken,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderWidth: 1,
+    borderColor: t.colors.border,
   },
   headerAvatar: {
     width: 36,
@@ -349,16 +439,22 @@ const makeStyles = (t: AppTheme) => ({
     backgroundColor: t.colors.surfaceSunken,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+    borderWidth: 1,
+    borderColor: t.colors.border,
   },
   headerAvatarText: {
     fontSize: 14,
     color: t.colors.primary,
+    fontWeight: '600' as const,
   },
   headerInfo: {
     flex: 1,
   },
   headerName: {
     fontSize: 15,
+  },
+  headerRole: {
+    fontSize: 11,
   },
 
   // Thread Styling
@@ -367,62 +463,74 @@ const makeStyles = (t: AppTheme) => ({
   },
   threadContent: {
     padding: t.spacing.md,
-    gap: t.spacing.sm,
+    paddingTop: t.spacing.lg,
+    gap: 10,
     flexGrow: 1,
     justifyContent: 'flex-end' as const,
   },
+  emptyThreadContent: {
+    flexGrow: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  emptyBox: {
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
   bubble: {
-    maxWidth: '78%' as const,
-    borderRadius: t.radii.lg,
+    maxWidth: '80%' as const,
+    borderRadius: 16,
     paddingHorizontal: t.spacing.md,
-    paddingVertical: t.spacing.sm,
+    paddingVertical: 10,
     gap: 4,
   },
   bubbleMine: {
     alignSelf: 'flex-end' as const,
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 2,
   },
   bubbleTheirs: {
     alignSelf: 'flex-start' as const,
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: 2,
     borderWidth: 1,
     borderColor: t.colors.border,
   },
   bubbleTime: {
     alignSelf: 'flex-end' as const,
-    fontSize: 10,
+    fontSize: 9,
+    marginTop: 2,
   },
 
   // Composer Input
   composerRow: {
     flexDirection: 'row' as const,
-    alignItems: 'flex-end' as const,
+    alignItems: 'center' as const,
     gap: t.spacing.sm,
     paddingHorizontal: t.spacing.md,
     paddingTop: t.spacing.sm,
-    paddingBottom: t.spacing.md,
     backgroundColor: t.colors.surface,
     borderTopWidth: 1,
     borderTopColor: t.colors.border,
   },
   composerInput: {
     flex: 1,
-    minHeight: 44,
-    maxHeight: 120,
+    minHeight: 40,
+    maxHeight: 100,
     borderWidth: 1,
     borderColor: t.colors.border,
-    borderRadius: t.radii.lg,
+    borderRadius: 20,
     paddingHorizontal: t.spacing.md,
-    paddingVertical: 10,
-    fontSize: 15,
+    paddingVertical: 8,
+    fontSize: 14,
     color: t.colors.textPrimary,
     backgroundColor: t.colors.surfaceSunken,
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
 });
+
+export default ChatScreen;

@@ -44,6 +44,7 @@ export function SelectField<T extends string | number>({
           {required ? ' *' : ''}
         </Text>
       ) : null}
+
       <Pressable
         style={[s.field, error && s.fieldError]}
         onPress={() => setOpen(true)}
@@ -51,18 +52,30 @@ export function SelectField<T extends string | number>({
         accessibilityLabel={label ?? placeholder}
         accessibilityValue={{ text: selected?.label ?? placeholder }}
       >
-        <Text variant="body" tone={selected ? 'primary' : 'muted'} numberOfLines={1} style={s.valueText}>
+        <Text
+          variant="body"
+          tone={selected ? 'primary' : 'muted'}
+          numberOfLines={1}
+          style={s.valueText}
+        >
           {selected?.label ?? placeholder}
         </Text>
+
         <ChevronDown size={18} color={theme.colors.textMuted} />
       </Pressable>
+
       {error ? (
         <Text variant="caption" tone="error" style={s.helperText}>
           {error}
         </Text>
       ) : null}
 
-      <FormModal visible={open} title={label ?? 'Select'} onClose={() => setOpen(false)} scrollable={false}>
+      <FormModal
+        visible={open}
+        title={label ?? 'Select'}
+        onClose={() => setOpen(false)}
+        scrollable={false}
+      >
         <FlatList
           data={options}
           keyExtractor={(o) => String(o.value)}
@@ -77,8 +90,11 @@ export function SelectField<T extends string | number>({
               accessibilityLabel={item.label}
               accessibilityState={{ selected: item.value === value }}
             >
-              <Text variant="body">{item.label}</Text>
-              {item.value === value ? <Check size={18} color={theme.colors.primary} /> : null}
+              <Text variant="body" tone="primary">{item.label}</Text>
+
+              {item.value === value ? (
+                <Check size={18} color={theme.colors.primary} />
+              ) : null}
             </Pressable>
           )}
           ItemSeparatorComponent={() => <View style={s.separator} />}
@@ -94,8 +110,12 @@ export function SelectField<T extends string | number>({
 }
 
 const makeStyles = (t: AppTheme) => ({
-  container: { marginBottom: t.spacing.md },
-  label: { marginBottom: t.spacing.xs },
+  container: {
+    marginBottom: t.spacing.md,
+  },
+  label: {
+    marginBottom: t.spacing.xs,
+  },
   field: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
@@ -103,13 +123,20 @@ const makeStyles = (t: AppTheme) => ({
     borderWidth: 1,
     borderColor: t.colors.border,
     borderRadius: t.radii.md,
-    backgroundColor: t.colors.surfaceSunken,
+    backgroundColor: t.colors.surface,
     paddingHorizontal: t.spacing.md,
     paddingVertical: t.spacing.md,
   },
-  fieldError: { borderColor: t.colors.error },
-  valueText: { flex: 1, marginRight: t.spacing.sm },
-  helperText: { marginTop: t.spacing.xs },
+  fieldError: {
+    borderColor: t.colors.error,
+  },
+  valueText: {
+    flex: 1,
+    marginRight: t.spacing.sm,
+  },
+  helperText: {
+    marginTop: t.spacing.xs,
+  },
   optionRow: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
@@ -117,6 +144,12 @@ const makeStyles = (t: AppTheme) => ({
     paddingVertical: t.spacing.md,
     paddingHorizontal: t.spacing.sm,
   },
-  separator: { height: 1, backgroundColor: t.colors.border },
-  empty: { padding: t.spacing.lg, textAlign: 'center' as const },
+  separator: {
+    height: 1,
+    backgroundColor: t.colors.border,
+  },
+  empty: {
+    padding: t.spacing.lg,
+    textAlign: 'center' as const,
+  },
 });

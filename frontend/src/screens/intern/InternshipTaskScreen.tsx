@@ -1,9 +1,9 @@
 import React, { useCallback, useState } from 'react';
-import { View } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { FileText, Calendar, CheckCircle2, Clock, FolderKanban, Download } from 'lucide-react-native';
+import { Calendar, CheckCircle2, Clock, FolderKanban, Download, FileText } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
@@ -42,64 +42,96 @@ export function InternshipTaskScreen() {
     }
   };
 
-  return (
-    <Screen scroll>
-      {isLoading ? (
-        <Text variant="body" tone="muted">
-          Loading...
-        </Text>
-      ) : assignments.length === 0 ? (
+  if (isLoading) {
+    return (
+      <Screen scroll={false}>
+        <View style={s.centerLoading}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text variant="caption" style={s.loadingText}>Loading Project tasks...</Text>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (assignments.length === 0) {
+    return (
+      <Screen scroll style={s.container}>
         <View style={s.emptyCard}>
           <View style={s.emptyIconWrapper}>
-            <FolderKanban size={36} color={theme.colors.textMuted} />
+            <FolderKanban size={32} color={theme.colors.textMuted} />
           </View>
-          <Text variant="bodyStrong" style={s.emptyTitle}>
+          <Text variant="h1" style={s.emptyTitle}>
             No Projects Assigned
           </Text>
-          <Text variant="caption" tone="muted" style={s.emptyText}>
+          <Text variant="caption" style={s.emptyText}>
             You don't have any active project assignments at the moment.
           </Text>
         </View>
-      ) : (
-        assignments.map((a) => (
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen scroll style={s.container}>
+      {assignments.map((a) => {
+        const isCompleted = a.status?.toLowerCase() === 'completed';
+        const activeColor = isCompleted ? theme.colors.success : theme.colors.warning;
+
+        return (
           <View key={a.id} style={s.card}>
-            <View style={s.headerRow}>
-              <Text variant="bodyStrong" style={s.title} numberOfLines={2}>
-                {a.title}
-              </Text>
+            {/* Header / Title Row */}
+            <View style={s.cardHeader}>
+              <View style={s.headerTitleGroup}>
+                <FolderKanban size={16} color={theme.colors.primary} />
+                <Text variant="overline" style={s.cardTitle}>
+                  ASSIGNED TASK
+                </Text>
+              </View>
               <StatusBadge status={a.status} />
             </View>
 
+            <Text variant="body" style={s.taskTitle} numberOfLines={2}>
+              {a.title}
+            </Text>
+
             {a.description ? (
-              <Text variant="body" tone="secondary" style={s.description}>
+              <Text variant="caption" style={s.description}>
                 {a.description}
               </Text>
             ) : null}
 
-            <View style={s.footerContainer}>
+            <View style={s.detailsGroup}>
+              <View style={s.rowDivider} />
+
               {a.dueDate ? (
-                <View style={s.dateRow}>
-                  <Calendar size={14} color={theme.colors.textMuted} />
-                  <Text variant="caption" tone="muted">
-                    Due: {new Date(a.dueDate).toLocaleDateString()}
+                <View style={s.detailRow}>
+                  <View style={s.labelWithIcon}>
+                    <Calendar size={14} color={theme.colors.textSecondary} />
+                    <Text variant="caption" style={s.detailLabel}>Due Date</Text>
+                  </View>
+                  <Text variant="body" style={s.detailValue}>
+                    {new Date(a.dueDate).toLocaleDateString()}
                   </Text>
                 </View>
               ) : null}
+            </View>
 
-              {a.fileId ? (
+            {/* Actions Group */}
+            {a.fileId ? (
+              <View style={s.actionsGroup}>
                 <Button
-                  label="View Attachment"
+                  label={downloadingId === a.id ? 'Opening Attachment...' : 'View Attachment'}
                   variant="outline"
-                  size="sm"
                   loading={downloadingId === a.id}
                   onPress={() => handleViewFile(a)}
-                  style={s.fileButton}
+                  fullWidth
+                  style={s.actionButton}
                 />
-              ) : null}
-            </View>
+              </View>
+            ) : null}
           </View>
-        ))
-      )}
+        );
+      })}
     </Screen>
   );
 }
@@ -112,22 +144,22 @@ function StatusBadge({ status }: { status: string }) {
 
   const config = isCompleted
     ? {
-        bg: theme.colors.successBg,
-        tone: 'success' as const,
-        icon: <CheckCircle2 size={13} color={theme.colors.success} />,
+        bg: `${theme.colors.success}15`,
+        color: theme.colors.success,
+        icon: <CheckCircle2 size={12} color={theme.colors.success} />,
         label: 'Completed',
       }
     : {
-        bg: theme.colors.warningBg,
-        tone: 'warning' as const,
-        icon: <Clock size={13} color={theme.colors.warning} />,
+        bg: `${theme.colors.warning}15`,
+        color: theme.colors.warning,
+        icon: <Clock size={12} color={theme.colors.warning} />,
         label: status || 'In Progress',
       };
 
   return (
     <View style={[s.badge, { backgroundColor: config.bg }]}>
       {config.icon}
-      <Text variant="caption" tone={config.tone} style={s.badgeText}>
+      <Text variant="caption" style={[s.badgeText, { color: config.color }]}>
         {config.label}
       </Text>
     </View>
@@ -135,31 +167,57 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 const makeStyles = (t: AppTheme) => ({
-  // Empty State Styling
+  container: {
+    paddingHorizontal: 22,
+    paddingTop: t.spacing.md,
+    paddingBottom: t.spacing.xl,
+  },
+  centerLoading: {
+    flex: 1,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    gap: t.spacing.sm,
+  },
+  loadingText: {
+    color: t.colors.textSecondary,
+  },
   emptyCard: {
+    alignItems: 'center' as const,
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: t.colors.border,
-    padding: t.spacing.xl,
-    alignItems: 'center' as const,
+    paddingVertical: t.spacing.xl,
+    paddingHorizontal: t.spacing.lg,
     marginTop: t.spacing.md,
-    gap: t.spacing.xs,
+    shadowColor: t.colors.textPrimary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
   emptyIconWrapper: {
-    padding: t.spacing.md,
-    borderRadius: 50,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: t.colors.surfaceSunken,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     marginBottom: t.spacing.xs,
   },
   emptyTitle: {
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: '800' as const,
+    color: t.colors.textPrimary,
+    textAlign: 'center' as const,
+    marginTop: 4,
+    marginBottom: 4,
   },
   emptyText: {
+    color: t.colors.textSecondary,
+    fontSize: 13,
     textAlign: 'center' as const,
   },
-
-  // Project Task Card
   card: {
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
@@ -167,48 +225,81 @@ const makeStyles = (t: AppTheme) => ({
     borderColor: t.colors.border,
     padding: t.spacing.lg,
     marginBottom: t.spacing.md,
-    gap: t.spacing.sm,
   },
-  headerRow: {
+  cardHeader: {
     flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
-    alignItems: 'flex-start' as const,
-    gap: t.spacing.sm,
+    marginBottom: t.spacing.sm,
   },
-  title: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  description: {
-    lineHeight: 20,
-  },
-  
-  // Footer & Actions
-  footerContainer: {
-    gap: t.spacing.xs,
-    marginTop: t.spacing.xs,
-  },
-  dateRow: {
+  headerTitleGroup: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: 6,
   },
-  fileButton: {
-    alignSelf: 'flex-start' as const,
-    marginTop: t.spacing.xs,
+  cardTitle: {
+    color: t.colors.textSecondary,
+    fontWeight: '700' as const,
+    letterSpacing: 0.8,
+    fontSize: 11,
   },
-
-  // Badge Styling
+  taskTitle: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: t.colors.textPrimary,
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  description: {
+    color: t.colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: t.spacing.xs,
+  },
+  detailsGroup: {
+    gap: 4,
+  },
+  rowDivider: {
+    height: 1,
+    backgroundColor: t.colors.border,
+    marginVertical: 6,
+  },
+  detailRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    paddingVertical: 2,
+  },
+  labelWithIcon: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+  },
+  detailLabel: {
+    color: t.colors.textSecondary,
+    fontSize: 13,
+  },
+  detailValue: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+    color: t.colors.textPrimary,
+  },
+  actionsGroup: {
+    marginTop: t.spacing.md,
+  },
+  actionButton: {
+    marginTop: 0,
+  },
   badge: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: 4,
-    paddingHorizontal: t.spacing.sm,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: t.radii.full,
   },
   badgeText: {
-    fontWeight: '600' as const,
+    fontWeight: '700' as const,
+    fontSize: 11,
   },
 });

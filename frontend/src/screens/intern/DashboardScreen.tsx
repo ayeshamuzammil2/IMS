@@ -1,9 +1,9 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, View, ActivityIndicator } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { Pencil, Info } from 'lucide-react-native';
+import { Pencil, Info, User, ShieldCheck } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
@@ -27,7 +27,6 @@ function formatTime(hms: string): string {
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-// Display Helper: CNIC (XXXXX-XXXXXXX-X)
 function formatCnic(cnic?: string | null): string | null {
   if (!cnic) return null;
   const digits = cnic.replace(/\D/g, '').slice(0, 13);
@@ -35,7 +34,6 @@ function formatCnic(cnic?: string | null): string | null {
   return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`;
 }
 
-// Display/Input Helper: Phone (+92 3XX XXXXXXX)
 function formatPhone(phone?: string | null): string {
   if (!phone) return '+92 ';
   let digits = phone.replace(/\D/g, '');
@@ -70,21 +68,22 @@ export function DashboardScreen() {
 
   if (isLoading || !data) {
     return (
-      <Screen>
-        <Text variant="body" tone="muted">
-          Loading...
-        </Text>
+      <Screen scroll={false}>
+        <View style={s.centerLoading}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text variant="caption" style={s.loadingText}>Loading Dashboard profile...</Text>
+        </View>
       </Screen>
     );
   }
 
-  // Check if self details have already been submitted
   const isSelfDetailsSubmitted = Boolean(
     data.address || data.emergencyContactName || data.emergencyContactPhone || data.bloodGroup
   );
 
   return (
-    <Screen scroll>
+    <Screen scroll style={s.container}>
+      {/* Profile Header */}
       <View style={s.profileHeader}>
         <View style={s.photoWrap}>
           {data.approvedPhotoFileId ? (
@@ -92,55 +91,67 @@ export function DashboardScreen() {
           ) : (
             <RoleAvatar name={data.fullName} size={110} />
           )}
-          <Pressable onPress={goToDocuments} style={[s.editButton, { backgroundColor: theme.colors.primary }]} hitSlop={4}>
-            <Pencil size={15} color={theme.colors.onPrimary} />
+          <Pressable onPress={goToDocuments} style={s.editButton} hitSlop={4}>
+            <Pencil size={14} color={theme.colors.onPrimary} />
           </Pressable>
         </View>
 
-        <Text variant="h2" style={s.name}>
+        <Text variant="h1" style={s.name}>
           {data.fullName}
         </Text>
-        <Text variant="caption" tone="muted" style={s.internCode}>
+        <Text variant="caption" style={s.internCode}>
           {data.internCode}
         </Text>
       </View>
 
       <VerificationBanner status={data.verificationStatus} />
 
-      <Text variant="overline" tone="muted" style={s.sectionLabel}>
-        INTERNSHIP DETAILS
-      </Text>
+      {/* Internship Details Card */}
       <View style={s.card}>
-        <Row label="Department" value={data.departmentName} />
-        <Row label="Mentor" value={data.mentorName} />
-        <Row label="Start Date" value={formatDate(data.internshipStartDate)} />
-        <Row label="End Date" value={formatDate(data.internshipEndDate)} />
-        <Row label="Daily Hours" value={`${formatTime(data.dailyStartTime)} - ${formatTime(data.dailyEndTime)}`} />
-        <Row label="University" value={data.universityName} />
-        <Row label="Degree Program" value={data.degreeProgram} />
-        <Row label="Email" value={data.email} />
-        <Row label="Phone" value={data.phone ? formatPhone(data.phone) : null} />
-        <Row label="CNIC" value={formatCnic(data.cnic)} isLast />
+        <View style={s.cardHeader}>
+          <ShieldCheck size={16} color={theme.colors.primary} />
+          <Text variant="overline" style={s.cardTitle}>
+            INTERNSHIP DETAILS
+          </Text>
+        </View>
+
+        <View style={s.detailsGroup}>
+          <Row label="Department" value={data.departmentName} />
+          <Row label="Mentor" value={data.mentorName} />
+          <Row label="Start Date" value={formatDate(data.internshipStartDate)} />
+          <Row label="End Date" value={formatDate(data.internshipEndDate)} />
+          <Row label="Daily Hours" value={`${formatTime(data.dailyStartTime)} - ${formatTime(data.dailyEndTime)}`} />
+          <Row label="University" value={data.universityName} />
+          <Row label="Degree Program" value={data.degreeProgram} />
+          <Row label="Email" value={data.email} />
+          <Row label="Phone" value={data.phone ? formatPhone(data.phone) : null} />
+          <Row label="CNIC" value={formatCnic(data.cnic)} isLast />
+        </View>
       </View>
 
-      <Text variant="overline" tone="muted" style={s.sectionLabel}>
-        SELF DETAILS
-      </Text>
+      {/* Self Details Card */}
       <View style={s.card}>
+        <View style={s.cardHeader}>
+          <User size={16} color={theme.colors.primary} />
+          <Text variant="overline" style={s.cardTitle}>
+            PERSONAL DETAILS
+          </Text>
+        </View>
+
         {isSelfDetailsSubmitted ? (
-          <>
+          <View style={s.detailsGroup}>
             <Row label="Address" value={data.address} />
             <Row label="Emergency Contact Name" value={data.emergencyContactName} />
             <Row label="Emergency Contact Phone" value={data.emergencyContactPhone ? formatPhone(data.emergencyContactPhone) : null} />
             <Row label="Blood Group" value={data.bloodGroup} isLast />
 
             <View style={s.noticeBox}>
-              <Info size={16} color={theme.colors.textMuted} />
-              <Text variant="caption" tone="muted" style={s.noticeText}>
+              <Info size={15} color={theme.colors.textSecondary} />
+              <Text variant="caption" style={s.noticeText}>
                 To modify or update these details, please contact your mentor.
               </Text>
             </View>
-          </>
+          </View>
         ) : (
           <SelfDetailsForm
             initial={data}
@@ -180,7 +191,7 @@ function SelfDetailsForm({ initial, onSubmitted }: { initial: InternDashboardDto
   };
 
   return (
-    <View style={s.formGap}>
+    <View style={s.formGroup}>
       <Input label="Address" value={address} onChangeText={setAddress} multiline />
       <Input label="Emergency Contact Name" value={emergencyName} onChangeText={setEmergencyName} />
       <Input
@@ -200,16 +211,35 @@ function Row({ label, value, isLast }: { label: string; value?: string | null; i
   const s = useThemedStyles(makeStyles);
   if (!value) return null;
   return (
-    <View style={[s.infoRow, !isLast && s.rowBorder]}>
-      <Text variant="caption" tone="muted">
-        {label}
-      </Text>
-      <Text variant="body" style={s.rowValue}>{value}</Text>
+    <View style={s.infoRowGroup}>
+      <View style={s.infoRow}>
+        <Text variant="caption" style={s.rowLabel}>
+          {label}
+        </Text>
+        <Text variant="body" style={s.rowValue}>
+          {value}
+        </Text>
+      </View>
+      {!isLast && <View style={s.rowDivider} />}
     </View>
   );
 }
 
 const makeStyles = (t: AppTheme) => ({
+  container: {
+    paddingHorizontal: 22,
+    paddingTop: t.spacing.md,
+    paddingBottom: t.spacing.xl,
+  },
+  centerLoading: {
+    flex: 1,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    gap: t.spacing.sm,
+  },
+  loadingText: {
+    color: t.colors.textSecondary,
+  },
   profileHeader: {
     alignItems: 'center' as const,
     marginBottom: t.spacing.md,
@@ -235,27 +265,30 @@ const makeStyles = (t: AppTheme) => ({
     right: -4,
     width: 32,
     height: 32,
-    borderRadius: t.radii.full,
+    borderRadius: 16,
+    backgroundColor: t.colors.primary,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     borderWidth: 2,
     borderColor: t.colors.surface,
-    zIndex: 2,
+    elevation: 3,
+    shadowColor: t.colors.textPrimary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
   },
   name: {
-    textAlign: 'center' as const,
     fontSize: 20,
-    marginTop: t.spacing.xs,
+    fontWeight: '800' as const,
+    color: t.colors.textPrimary,
+    textAlign: 'center' as const,
+    marginTop: 4,
   },
   internCode: {
+    color: t.colors.textSecondary,
+    fontSize: 13,
     textAlign: 'center' as const,
-    marginBottom: t.spacing.xs,
-  },
-  sectionLabel: {
-    marginTop: t.spacing.md,
-    marginBottom: t.spacing.xs,
-    marginLeft: t.spacing.xs,
-    letterSpacing: 0.8,
+    marginTop: 2,
   },
   card: {
     backgroundColor: t.colors.surface,
@@ -263,36 +296,65 @@ const makeStyles = (t: AppTheme) => ({
     borderWidth: 1,
     borderColor: t.colors.border,
     padding: t.spacing.lg,
-    marginBottom: t.spacing.xs,
+    marginBottom: t.spacing.md,
+  },
+  cardHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    marginBottom: t.spacing.sm,
+  },
+  cardTitle: {
+    color: t.colors.textSecondary,
+    fontWeight: '700' as const,
+    letterSpacing: 0.8,
+    fontSize: 11,
+  },
+  detailsGroup: {
+    gap: 0,
+  },
+  infoRowGroup: {
+    width: '100%' as const,
   },
   infoRow: {
-    gap: 2,
-    paddingVertical: t.spacing.xs,
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    paddingVertical: 4,
   },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: t.colors.border,
-    paddingBottom: t.spacing.xs + 2,
-    marginBottom: t.spacing.xs,
+  rowLabel: {
+    color: t.colors.textSecondary,
+    fontSize: 13,
   },
   rowValue: {
-    fontWeight: '500' as const,
+    fontSize: 13,
+    fontWeight: '700' as const,
+    color: t.colors.textPrimary,
+    textAlign: 'right' as const,
+    flexShrink: 1,
+    marginLeft: t.spacing.sm,
+  },
+  rowDivider: {
+    height: 1,
+    backgroundColor: t.colors.border,
+    marginVertical: 6,
   },
   noticeBox: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: t.spacing.xs,
     backgroundColor: t.colors.surfaceSunken,
-    padding: t.spacing.md,
+    padding: t.spacing.sm,
     borderRadius: t.radii.md,
     marginTop: t.spacing.md,
   },
   noticeText: {
     flex: 1,
     fontSize: 12,
+    color: t.colors.textSecondary,
   },
-  formGap: {
-    gap: t.spacing.sm,
+  formGroup: {
+    gap: t.spacing.md,
   },
   saveBtn: {
     marginTop: t.spacing.xs,

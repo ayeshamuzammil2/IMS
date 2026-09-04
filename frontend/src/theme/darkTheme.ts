@@ -2,55 +2,61 @@ import type { AppTheme, ChartPalette, ThemeColors } from './types';
 import { radii, spacing, typography, makeShadows } from './tokens';
 
 export const darkColors: ThemeColors = {
-  background: '#0C120E',
-  surface: '#16211A',
-  surfaceAlt: '#1E2C22',
-  surfaceSunken: '#101A13',
-  border: '#2C3F31',
-  borderStrong: '#3E5644',
+  // Deep Background for high contrast against cards
+  background: '#070B08',
+  surface: '#141E17',
+  surfaceAlt: '#1B2A1E',
+  surfaceSunken: '#0D150F',
 
-  primary: '#66BB6A',
-  primaryHover: '#81C784',
-  primaryMuted: '#43A047',
-  onPrimary: '#062B0A',
-  primaryContainer: '#1B5E20',
+  // Crisp high-contrast borders so cards/inputs stand out
+  border: '#263B2C',
+  borderStrong: '#3A5741',
+
+  // Primary Action Colors
+  primary: '#4CAF50',
+  primaryHover: '#66BB6A',
+  primaryMuted: '#2E7D32',
+  onPrimary: '#FFFFFF',
+  primaryContainer: '#103B14', // Distinct active button/chip background
   onPrimaryContainer: '#C8E6C9',
-  accent: '#A5D6A7',
+  accent: '#81C784',
 
-  textPrimary: '#E6F0E8',
-  textSecondary: '#A8BFAE',
-  textMuted: '#82998A',
-  textOnDark: '#E6F0E8',
-  textOnDarkMuted: '#A8BFAE',
+  // Crisp High-Contrast Typography (No blurriness or mixing)
+  textPrimary: '#F1F5F2',
+  textSecondary: '#B0C4B4',
+  textMuted: '#7D9684',
+  textOnDark: '#F1F5F2',
+  textOnDarkMuted: '#B0C4B4',
 
-  success: '#66BB6A',
-  successBg: '#122A16',
-  warning: '#FFC246',
-  warningBg: '#2E2410',
-  error: '#FF8A80',
-  errorBg: '#2E1614',
-  info: '#82B1FF',
-  infoBg: '#131F33',
-  gold: '#E0C060',
+  // Feedback Colors
+  success: '#4CAF50',
+  successBg: '#0E2412',
+  warning: '#FFC107',
+  warningBg: '#2A200B',
+  error: '#FF5252',
+  errorBg: '#2C1010',
+  info: '#64B5F6',
+  infoBg: '#0F2133',
+  gold: '#FFD54F',
   slate: '#94A3B8',
   slateLight: '#64748B',
 
-  overlay: 'rgba(0,0,0,0.66)',
+  // Navigation & Overlays
+  overlay: 'rgba(0,0,0,0.75)',
   shadowColor: '#000000',
-  skeleton: '#1E2C22',
-  skeletonShimmer: '#2C3F31',
-  // Dark header is the dark surface, not saturated green - a green bar in dark mode is glare.
-  headerBg: '#16211A',
-  drawerBg: '#101A13',
-  tabInactive: '#82998A',
+  skeleton: '#1A271C',
+  skeletonShimmer: '#263B2C',
+  headerBg: '#141E17',
+  drawerBg: '#0D150F',
+  tabInactive: '#7D9684',
 };
 
 export const darkCharts: ChartPalette = {
-  categorical: ['#43A047', '#3987E5', '#D95926', '#9085E9', '#C98500', '#D55181'],
-  sequential: ['#0F3D13', '#1B5E20', '#2E7D32', '#4CAF50', '#81C784', '#A5D6A7', '#C1E4C3'],
-  ordinal: ['#1B5E20', '#2E7D32', '#4CAF50', '#81C784'],
-  gridline: '#233326',
-  axis: '#3E5644',
+  categorical: ['#4CAF50', '#42A5F5', '#FF7043', '#AB47BC', '#FFA726', '#EC407A'],
+  sequential: ['#0B2E0E', '#103B14', '#1B5E20', '#2E7D32', '#4CAF50', '#81C784', '#C8E6C9'],
+  ordinal: ['#103B14', '#2E7D32', '#4CAF50', '#81C784'],
+  gridline: '#1E2F22',
+  axis: '#3A5741',
 };
 
 export const darkTheme: AppTheme = {
@@ -59,6 +65,6 @@ export const darkTheme: AppTheme = {
   spacing,
   radii,
   typography,
-  shadows: makeShadows('#000000', [0.3, 0.4, 0.5]),
+  shadows: makeShadows('#000000', [0.4, 0.5, 0.6]),
   charts: darkCharts,
 };

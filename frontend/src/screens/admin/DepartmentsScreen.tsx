@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import * as Location from 'expo-location';
-import { Power, PowerOff, Trash2, ChevronRight, Search, X } from 'lucide-react-native';
+import { Power, PowerOff, Trash2, ChevronRight, Search, X, Building2 } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
@@ -190,24 +190,29 @@ export function DepartmentsScreen() {
     return (
       <Pressable style={s.card} onPress={() => openEdit(d)}>
         <View style={s.cardHeader}>
+          <View style={s.avatarBadge}>
+            <Building2 size={20} color={theme.colors.primary} />
+          </View>
           <View style={s.cardHeaderText}>
-            <Text variant="bodyStrong" numberOfLines={1}>
+            <Text variant="bodyStrong" style={s.cardTitle} numberOfLines={1}>
               {d.name}
             </Text>
-            <Text variant="caption" tone="muted">
-              {d.code}
+            <Text variant="caption" tone="muted" style={s.subText} numberOfLines={1}>
+              {d.code} · Geofence: {d.geofenceRadiusMeters}m
             </Text>
           </View>
           <ChevronRight size={18} color={theme.colors.textMuted} />
         </View>
 
-        <Text variant="caption" tone="secondary" numberOfLines={1} style={s.cardSubline}>
-          Geofence: {d.geofenceRadiusMeters}m · {d.mentorCount} Mentors · {d.internCount} Interns
-        </Text>
+        <View style={s.statusRow}>
+          <View style={s.metaLeftGroup}>
+            <Text variant="caption" tone="muted" style={s.countText} numberOfLines={1}>
+              {d.mentorCount} Mentors · {d.internCount} Interns
+            </Text>
+          </View>
 
-        <View style={s.badgeRow}>
-          <View style={[s.badge, { backgroundColor: d.isActive ? theme.colors.successBg : theme.colors.errorBg }]}>
-            <Text variant="caption" tone={d.isActive ? 'success' : 'error'}>
+          <View style={[s.badge, { backgroundColor: d.isActive ? (theme.colors.successBg || '#F0FDF4') : (theme.colors.errorBg || '#FEF2F2') }]}>
+            <Text variant="caption" tone={d.isActive ? 'success' : 'error'} style={s.badgeText}>
               {d.isActive ? 'Active' : 'Inactive'}
             </Text>
           </View>
@@ -218,7 +223,7 @@ export function DepartmentsScreen() {
         <View style={s.actionsRow}>
           <Pressable
             hitSlop={8}
-            style={s.actionIcon}
+            style={s.actionIconBtn}
             onPress={(e) => {
               e.stopPropagation();
               confirmToggleActive(d);
@@ -234,7 +239,7 @@ export function DepartmentsScreen() {
           </Pressable>
           <Pressable
             hitSlop={8}
-            style={s.actionIcon}
+            style={s.actionIconBtn}
             onPress={(e) => {
               e.stopPropagation();
               confirmDelete(d);
@@ -251,20 +256,23 @@ export function DepartmentsScreen() {
     <Screen scroll={false}>
       {/* Top Header Row */}
       <View style={s.headerRow}>
-        <Text variant="body" tone="secondary">
-          {filteredDepartments.length} department{filteredDepartments.length === 1 ? '' : 's'}
-        </Text>
+        <View style={s.headerTitleContainer}>
+          <View style={s.titleIndicator} />
+          <Text variant="overline" tone="muted" style={s.headerLabel}>
+            {filteredDepartments.length} {filteredDepartments.length === 1 ? 'DEPARTMENT' : 'DEPARTMENTS'} FOUND
+          </Text>
+        </View>
         <Button label="Add Department" size="sm" onPress={openCreate} />
       </View>
 
       {/* Search Icon Trigger & Expandable Input under Add Department */}
       <View style={s.searchBarSection}>
         <View style={s.searchIconRow}>
-          <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
+          <Pressable onPress={toggleSearch} style={[s.iconButton, showSearch && s.iconButtonActive]} hitSlop={8}>
             {showSearch ? (
-              <X size={20} color={theme.colors.textSecondary} />
+              <X size={18} color={theme.colors.primary} />
             ) : (
-              <Search size={20} color={theme.colors.textSecondary} />
+              <Search size={18} color={theme.colors.textMuted} />
             )}
           </Pressable>
         </View>
@@ -283,9 +291,12 @@ export function DepartmentsScreen() {
       </View>
 
       {isLoading ? (
-        <Text variant="body" tone="muted">
-          Loading...
-        </Text>
+        <View style={s.centerBox}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <Text variant="caption" tone="muted" style={{ marginTop: 12 }}>
+            Loading departments...
+          </Text>
+        </View>
       ) : (
         <FlatList
           data={filteredDepartments}
@@ -294,9 +305,11 @@ export function DepartmentsScreen() {
           style={s.list}
           contentContainerStyle={filteredDepartments.length === 0 ? s.emptyListContent : s.listContent}
           ListEmptyComponent={
-            <Text variant="body" tone="muted">
-              {departments.length === 0 ? 'No departments yet. Add one to get started.' : 'No departments match your search.'}
-            </Text>
+            <View style={s.emptyBox}>
+              <Text variant="body" tone="muted">
+                {departments.length === 0 ? 'No departments yet. Add one to get started.' : 'No departments match your search.'}
+              </Text>
+            </View>
           }
         />
       )}
@@ -410,7 +423,23 @@ const makeStyles = (t: AppTheme) => ({
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
-    marginBottom: t.spacing.sm,
+    marginBottom: t.spacing.xs,
+    marginTop: 0,
+    paddingTop: 0,
+  },
+  headerTitleContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  titleIndicator: {
+    width: 3,
+    height: 12,
+    borderRadius: 2,
+    backgroundColor: t.colors.primary,
+  },
+  headerLabel: {
+    letterSpacing: 0.8,
   },
   searchBarSection: {
     marginBottom: t.spacing.sm,
@@ -419,35 +448,125 @@ const makeStyles = (t: AppTheme) => ({
     alignItems: 'flex-end' as const,
   },
   iconButton: {
-    padding: 8,
-    borderRadius: t.radii.md,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: t.colors.surface,
     borderWidth: 1,
     borderColor: t.colors.border,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  iconButtonActive: {
+    borderColor: t.colors.primary,
+    backgroundColor: t.colors.surfaceSunken,
   },
   searchContainer: {
     marginTop: t.spacing.xs,
   },
   list: { flex: 1 },
-  listContent: { gap: t.spacing.sm, paddingBottom: t.spacing.lg },
-  emptyListContent: { flexGrow: 1, alignItems: 'center' as const, justifyContent: 'center' as const },
+  listContent: {
+    gap: t.spacing.sm,
+    paddingBottom: t.spacing.xl,
+  },
+  emptyListContent: {
+    flexGrow: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
   card: {
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: t.colors.border,
-    padding: t.spacing.lg,
-    ...t.shadows.sm,
+    padding: t.spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  cardHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, gap: t.spacing.sm },
-  cardHeaderText: { flex: 1 },
-  cardSubline: { marginTop: 2 },
-  badgeRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: t.spacing.xs, marginTop: t.spacing.sm },
-  badge: { paddingHorizontal: t.spacing.sm, paddingVertical: 3, borderRadius: t.radii.full },
-  divider: { height: 1, backgroundColor: t.colors.border, marginTop: t.spacing.md, marginBottom: t.spacing.sm },
-  actionsRow: { flexDirection: 'row' as const, gap: t.spacing.lg, justifyContent: 'flex-end' as const },
-  actionIcon: { padding: t.spacing.xs },
-  locationRow: { flexDirection: 'row' as const, gap: t.spacing.md },
-  locationFields: { flex: 1 },
-  locationButton: { marginBottom: t.spacing.md, marginTop: -t.spacing.sm },
+  cardHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: t.spacing.sm,
+  },
+  avatarBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: t.colors.surfaceSunken,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  cardHeaderText: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 15,
+    flexShrink: 1,
+  },
+  subText: {
+    marginTop: 2,
+  },
+  statusRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginTop: 10,
+  },
+  metaLeftGroup: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    flex: 1,
+  },
+  countText: {
+    fontSize: 12,
+  },
+  badge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 9999,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: t.colors.border,
+    marginTop: t.spacing.sm,
+    marginBottom: t.spacing.xs,
+  },
+  actionsRow: {
+    flexDirection: 'row' as const,
+    gap: t.spacing.md,
+    justifyContent: 'flex-end' as const,
+  },
+  actionIconBtn: {
+    padding: 4,
+  },
+  locationRow: {
+    flexDirection: 'row' as const,
+    gap: t.spacing.md,
+  },
+  locationFields: {
+    flex: 1,
+  },
+  locationButton: {
+    marginBottom: t.spacing.md,
+    marginTop: -t.spacing.sm,
+  },
+  emptyBox: {
+    paddingVertical: t.spacing.xl,
+    alignItems: 'center' as const,
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
 });

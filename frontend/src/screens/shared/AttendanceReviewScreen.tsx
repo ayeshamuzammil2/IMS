@@ -1,9 +1,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Pressable, ActivityIndicator, FlatList } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { ShieldAlert, ClipboardList, Lock, ChevronRight, Check, X } from 'lucide-react-native';
+import { ShieldAlert, ClipboardList, Lock, ChevronRight, Check, X, Search } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
@@ -44,6 +44,9 @@ export function AttendanceReviewScreen() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [requestModalOpen, setRequestModalOpen] = useState(false);
 
+  const [showSearch, setShowSearch] = useState(false);
+  const [search, setSearch] = useState('');
+
   const { data: queue = [], isLoading: queueLoading, refetch: refetchQueue } = useQuery({
     queryKey: ['attendance', 'review', 'queue'],
     queryFn: attendanceReviewApi.getQueue,
@@ -59,6 +62,25 @@ export function AttendanceReviewScreen() {
       refetchOverrides();
     }, [refetchQueue, refetchOverrides]),
   );
+
+  const filteredQueue = useMemo(() => {
+    if (!search.trim()) return queue;
+    const q = search.toLowerCase().trim();
+    return queue.filter((i) => i.internFullName?.toLowerCase().includes(q) || i.internCode?.toLowerCase().includes(q));
+  }, [queue, search]);
+
+  const filteredOverrides = useMemo(() => {
+    if (!search.trim()) return overrides;
+    const q = search.toLowerCase().trim();
+    return overrides.filter((i) => i.internFullName?.toLowerCase().includes(q) || i.reasonCode?.toLowerCase().includes(q));
+  }, [overrides, search]);
+
+  const toggleSearch = () => {
+    if (showSearch) {
+      setSearch('');
+    }
+    setShowSearch((prev) => !prev);
+  };
 
   const handleApproveReview = async (item: ReviewQueueItemDto) => {
     setBusyId(item.attendanceDayId);
@@ -107,155 +129,238 @@ export function AttendanceReviewScreen() {
     }
   };
 
-  return (
-    <Screen scroll>
-      <View style={s.headerRow}>
-        <Text variant="body" tone="secondary">
-          {queue.length} review{queue.length === 1 ? '' : 's'} · {overrides.length} override{overrides.length === 1 ? '' : 's'}
-        </Text>
-        <Button label="Request Override" size="sm" onPress={() => setRequestModalOpen(true)} />
-      </View>
+  const renderQueueItem = ({ item }: { item: ReviewQueueItemDto }) => {
+    const isBusy = busyId === item.attendanceDayId;
+    return (
+      <View style={s.card}>
+        <View style={s.cardHeader}>
+          <View style={s.imageGroup}>
+            {item.arrivalSelfieFileId ? (
+              <AuthImage fileId={item.arrivalSelfieFileId} size={44} style={s.avatarImage} />
+            ) : null}
+            {item.departureSelfieFileId ? (
+              <AuthImage fileId={item.departureSelfieFileId} size={44} style={s.avatarImage} />
+            ) : null}
+            {!item.arrivalSelfieFileId && !item.departureSelfieFileId && (
+              <View style={s.avatarBadge}>
+                <Text variant="bodyStrong" style={s.avatarText}>
+                  {item.internFullName?.charAt(0).toUpperCase() || 'I'}
+                </Text>
+              </View>
+            )}
+          </View>
+          <View style={s.cardHeaderText}>
+            <Text variant="bodyStrong" style={s.cardTitle} numberOfLines={1}>
+              {item.internFullName}
+            </Text>
+            <Text variant="caption" tone="muted" style={s.emailText} numberOfLines={1}>
+              {item.internCode} · {new Date(item.workDate).toLocaleDateString()}
+            </Text>
+          </View>
+          <ChevronRight size={18} color={theme.colors.textMuted} />
+        </View>
 
-      <Text variant="caption" tone="muted" style={s.sectionTitle}>
-        FLAGGED ATTENDANCE
-      </Text>
-      {queueLoading ? (
-        <Text variant="body" tone="muted">
-          Loading...
-        </Text>
-      ) : queue.length === 0 ? (
-        <View style={s.emptyContainer}>
-          <ShieldAlert size={28} color={theme.colors.textMuted} />
-          <Text variant="body" tone="muted">
-            Nothing flagged for review.
+        <View style={s.metaInfoRow}>
+          {item.distanceM !== null && (
+            <View style={s.metaChip}>
+              <Text variant="caption" tone="secondary" style={s.metaChipText}>
+                {item.distanceM.toFixed(0)}m · {item.geofenceState}
+              </Text>
+            </View>
+          )}
+
+          {item.flags.length > 0 && (
+            <View style={s.flagsRow}>
+              {item.flags.map((flag, idx) => (
+                <View key={idx} style={[s.badge, { backgroundColor: theme.colors.warningBg || '#FEF3C7' }]}>
+                  <Text variant="caption" tone="warning" style={s.badgeText}>
+                    {flag}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {!item.attendanceReady && (
+          <View style={s.lockRow}>
+            <Lock size={14} color={theme.colors.error} />
+            <Text variant="caption" tone="error" style={{ flex: 1 }}>
+              Verification pending - review locked.
+            </Text>
+          </View>
+        )}
+
+        <View style={s.divider} />
+
+        <View style={s.actionsRow}>
+          <Pressable
+            hitSlop={8}
+            style={s.actionIcon}
+            disabled={isBusy || !item.attendanceReady}
+            onPress={() => {
+              setNote('');
+              setNoteModal({ dayId: item.attendanceDayId, kind: 'review' });
+            }}
+          >
+            <X size={16} color={theme.colors.error} />
+          </Pressable>
+          <Pressable
+            hitSlop={8}
+            style={s.actionIcon}
+            disabled={isBusy || !item.attendanceReady}
+            onPress={() => handleApproveReview(item)}
+          >
+            {isBusy ? (
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            ) : (
+              <Check size={16} color={theme.colors.success} />
+            )}
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
+
+  const renderOverrideItem = ({ item }: { item: AttendanceOverrideDto }) => {
+    const isBusy = busyId === item.id;
+    return (
+      <View style={s.card}>
+        <View style={s.cardHeader}>
+          <View style={s.avatarBadge}>
+            <Text variant="bodyStrong" style={s.avatarText}>
+              {item.internFullName?.charAt(0).toUpperCase() || 'I'}
+            </Text>
+          </View>
+          <View style={s.cardHeaderText}>
+            <Text variant="bodyStrong" style={s.cardTitle} numberOfLines={1}>
+              {item.internFullName}
+            </Text>
+            <Text variant="caption" tone="muted" style={s.emailText} numberOfLines={1}>
+              {item.eventType} · {item.reasonCode}
+            </Text>
+          </View>
+          <ChevronRight size={18} color={theme.colors.textMuted} />
+        </View>
+
+        <View style={s.metaInfoRow}>
+          <Text variant="body" tone="secondary" style={s.justificationText}>
+            {item.justification}
           </Text>
         </View>
-      ) : (
-        queue.map((item) => (
-          <View key={item.attendanceDayId} style={s.card}>
-            <View style={s.cardHeader}>
-              <View style={s.imageGroup}>
-                {item.arrivalSelfieFileId ? <AuthImage fileId={item.arrivalSelfieFileId} size={42} /> : null}
-                {item.departureSelfieFileId ? <AuthImage fileId={item.departureSelfieFileId} size={42} /> : null}
-              </View>
-              <View style={s.cardHeaderText}>
-                <Text variant="bodyStrong" style={s.nameText}>
-                  {item.internFullName}
-                </Text>
-                <Text variant="caption" tone="muted">
-                  {item.internCode} · {new Date(item.workDate).toLocaleDateString()}
-                </Text>
-                {item.distanceM !== null ? (
-                  <Text variant="caption" tone="secondary">
-                    {item.distanceM.toFixed(0)}m · {item.geofenceState}
-                  </Text>
-                ) : null}
-              </View>
-              <ChevronRight size={18} color={theme.colors.textMuted} />
-            </View>
 
-            {item.flags.length > 0 ? (
-              <View style={s.badgeRow}>
-                {item.flags.map((flag, idx) => (
-                  <View key={idx} style={[s.badge, { backgroundColor: theme.colors.warningBg }]}>
-                    <Text variant="caption" tone="warning">
-                      {flag}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-
-            {!item.attendanceReady ? (
-              <View style={s.lockRow}>
-                <Lock size={14} color={theme.colors.error} />
-                <Text variant="caption" tone="error" style={{ flex: 1 }}>
-                  Verification pending - review locked.
-                </Text>
-              </View>
-            ) : null}
-
+        {isAdmin && (
+          <>
             <View style={s.divider} />
-
-            <View style={s.iconActionRow}>
+            <View style={s.actionsRow}>
               <Pressable
+                hitSlop={8}
+                style={s.actionIcon}
+                disabled={isBusy}
                 onPress={() => {
                   setNote('');
-                  setNoteModal({ dayId: item.attendanceDayId, kind: 'review' });
+                  setNoteModal({ overrideId: item.id, kind: 'override' });
                 }}
-                disabled={busyId === item.attendanceDayId || !item.attendanceReady}
-                style={s.iconBtn}
               >
-                <X size={20} color={theme.colors.error} />
+                <X size={16} color={theme.colors.error} />
               </Pressable>
-              <Pressable
-                onPress={() => handleApproveReview(item)}
-                disabled={busyId === item.attendanceDayId || !item.attendanceReady}
-                style={s.iconBtn}
-              >
-                <Check size={20} color={theme.colors.primary} />
+              <Pressable hitSlop={8} style={s.actionIcon} disabled={isBusy} onPress={() => handleApproveOverride(item)}>
+                {isBusy ? (
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
+                ) : (
+                  <Check size={16} color={theme.colors.success} />
+                )}
               </Pressable>
             </View>
+          </>
+        )}
+      </View>
+    );
+  };
+
+  return (
+    <Screen scroll={false} style={s.screenContainer}>
+      <View style={s.headerContainer}>
+        <View style={s.headerRow}>
+          <View style={s.headerTitleContainer}>
+            <View style={s.titleIndicator} />
+            <Text variant="overline" tone="muted" style={s.headerLabel}>
+              {queue.length} REVIEWS · {overrides.length} OVERRIDES
+            </Text>
           </View>
-        ))
-      )}
-
-      <Text variant="caption" tone="muted" style={[s.sectionTitle, { marginTop: theme.spacing.lg }]}>
-        PENDING OVERRIDES
-      </Text>
-      {overridesLoading ? (
-        <Text variant="body" tone="muted">
-          Loading...
-        </Text>
-      ) : overrides.length === 0 ? (
-        <View style={s.emptyContainer}>
-          <ClipboardList size={28} color={theme.colors.textMuted} />
-          <Text variant="body" tone="muted">
-            No override requests pending.
-          </Text>
+          <Button label="Request Override" size="sm" onPress={() => setRequestModalOpen(true)} />
         </View>
-      ) : (
-        overrides.map((item) => (
-          <View key={item.id} style={s.card}>
-            <View style={s.cardHeader}>
-              <View style={s.cardHeaderText}>
-                <Text variant="bodyStrong" style={s.nameText}>
-                  {item.internFullName}
-                </Text>
-                <Text variant="caption" tone="muted">
-                  {item.eventType} · {item.reasonCode}
-                </Text>
-              </View>
-              <ChevronRight size={18} color={theme.colors.textMuted} />
-            </View>
 
-            <Text variant="body" tone="secondary" style={{ marginTop: theme.spacing.xs }}>
-              {item.justification}
+        <View style={s.subHeaderRow}>
+          <Pressable onPress={toggleSearch} style={[s.iconButton, showSearch && s.iconButtonActive]} hitSlop={8}>
+            {showSearch ? (
+              <X size={18} color={theme.colors.primary} />
+            ) : (
+              <Search size={18} color={theme.colors.textMuted} />
+            )}
+          </Pressable>
+        </View>
+
+        {showSearch && (
+          <View style={s.searchContainer}>
+            <Input
+              placeholder="Search reviews or overrides..."
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="none"
+              autoFocus
+            />
+          </View>
+        )}
+      </View>
+
+      <FlatList
+        data={[]}
+        renderItem={null}
+        style={s.list}
+        contentContainerStyle={s.listContent}
+        ListHeaderComponent={
+          <>
+            <Text variant="caption" tone="muted" style={s.sectionTitle}>
+              FLAGGED ATTENDANCE
             </Text>
 
-            {isAdmin ? (
-              <>
-                <View style={s.divider} />
-                <View style={s.iconActionRow}>
-                  <Pressable
-                    onPress={() => {
-                      setNote('');
-                      setNoteModal({ overrideId: item.id, kind: 'override' });
-                    }}
-                    disabled={busyId === item.id}
-                    style={s.iconBtn}
-                  >
-                    <X size={20} color={theme.colors.error} />
-                  </Pressable>
-                  <Pressable onPress={() => handleApproveOverride(item)} disabled={busyId === item.id} style={s.iconBtn}>
-                    <Check size={20} color={theme.colors.primary} />
-                  </Pressable>
-                </View>
-              </>
-            ) : null}
-          </View>
-        ))
-      )}
+            {queueLoading ? (
+              <View style={s.centerBox}>
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+              </View>
+            ) : filteredQueue.length === 0 ? (
+              <View style={s.emptyBox}>
+                <ShieldAlert size={28} color={theme.colors.textMuted} />
+                <Text variant="body" tone="muted" style={{ marginTop: 8 }}>
+                  Nothing flagged for review.
+                </Text>
+              </View>
+            ) : (
+              filteredQueue.map((item) => <React.Fragment key={item.attendanceDayId}>{renderQueueItem({ item })}</React.Fragment>)
+            )}
+
+            <Text variant="caption" tone="muted" style={[s.sectionTitle, { marginTop: theme.spacing.lg }]}>
+              PENDING OVERRIDES
+            </Text>
+
+            {overridesLoading ? (
+              <View style={s.centerBox}>
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+              </View>
+            ) : filteredOverrides.length === 0 ? (
+              <View style={s.emptyBox}>
+                <ClipboardList size={28} color={theme.colors.textMuted} />
+                <Text variant="body" tone="muted" style={{ marginTop: 8 }}>
+                  No override requests pending.
+                </Text>
+              </View>
+            ) : (
+              filteredOverrides.map((item) => <React.Fragment key={item.id}>{renderOverrideItem({ item })}</React.Fragment>)
+            )}
+          </>
+        }
+      />
 
       <FormModal
         visible={noteModal !== null}
@@ -302,9 +407,7 @@ function RequestOverrideModal({ visible, onClose, onRequested }: { visible: bool
     () => interns.find((i) => i.id === internProfileId) ?? null,
     [interns, internProfileId],
   );
-  // Same dual-lock as normal attendance: an override can't be requested for an intern whose
-  // profile photo / face enrollment isn't verified yet - it would otherwise be a backdoor around
-  // face verification. Mirrors the ATTENDANCE_LOCKED check enforced server-side.
+
   const isOverrideLocked = selectedIntern !== null && !selectedIntern.attendanceReady;
 
   const reset = () => {
@@ -375,55 +478,150 @@ function RequestOverrideModal({ visible, onClose, onRequested }: { visible: bool
 }
 
 const makeStyles = (t: AppTheme) => ({
+  screenContainer: {
+    paddingHorizontal: t.spacing.lg,
+    paddingTop: t.spacing.md,
+  },
+  headerContainer: {
+    marginBottom: t.spacing.md,
+  },
   headerRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
-    marginBottom: t.spacing.md,
+  },
+  headerTitleContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    flexShrink: 1,
+  },
+  titleIndicator: {
+    width: 4,
+    height: 14,
+    borderRadius: 2,
+    backgroundColor: t.colors.primary,
+  },
+  headerLabel: {
+    letterSpacing: 1,
+  },
+  subHeaderRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'flex-end' as const,
+    alignItems: 'center' as const,
+    marginTop: t.spacing.xs,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: t.colors.surface,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  iconButtonActive: {
+    borderColor: t.colors.primary,
+    backgroundColor: t.colors.surfaceSunken,
+  },
+  searchContainer: {
+    marginTop: t.spacing.xs,
   },
   sectionTitle: {
     marginBottom: t.spacing.sm,
     fontWeight: '700' as const,
     letterSpacing: 0.5,
   },
-  emptyContainer: {
-    alignItems: 'center' as const,
-    padding: t.spacing.xl,
-    gap: t.spacing.sm,
+  list: { flex: 1 },
+  listContent: {
+    paddingBottom: t.spacing.xl * 1.5,
   },
   card: {
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: t.colors.border,
     padding: t.spacing.lg,
     marginBottom: t.spacing.md,
-    ...t.shadows.sm,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    gap: t.spacing.sm,
+    gap: t.spacing.md,
   },
-  imageGroup: { flexDirection: 'row' as const, gap: 4 },
-  cardHeaderText: { flex: 1 },
-  nameText: { fontSize: 16, fontWeight: '600' as const },
-  badgeRow: {
+  imageGroup: {
+    flexDirection: 'row' as const,
+    gap: 4,
+  },
+  avatarImage: {
+    borderRadius: 12,
+  },
+  avatarBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: t.colors.surfaceSunken,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  avatarText: {
+    color: t.colors.primary,
+    fontSize: 16,
+  },
+  cardHeaderText: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    flexShrink: 1,
+  },
+  emailText: {
+    marginTop: 3,
+  },
+  metaInfoRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginTop: 14,
+    gap: 8,
+    flexWrap: 'wrap' as const,
+  },
+  metaChip: {
+    backgroundColor: t.colors.surfaceSunken,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  metaChipText: {
+    fontSize: 12,
+  },
+  flagsRow: {
     flexDirection: 'row' as const,
     flexWrap: 'wrap' as const,
-    gap: t.spacing.xs,
-    marginTop: t.spacing.sm,
+    gap: 6,
   },
   badge: {
-    paddingHorizontal: t.spacing.sm,
-    paddingVertical: 3,
-    borderRadius: t.radii.full,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 9999,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+  },
+  justificationText: {
+    fontSize: 13,
   },
   lockRow: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: t.spacing.xs,
-    marginTop: t.spacing.xs,
+    marginTop: t.spacing.sm,
   },
   divider: {
     height: 1,
@@ -431,10 +629,25 @@ const makeStyles = (t: AppTheme) => ({
     marginTop: t.spacing.md,
     marginBottom: t.spacing.sm,
   },
-  iconActionRow: {
+  actionsRow: {
     flexDirection: 'row' as const,
+    gap: t.spacing.md,
     justifyContent: 'flex-end' as const,
-    gap: t.spacing.lg,
+    alignItems: 'center' as const,
+    paddingTop: 4,
   },
-  iconBtn: { padding: 4 },
+  actionIcon: {
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: t.colors.surfaceSunken,
+  },
+  emptyBox: {
+    paddingVertical: t.spacing.xl,
+    alignItems: 'center' as const,
+  },
+  centerBox: {
+    paddingVertical: t.spacing.lg,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
 });

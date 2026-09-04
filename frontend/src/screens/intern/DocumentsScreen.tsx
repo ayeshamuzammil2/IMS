@@ -1,15 +1,18 @@
 import React, { useCallback, useState } from 'react';
-import { View } from 'react-native';
+import { View, ActivityIndicator, Modal, Pressable } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import Toast from 'react-native-toast-message';
-import { CheckCircle2, Clock, XCircle, FileWarning, ShieldCheck } from 'lucide-react-native';
+import { FileText, AlertCircle, ShieldCheck, Clock, X, File } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
 import { Button } from '../../components/primitives/Button';
+import { AuthImage } from '../../components/media/AuthImage';
 import { documentsApi, type DocumentDto, type DocumentTypeKey } from '../../api/resources/documents.api';
+import { apiBaseUrl } from '../../api/client';
+import { downloadAndShare } from '../../lib/downloadAndShare';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
 import type { AppTheme } from '../../theme/types';
@@ -22,11 +25,21 @@ const REQUIRED_TYPES: { key: DocumentTypeKey; label: string; helper: string; ima
   { key: 'ReferenceLetter', label: 'Reference Letter', helper: 'A reference or recommendation letter.', imageOnly: false },
 ];
 
+function isImageFile(doc: DocumentDto | undefined): boolean {
+  if (!doc) return false;
+  return (
+    ['ProfilePhoto', 'CnicFront', 'CnicBack'].includes(doc.documentType) ||
+    Boolean((doc as any).contentType?.startsWith('image/')) ||
+    Boolean((doc as any).mimeType?.startsWith('image/'))
+  );
+}
+
 export function DocumentsScreen() {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
   const queryClient = useQueryClient();
   const [uploadingType, setUploadingType] = useState<DocumentTypeKey | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<DocumentDto | null>(null);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['documents', 'dashboard'],
@@ -85,69 +98,148 @@ export function DocumentsScreen() {
     }
   };
 
+  const handleDocumentClick = async (doc: DocumentDto) => {
+    if (!doc.fileId) return;
+
+    if (isImageFile(doc)) {
+      setPreviewDoc(doc);
+    } else {
+      try {
+        await downloadAndShare(`${apiBaseUrl}/api/files/${doc.fileId}`, `doc-${doc.id}`);
+      } catch (error: any) {
+        Toast.show({ type: 'error', text1: 'Could not open file', text2: error?.message });
+      }
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Screen scroll={false}>
+        <View style={s.centerBox}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text variant="caption" tone="muted">Loading document details...</Text>
+        </View>
+      </Screen>
+    );
+  }
+
   return (
-    <Screen scroll>
-      {/* Dynamic Enhanced Verification Banner */}
+    <Screen scroll style={s.screenContainer}>
       {data?.verificationStatus ? (
         <EnhancedVerificationBanner status={data.verificationStatus} />
       ) : null}
 
-      {isLoading ? (
-        <Text variant="body" tone="muted">
-          Loading...
-        </Text>
-      ) : (
-        <>
-          {REQUIRED_TYPES.map((typeConfig) => {
-            const doc = documentsByType.get(typeConfig.key);
-            return (
-              <View key={typeConfig.key} style={s.card}>
-                <View style={s.cardHeader}>
-                  <Text variant="bodyStrong">{typeConfig.label}</Text>
-                  <StatusBadge status={doc?.status ?? null} />
+      <View style={s.listContainer}>
+        {REQUIRED_TYPES.map((typeConfig) => {
+          const doc = documentsByType.get(typeConfig.key);
+          const isImg = isImageFile(doc);
+
+          return (
+            <View key={typeConfig.key} style={s.card}>
+              <View style={s.cardHeader}>
+                <Pressable
+                  onPress={() => doc && handleDocumentClick(doc)}
+                  disabled={!doc}
+                  style={[s.avatarBadge, doc && !isImg && s.pdfAvatarBadge]}
+                >
+                  {doc?.fileId ? (
+                    isImg ? (
+                      <AuthImage fileId={doc.fileId} size={44} style={s.avatarImage} />
+                    ) : (
+                      <File size={20} color={theme.colors.primary} />
+                    )
+                  ) : (
+                    <FileText size={20} color={theme.colors.textMuted} />
+                  )}
+                </Pressable>
+
+                <View style={s.cardHeaderText}>
+                  <Text variant="bodyStrong" style={s.cardTitle} numberOfLines={1}>
+                    {typeConfig.label}
+                  </Text>
+                  <Text variant="caption" tone="muted" style={s.subText} numberOfLines={2}>
+                    {typeConfig.helper}
+                  </Text>
                 </View>
-                <Text variant="caption" tone="muted" style={s.helper}>
-                  {typeConfig.helper}
-                </Text>
-                {doc?.status === 'Rejected' && doc.remarks ? (
-                  <View style={s.remarksRow}>
-                    <FileWarning size={16} color={theme.colors.error} />
-                    <Text variant="caption" tone="error" style={s.remarksText}>
-                      {doc.remarks}
+              </View>
+
+              <View style={s.statusRow}>
+                <View style={s.metaLeftGroup}>
+                  <Text variant="caption" tone="muted" style={s.deptText} numberOfLines={1}>
+                    Status
+                  </Text>
+                </View>
+
+                <StatusBadge status={doc?.status ?? null} />
+              </View>
+
+              {doc?.status === 'Rejected' && doc.remarks ? (
+                <View style={s.remarksCard}>
+                  <View style={s.remarksHeader}>
+                    <AlertCircle size={15} color={theme.colors.error} />
+                    <Text variant="overline" style={s.remarksTitle}>
+                      REJECTION REASON
                     </Text>
                   </View>
-                ) : null}
+                  <Text variant="caption" style={s.remarksText}>
+                    {doc.remarks}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View style={s.divider} />
+
+              <View style={s.actionRow}>
                 <Button
                   label={doc ? 'Re-upload' : 'Upload'}
-                  variant={doc?.status === 'Rejected' ? 'danger' : doc ? 'outline' : 'primary'}
                   size="sm"
+                  variant={doc?.status === 'Rejected' ? 'danger' : 'primary'}
                   loading={uploadingType === typeConfig.key}
                   onPress={() => handleUpload(typeConfig)}
-                  style={s.uploadButton}
+                  style={s.actionBtn}
                 />
               </View>
-            );
-          })}
+            </View>
+          );
+        })}
 
-          <ExtraDocumentCard
-            doc={extraDocument}
-            uploading={uploadingType === 'ExtraDocument'}
-            onUploadFile={handleUploadExtraFile}
-            onSubmitLink={async (url) => {
-              setUploadingType('ExtraDocument');
-              try {
-                await documentsApi.submitExtraLink(url);
-                Toast.show({ type: 'success', text1: 'Link submitted', text2: 'Awaiting review by your mentor.' });
-                invalidate();
-              } catch (error: any) {
-                Toast.show({ type: 'error', text1: 'Could not submit link', text2: error?.response?.data?.message ?? error?.message });
-              } finally {
-                setUploadingType(null);
-              }
-            }}
-          />
-        </>
-      )}
+        <ExtraDocumentCard
+          doc={extraDocument}
+          uploading={uploadingType === 'ExtraDocument'}
+          onUploadFile={handleUploadExtraFile}
+          onDocumentClick={handleDocumentClick}
+          onSubmitLink={async (url) => {
+            setUploadingType('ExtraDocument');
+            try {
+              await documentsApi.submitExtraLink(url);
+              Toast.show({ type: 'success', text1: 'Link submitted', text2: 'Awaiting review by your mentor.' });
+              invalidate();
+            } catch (error: any) {
+              Toast.show({ type: 'error', text1: 'Could not submit link', text2: error?.response?.data?.message ?? error?.message });
+            } finally {
+              setUploadingType(null);
+            }
+          }}
+        />
+      </View>
+
+      <Modal visible={Boolean(previewDoc)} transparent animationType="fade" onRequestClose={() => setPreviewDoc(null)}>
+        <View style={s.modalOverlay}>
+          <View style={s.modalContainer}>
+            <View style={s.modalHeader}>
+              <Text variant="body" style={s.modalTitle}>
+                Document Preview
+              </Text>
+              <Pressable onPress={() => setPreviewDoc(null)} hitSlop={10}>
+                <X size={20} color={theme.colors.textPrimary} />
+              </Pressable>
+            </View>
+            {previewDoc?.fileId ? (
+              <AuthImage fileId={previewDoc.fileId} style={s.previewImage} contentFit="contain" />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -155,38 +247,23 @@ export function DocumentsScreen() {
 function EnhancedVerificationBanner({ status }: { status: string }) {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
-
   const isApproved = status === 'Approved' || status === 'Verified';
 
-  if (isApproved) {
-    return (
-      <View style={s.bannerCard}>
-        <View style={[s.iconBox, { backgroundColor: theme.colors.successBg }]}>
-          <ShieldCheck size={18} color={theme.colors.success} />
-        </View>
-        <View style={s.bannerTextContainer}>
-          <Text variant="bodyStrong" tone="success" style={s.bannerTitle}>
-            Verification Completed
-          </Text>
-          <Text variant="caption" tone="secondary">
-            All required documents have been reviewed and verified.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
   return (
-    <View style={s.bannerCard}>
-      <View style={[s.iconBox, { backgroundColor: theme.colors.warningBg }]}>
-        <Clock size={18} color={theme.colors.warning} />
+    <View style={[s.bannerCard, { borderColor: isApproved ? theme.colors.success : theme.colors.warning }]}>
+      <View style={[s.iconBox, { backgroundColor: isApproved ? `${theme.colors.success}15` : `${theme.colors.warning}15` }]}>
+        {isApproved ? (
+          <ShieldCheck size={20} color={theme.colors.success} />
+        ) : (
+          <Clock size={20} color={theme.colors.warning} />
+        )}
       </View>
       <View style={s.bannerTextContainer}>
-        <Text variant="bodyStrong" tone="warning" style={s.bannerTitle}>
-          Verification Pending
+        <Text variant="body" style={[s.bannerTitle, { color: isApproved ? theme.colors.success : theme.colors.warning }]}>
+          {isApproved ? 'Verification Completed' : 'Verification Pending'}
         </Text>
-        <Text variant="caption" tone="muted">
-          Documents are under review by your mentor.
+        <Text variant="caption" style={s.bannerDesc}>
+          {isApproved ? 'All required documents have been reviewed and verified.' : 'Documents are under review by your mentor.'}
         </Text>
       </View>
     </View>
@@ -197,57 +274,98 @@ function ExtraDocumentCard({
   doc,
   uploading,
   onUploadFile,
+  onDocumentClick,
   onSubmitLink,
 }: {
   doc: DocumentDto | undefined;
   uploading: boolean;
   onUploadFile: () => void;
+  onDocumentClick: (doc: DocumentDto) => void;
   onSubmitLink: (url: string) => void;
 }) {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
   const [link, setLink] = useState(doc?.externalLinkUrl ?? '');
+  const isImg = isImageFile(doc);
 
   return (
     <View style={s.card}>
       <View style={s.cardHeader}>
-        <Text variant="bodyStrong">Additional Document (Optional)</Text>
+        <Pressable
+          onPress={() => doc && onDocumentClick(doc)}
+          disabled={!doc}
+          style={[s.avatarBadge, doc && !isImg && s.pdfAvatarBadge]}
+        >
+          {doc?.fileId ? (
+            isImg ? (
+              <AuthImage fileId={doc.fileId} size={44} style={s.avatarImage} />
+            ) : (
+              <File size={20} color={theme.colors.primary} />
+            )
+          ) : (
+            <FileText size={20} color={theme.colors.textMuted} />
+          )}
+        </Pressable>
+
+        <View style={s.cardHeaderText}>
+          <Text variant="bodyStrong" style={s.cardTitle} numberOfLines={1}>
+            Extra Document
+          </Text>
+          <Text variant="caption" tone="muted" style={s.subText} numberOfLines={2}>
+            Portfolio, certificate, or writing sample.
+          </Text>
+        </View>
+      </View>
+
+      <View style={s.statusRow}>
+        <View style={s.metaLeftGroup}>
+          <Text variant="caption" tone="muted" style={s.deptText} numberOfLines={1}>
+            Status
+          </Text>
+        </View>
+
         <StatusBadge status={doc?.status ?? null} />
       </View>
-      <Text variant="caption" tone="muted" style={s.helper}>
-        Anything else worth sharing - a portfolio, a certificate, a writing sample. Upload a file or paste a link.
-      </Text>
+
       {doc?.status === 'Rejected' && doc.remarks ? (
-        <View style={s.remarksRow}>
-          <FileWarning size={16} color={theme.colors.error} />
-          <Text variant="caption" tone="error" style={s.remarksText}>
+        <View style={s.remarksCard}>
+          <View style={s.remarksHeader}>
+            <AlertCircle size={15} color={theme.colors.error} />
+            <Text variant="overline" style={s.remarksTitle}>
+              REJECTION REASON
+            </Text>
+          </View>
+          <Text variant="caption" style={s.remarksText}>
             {doc.remarks}
           </Text>
         </View>
       ) : null}
-      {doc?.externalLinkUrl ? (
-        <Text variant="caption" tone="secondary" style={s.helper} numberOfLines={1}>
-          {doc.externalLinkUrl}
-        </Text>
-      ) : null}
-      <Button
-        label={doc ? 'Re-upload File' : 'Upload File'}
-        variant={doc?.status === 'Rejected' ? 'danger' : doc ? 'outline' : 'primary'}
-        size="sm"
-        loading={uploading}
-        onPress={onUploadFile}
-        style={s.uploadButton}
-      />
-      <Input label="Or paste a link" value={link} onChangeText={setLink} autoCapitalize="none" placeholder="https://..." />
-      <Button
-        label="Submit Link"
-        variant="outline"
-        size="sm"
-        loading={uploading}
-        disabled={!link.trim()}
-        onPress={() => onSubmitLink(link.trim())}
-        style={s.uploadButton}
-      />
+
+      <View style={s.divider} />
+
+      <View style={s.actionRow}>
+        <Button
+          label={doc ? 'Re-upload File' : 'Upload File'}
+          size="sm"
+          variant={doc?.status === 'Rejected' ? 'danger' : 'primary'}
+          loading={uploading}
+          onPress={onUploadFile}
+          style={s.actionBtn}
+        />
+      </View>
+
+      <View style={s.formGroup}>
+        <Input label="Or paste a link" value={link} onChangeText={setLink} autoCapitalize="none" placeholder="https://..." />
+        <Button
+          label="Submit Link"
+          variant="outline"
+          size="sm"
+          loading={uploading}
+          disabled={!link.trim()}
+          onPress={() => onSubmitLink(link.trim())}
+          fullWidth
+        />
+      </View>
     </View>
   );
 }
@@ -255,84 +373,235 @@ function ExtraDocumentCard({
 function StatusBadge({ status }: { status: DocumentDto['status'] | null }) {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
+
   if (!status) {
     return (
       <View style={[s.badge, { backgroundColor: theme.colors.surfaceSunken }]}>
-        <Text variant="caption" tone="muted">
+        <Text variant="caption" style={[s.badgeText, { color: theme.colors.textMuted }]}>
           Missing
         </Text>
       </View>
     );
   }
-  const config: Record<DocumentDto['status'], { bg: string; tone: 'success' | 'warning' | 'error'; icon: React.ReactNode; label: string }> = {
-    Approved: { bg: theme.colors.successBg, tone: 'success', icon: <CheckCircle2 size={14} color={theme.colors.success} />, label: 'Approved' },
-    Pending: { bg: theme.colors.warningBg, tone: 'warning', icon: <Clock size={14} color={theme.colors.warning} />, label: 'Pending Review' },
-    Rejected: { bg: theme.colors.errorBg, tone: 'error', icon: <XCircle size={14} color={theme.colors.error} />, label: 'Rejected' },
-  };
-  const c = config[status];
+
+  const isApproved = status === 'Approved';
+  const isPending = status === 'Pending';
+
+  const bg = isApproved
+    ? `${theme.colors.success}15`
+    : isPending
+    ? theme.colors.warningBg || '#FFFBEB'
+    : `${theme.colors.error}15`;
+
+  const color = isApproved
+    ? theme.colors.success
+    : isPending
+    ? theme.colors.warning || '#D97706'
+    : theme.colors.error;
+
+  const label = isApproved ? 'Approved' : isPending ? 'Pending Review' : 'Rejected';
+
   return (
-    <View style={[s.badge, { backgroundColor: c.bg }]}>
-      {c.icon}
-      <Text variant="caption" tone={c.tone}>
-        {c.label}
+    <View style={[s.badge, { backgroundColor: bg }]}>
+      <Text variant="caption" style={[s.badgeText, { color }]}>
+        {label}
       </Text>
     </View>
   );
 }
 
 const makeStyles = (t: AppTheme) => ({
+  screenContainer: {
+    paddingHorizontal: t.spacing.lg,
+    paddingTop: t.spacing.lg,
+  },
   bannerCard: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
+    borderRadius: 20,
     paddingHorizontal: t.spacing.md,
-    paddingVertical: t.spacing.sm + 2,
-    borderWidth: 1,
-    borderColor: t.colors.border,
-    marginBottom: t.spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    paddingVertical: t.spacing.md,
+    borderWidth: 1.5,
+    marginBottom: t.spacing.md,
     elevation: 2,
-    gap: t.spacing.sm + 2,
+    gap: t.spacing.md,
   },
   iconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: t.radii.full,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
   bannerTextContainer: {
     flex: 1,
-    gap: 1,
   },
   bannerTitle: {
-    fontSize: 13,
-    fontWeight: '600' as const,
+    fontSize: 14,
+    fontWeight: '800' as const,
+  },
+  bannerDesc: {
+    color: t.colors.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  listContainer: {
+    gap: t.spacing.md,
+    paddingBottom: t.spacing.xl * 1.5,
   },
   card: {
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: t.colors.border,
     padding: t.spacing.lg,
-    marginBottom: t.spacing.md,
-    gap: t.spacing.xs,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  cardHeader: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const },
-  helper: { marginBottom: t.spacing.xs },
-  remarksRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: t.spacing.xs },
-  remarksText: { flex: 1 },
-  uploadButton: { alignSelf: 'flex-start' as const, marginTop: t.spacing.xs },
+  cardHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: t.spacing.md,
+  },
+  avatarBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: t.colors.surfaceSunken,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    overflow: 'hidden' as const,
+  },
+  pdfAvatarBadge: {
+    backgroundColor: `${t.colors.primary}12`,
+    borderWidth: 1,
+    borderColor: `${t.colors.primary}30`,
+  },
+  avatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+  },
+  cardHeaderText: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    flexShrink: 1,
+  },
+  subText: {
+    marginTop: 3,
+  },
+  statusRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginTop: 12,
+    paddingLeft: 2,
+  },
+  metaLeftGroup: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    flex: 1,
+  },
+  deptText: {
+    fontSize: 12,
+  },
   badge: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    gap: 4,
-    paddingHorizontal: t.spacing.sm,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: t.radii.full,
+    borderRadius: 9999,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+  },
+  remarksCard: {
+    backgroundColor: t.colors.errorBg,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: t.colors.error,
+    padding: t.spacing.md,
+    marginTop: t.spacing.sm,
+  },
+  remarksHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    marginBottom: 4,
+  },
+  remarksTitle: {
+    color: t.colors.error,
+    fontWeight: '700' as const,
+    fontSize: 11,
+  },
+  remarksText: {
+    color: t.colors.error,
+    fontSize: 12,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: t.colors.border,
+    marginTop: t.spacing.md,
+    marginBottom: t.spacing.md,
+  },
+  actionRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'flex-end' as const,
+    gap: t.spacing.sm,
+  },
+  actionBtn: {
+    minWidth: 100,
+  },
+  formGroup: {
+    marginTop: t.spacing.md,
+    gap: t.spacing.sm,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    padding: t.spacing.lg,
+  },
+  modalContainer: {
+    width: '100%' as const,
+    backgroundColor: t.colors.surface,
+    borderRadius: 20,
+    padding: t.spacing.lg,
+    alignItems: 'center' as const,
+  },
+  modalHeader: {
+    width: '100%' as const,
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: t.spacing.md,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800' as const,
+    color: t.colors.textPrimary,
+  },
+  previewImage: {
+    alignSelf: 'center' as const,
+    width: '100%' as const,
+    height: 220,
+    borderRadius: 12,
+    marginTop: t.spacing.sm,
+    backgroundColor: t.colors.surface,
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: t.spacing.sm,
   },
 });

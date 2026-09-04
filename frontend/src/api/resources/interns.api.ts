@@ -27,6 +27,10 @@ export interface InternDto {
   bloodGroup: string | null;
   attendanceReady: boolean;
   isLockedForUnofficialActivity: boolean;
+  faceEnrollmentStatus: string;
+  /** True only while an admin has granted one pending re-enrollment (see unlockFaceEnrollment).
+   * Automatically flips back to false the moment the intern successfully re-enrolls. */
+  faceReEnrollmentAllowed: boolean;
 }
 
 /** mentorId is required only when an Admin creates the intern - a Mentor creating their own intern omits it. */
@@ -87,4 +91,9 @@ export const internsApi = {
   resetPassword: (id: number, newPassword: string) => client.post(endpoints.interns.resetPassword(id), { newPassword }),
 
   unlockAttendance: (id: number) => client.post(endpoints.interns.unlock(id)),
+
+  /** Grants exactly one more face enrollment past the standard one-time lock - consumed
+   * automatically the next time the intern successfully enrolls. */
+  unlockFaceEnrollment: (id: number, reason: string) =>
+    client.post(endpoints.interns.unlockFaceEnrollment(id), { reason }),
 };

@@ -289,5 +289,7 @@ public sealed class InternService(
         p.VerificationStatus.ToString(), p.User.IsActive,
         p.Address, p.EmergencyContactName, p.EmergencyContactPhone, p.BloodGroup,
         p.ProfilePhotoStatus == ProfilePhotoStatus.Approved && p.FaceEnrollmentStatus == FaceEnrollmentStatus.Active,
-        p.User.IsLockedForUnofficialActivity);
+        p.User.IsLockedForUnofficialActivity,
+        p.FaceEnrollmentStatus.ToString(),
+        p.FaceReEnrollmentAllowed);
 }

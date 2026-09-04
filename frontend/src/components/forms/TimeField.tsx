@@ -9,7 +9,7 @@ import type { AppTheme } from '../../theme/types';
 
 interface Props {
   label?: string;
-  value: string | null; // HH:mm:ss, matches the backend's TimeOnly JSON serialization
+  value: string | null;
   onChange: (value: string) => void;
   error?: string;
   required?: boolean;
@@ -74,7 +74,7 @@ export function TimeField({ label, value, onChange, error, required, stepMinutes
                 setOpen(false);
               }}
             >
-              <Text variant="body">{formatDisplay(item)}</Text>
+              <Text variant="body" tone="primary">{formatDisplay(item)}</Text>
               {item === value ? <Check size={18} color={theme.colors.primary} /> : null}
             </Pressable>
           )}
@@ -95,7 +95,7 @@ const makeStyles = (t: AppTheme) => ({
     borderWidth: 1,
     borderColor: t.colors.border,
     borderRadius: t.radii.md,
-    backgroundColor: t.colors.surfaceSunken,
+    backgroundColor: t.colors.surface,
     paddingHorizontal: t.spacing.md,
     paddingVertical: t.spacing.md,
   },

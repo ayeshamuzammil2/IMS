@@ -88,8 +88,10 @@ export function FaceEnrollmentScreen() {
         <View style={s.bulletItem}>
           <Text style={s.bulletPoint}>•</Text>
           <Text variant="body" tone="secondary" style={s.bulletText}>
-            <Text variant="bodyStrong">Profile Updates: </Text>
-            Biometric data can be refreshed once every 30 days in case of significant physical changes.
+            <Text variant="bodyStrong">One-Time Enrollment: </Text>
+            This can only be done once. After it succeeds, it locks automatically - if you ever need
+            to re-enroll (e.g. a significant physical change), ask your administrator to unlock it
+            for you first.
           </Text>
         </View>
       </View>

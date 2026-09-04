@@ -9,7 +9,7 @@ import type { AppTheme } from '../../theme/types';
 
 interface Props {
   label?: string;
-  value: string | null; // yyyy-MM-dd, matches the backend's DateOnly JSON serialization
+  value: string | null;
   onChange: (value: string) => void;
   error?: string;
   required?: boolean;
@@ -141,7 +141,13 @@ export function DateField({ label, value, onChange, error, required, minDate, ma
               >
                 <Text
                   variant="body"
-                  style={disabled ? { color: theme.colors.textMuted } : selected ? { color: theme.colors.onPrimary } : { color: theme.colors.textPrimary }}
+                  style={
+                    disabled
+                      ? { color: theme.colors.textMuted }
+                      : selected
+                      ? { color: theme.colors.surface }
+                      : { color: theme.colors.textPrimary }
+                  }
                 >
                   {day}
                 </Text>
@@ -155,7 +161,7 @@ export function DateField({ label, value, onChange, error, required, minDate, ma
 }
 
 const makeStyles = (t: AppTheme) => ({
-  container: { marginBottom: t.spacing.md },
+  container: { marginBottom: 0 },
   label: { marginBottom: t.spacing.xs },
   field: {
     flexDirection: 'row' as const,
@@ -164,9 +170,10 @@ const makeStyles = (t: AppTheme) => ({
     borderWidth: 1,
     borderColor: t.colors.border,
     borderRadius: t.radii.md,
-    backgroundColor: t.colors.surfaceSunken,
+    backgroundColor: t.colors.surface,
     paddingHorizontal: t.spacing.md,
-    paddingVertical: t.spacing.md,
+    paddingVertical: t.spacing.sm,
+    height: 44,
   },
   fieldError: { borderColor: t.colors.error },
   helperText: { marginTop: t.spacing.xs },

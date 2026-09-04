@@ -1,8 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, FlatList, Pressable } from 'react-native';
+import { View, FlatList, Pressable, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
-import { Search, X } from 'lucide-react-native';
+import { Search, X, Users, MapPin, Clock } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Input } from '../../components/primitives/Input';
@@ -21,15 +21,6 @@ const statusTone: Record<string, 'muted' | 'success' | 'warning' | 'error'> = {
   Absent: 'error',
   Leave: 'muted',
   Holiday: 'muted',
-};
-
-const statusBgKey: Record<string, 'surfaceSunken' | 'warningBg' | 'successBg' | 'errorBg'> = {
-  NotMarked: 'surfaceSunken',
-  Present: 'successBg',
-  Late: 'warningBg',
-  Absent: 'errorBg',
-  Leave: 'surfaceSunken',
-  Holiday: 'surfaceSunken',
 };
 
 function formatTime(iso: string | null): string {
@@ -87,60 +78,90 @@ export function TeamAttendanceScreen() {
   };
 
   const renderCard = ({ item: r }: { item: TeamAttendanceRowDto }) => {
+    const statusToneType = statusTone[r.status] || 'muted';
+    let statusBg = theme.colors.surfaceSunken;
+    if (r.status === 'Present') statusBg = theme.colors.successBg || '#F0FDF4';
+    if (r.status === 'Late') statusBg = theme.colors.warningBg || '#FFFBEB';
+    if (r.status === 'Absent') statusBg = theme.colors.errorBg || '#FEF2F2';
+
     return (
       <View style={s.card}>
         <View style={s.cardHeader}>
+          <View style={s.avatarBadge}>
+            <Text variant="bodyStrong" style={s.avatarText}>
+              {r.internFullName?.charAt(0).toUpperCase() || 'I'}
+            </Text>
+          </View>
           <View style={s.cardHeaderText}>
-            <Text variant="bodyStrong" numberOfLines={1}>
+            <Text variant="bodyStrong" style={s.cardTitle} numberOfLines={1}>
               {r.internFullName}
             </Text>
-            <Text variant="caption" tone="muted">
+            <Text variant="caption" tone="muted" style={s.emailText} numberOfLines={1}>
               {r.internCode}
             </Text>
           </View>
-          <View
-            style={[
-              s.badge,
-              { backgroundColor: theme.colors[statusBgKey[r.status] ?? 'surfaceSunken'] },
-            ]}
-          >
-            <Text variant="caption" tone={statusTone[r.status] ?? 'muted'}>
+        </View>
+
+        <View style={s.statusRow}>
+          <View style={s.metaLeftGroup}>
+            <View style={s.mentorBadge}>
+              <Users size={12} color={theme.colors.textMuted} />
+              <Text variant="caption" tone="muted" style={s.mentorText} numberOfLines={1}>
+                Today's Log
+              </Text>
+            </View>
+          </View>
+
+          <View style={[s.badge, { backgroundColor: statusBg }]}>
+            <Text variant="caption" tone={statusToneType} style={s.badgeText}>
               {r.status}
             </Text>
           </View>
         </View>
 
+        <View style={s.divider} />
+
         <View style={s.attendanceGrid}>
-          {/* Arrival Info */}
           <View style={s.attendanceBlock}>
-            <Text variant="caption" tone="muted" style={s.blockLabel}>
-              Arrival
-            </Text>
-            <Text variant="body">
+            <View style={s.blockHeaderRow}>
+              <Clock size={12} color={theme.colors.textMuted} />
+              <Text variant="caption" tone="muted" style={s.blockLabel}>
+                Arrival
+              </Text>
+            </View>
+            <Text variant="bodyStrong" style={s.timeText}>
               {formatTime(r.arrivalAtUtc)}
               {r.arrivalIsLate ? ' (Late)' : ''}
             </Text>
-            {r.arrivalDistanceM !== null && (
-              <Text variant="caption" tone="muted">
-                {r.arrivalDistanceM.toFixed(0)}m · {r.arrivalGeofenceState}
-              </Text>
-            )}
+            {r.arrivalDistanceM !== null ? (
+              <View style={s.distanceRow}>
+                <MapPin size={10} color={theme.colors.textMuted} />
+                <Text variant="caption" tone="muted" style={s.distanceText}>
+                  {r.arrivalDistanceM.toFixed(0)}m · {r.arrivalGeofenceState}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
-          {/* Departure Info */}
           <View style={s.attendanceBlock}>
-            <Text variant="caption" tone="muted" style={s.blockLabel}>
-              Departure
-            </Text>
-            <Text variant="body">
+            <View style={s.blockHeaderRow}>
+              <Clock size={12} color={theme.colors.textMuted} />
+              <Text variant="caption" tone="muted" style={s.blockLabel}>
+                Departure
+              </Text>
+            </View>
+            <Text variant="bodyStrong" style={s.timeText}>
               {formatTime(r.departureAtUtc)}
               {r.departureIsEarly ? ' (Early)' : ''}
             </Text>
-            {r.departureDistanceM !== null && (
-              <Text variant="caption" tone="muted">
-                {r.departureDistanceM.toFixed(0)}m · {r.departureGeofenceState}
-              </Text>
-            )}
+            {r.departureDistanceM !== null ? (
+              <View style={s.distanceRow}>
+                <MapPin size={10} color={theme.colors.textMuted} />
+                <Text variant="caption" tone="muted" style={s.distanceText}>
+                  {r.departureDistanceM.toFixed(0)}m · {r.departureGeofenceState}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
       </View>
@@ -148,33 +169,37 @@ export function TeamAttendanceScreen() {
   };
 
   return (
-    <Screen scroll={false} style={s.container}>
+    <Screen scroll={false} style={s.screenContainer}>
       <View style={s.headerContainer}>
-        {/* Main Header Row */}
+        {/* Header Label Row */}
         <View style={s.headerRow}>
-          <Text variant="body" tone="secondary">
-            {filteredRows.length} intern{filteredRows.length === 1 ? '' : 's'} today
-          </Text>
-
-          {isAdmin && (
-            <View style={s.filter}>
-              <SelectField
-                placeholder="All departments"
-                value={departmentId}
-                options={deptSelectOptions}
-                onChange={setDepartmentId}
-              />
-            </View>
-          )}
+          <View style={s.headerTitleContainer}>
+            <View style={s.titleIndicator} />
+            <Text variant="overline" tone="muted" style={s.headerLabel}>
+              {filteredRows.length} {filteredRows.length === 1 ? 'INTERN' : 'INTERNS'} TODAY
+            </Text>
+          </View>
         </View>
 
-        {/* Search Icon Trigger placed below the Department Filter */}
+        {/* Admin Department Filter */}
+        {isAdmin && (
+          <View style={s.filterWrapper}>
+            <SelectField
+              placeholder="All departments"
+              value={departmentId}
+              options={deptSelectOptions}
+              onChange={setDepartmentId}
+            />
+          </View>
+        )}
+
+        {/* Search Icon Row (Filter ke niche Right side par) */}
         <View style={s.searchIconRow}>
-          <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
+          <Pressable onPress={toggleSearch} style={[s.iconButton, showSearch && s.iconButtonActive]} hitSlop={8}>
             {showSearch ? (
-              <X size={20} color={theme.colors.textSecondary} />
+              <X size={18} color={theme.colors.primary} />
             ) : (
-              <Search size={20} color={theme.colors.textSecondary} />
+              <Search size={18} color={theme.colors.textMuted} />
             )}
           </Pressable>
         </View>
@@ -194,9 +219,12 @@ export function TeamAttendanceScreen() {
       </View>
 
       {isLoading ? (
-        <Text variant="body" tone="muted">
-          Loading...
-        </Text>
+        <View style={s.centerBox}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <Text variant="caption" tone="muted" style={{ marginTop: 12 }}>
+            Loading attendance records...
+          </Text>
+        </View>
       ) : (
         <FlatList
           data={filteredRows}
@@ -207,9 +235,11 @@ export function TeamAttendanceScreen() {
             filteredRows.length === 0 ? s.emptyListContent : s.listContent
           }
           ListEmptyComponent={
-            <Text variant="body" tone="muted">
-              No interns to show.
-            </Text>
+            <View style={s.emptyBox}>
+              <Text variant="body" tone="muted">
+                {search.trim() ? 'No attendance records found matching your search.' : 'No interns to show today.'}
+              </Text>
+            </View>
           }
         />
       )}
@@ -218,36 +248,64 @@ export function TeamAttendanceScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
-  container: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
+  screenContainer: {
+    paddingHorizontal: t.spacing.lg,
+    paddingTop: t.spacing.lg,
   },
   headerContainer: {
-    marginBottom: 12,
+    marginTop: t.spacing.sm,
+    marginBottom: t.spacing.lg,
   },
   headerRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
-    gap: 8,
+    marginBottom: t.spacing.sm,
   },
-  filter: { width: 160 },
+  headerTitleContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+  },
+  titleIndicator: {
+    width: 4,
+    height: 14,
+    borderRadius: 2,
+    backgroundColor: t.colors.primary,
+  },
+  headerLabel: {
+    letterSpacing: 1,
+  },
+  filterWrapper: {
+    marginTop: t.spacing.xs,
+    
+  },
   searchIconRow: {
     alignItems: 'flex-end' as const,
-    marginTop: 8,
+    marginTop: t.spacing.sm,
   },
   iconButton: {
-    padding: 8,
-    borderRadius: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: t.colors.surface,
     borderWidth: 1,
     borderColor: t.colors.border,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  iconButtonActive: {
+    borderColor: t.colors.primary,
+    backgroundColor: t.colors.surfaceSunken,
   },
   searchContainer: {
-    marginTop: 8,
+    marginTop: t.spacing.sm,
   },
   list: { flex: 1 },
-  listContent: { gap: 12, paddingBottom: 16 },
+  listContent: {
+    gap: t.spacing.md,
+    paddingBottom: t.spacing.xl * 1.5,
+  },
   emptyListContent: {
     flexGrow: 1,
     alignItems: 'center' as const,
@@ -255,36 +313,120 @@ const makeStyles = (t: AppTheme) => ({
   },
   card: {
     backgroundColor: t.colors.surface,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: t.colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    padding: t.spacing.lg,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
     elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    justifyContent: 'space-between' as const,
-    gap: 8,
+    gap: t.spacing.md,
   },
-  cardHeaderText: { flex: 1 },
+  avatarBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: t.colors.surfaceSunken,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  avatarText: {
+    color: t.colors.primary,
+    fontSize: 16,
+  },
+  cardHeaderText: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    flexShrink: 1,
+  },
+  emailText: {
+    marginTop: 3,
+  },
+  statusRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginTop: 12,
+    paddingLeft: 2,
+  },
+  metaLeftGroup: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    flex: 1,
+  },
+  mentorBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    flexShrink: 1,
+  },
+  mentorText: {
+    fontSize: 12,
+  },
   badge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 9999,
   },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: t.colors.border,
+    marginTop: t.spacing.md,
+    marginBottom: t.spacing.md,
+  },
   attendanceGrid: {
     flexDirection: 'row' as const,
-    gap: 16,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: t.colors.border,
+    gap: t.spacing.md,
   },
-  attendanceBlock: { flex: 1 },
-  blockLabel: { marginBottom: 2 },
+  attendanceBlock: {
+    flex: 1,
+    backgroundColor: t.colors.surfaceSunken,
+    borderRadius: 12,
+    padding: t.spacing.sm,
+  },
+  blockHeaderRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    marginBottom: 4,
+  },
+  blockLabel: {
+    fontSize: 11,
+  },
+  timeText: {
+    fontSize: 13,
+  },
+  distanceRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 3,
+    marginTop: 4,
+  },
+  distanceText: {
+    fontSize: 10,
+  },
+  emptyBox: {
+    paddingVertical: t.spacing.xl * 2,
+    alignItems: 'center' as const,
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
 });

@@ -55,10 +55,14 @@ export function AuthNavigator() {
           header: () => <LeftAlignedAuthHeader title="Forgot Password" navigation={navigation} />,
         })}
       />
-      <Stack.Screen 
-        name="LockedAccount" 
-        component={LockedAccountScreen} 
-        options={{ gestureEnabled: false }}
+      <Stack.Screen
+        name="LockedAccount"
+        component={LockedAccountScreen}
+        options={({ navigation }) => ({
+          gestureEnabled: false,
+          headerShown: true,
+          header: () => <LeftAlignedAuthHeader title="Account Locked" navigation={navigation} />,
+        })}
       />
     </Stack.Navigator>
   );
