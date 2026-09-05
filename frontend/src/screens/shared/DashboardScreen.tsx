@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import React, { useCallback, useState, useRef } from 'react';
+import { Pressable, View, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { LineChart, BarChart, PieChart } from 'react-native-gifted-charts';
@@ -18,6 +18,9 @@ export function DashboardScreen() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'Admin';
 
+  const [resetKey, setResetKey] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['dashboard', 'summary'],
     queryFn: () => dashboardApi.getSummary(),
@@ -26,6 +29,11 @@ export function DashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       refetch();
+      setResetKey((prev) => prev + 1);
+
+      if (scrollRef.current) {
+        scrollRef.current.scrollTo({ y: 0, animated: false });
+      }
     }, [refetch]),
   );
 
@@ -40,129 +48,135 @@ export function DashboardScreen() {
   }
 
   return (
-    <Screen scroll style={s.container}>
-      <View style={s.heroCard}>
-        <View style={s.heroContent}>
-          <Text variant="overline" tone="muted" style={s.heroLabel}>
-            {isAdmin ? 'TOTAL INTERNS (ORG-WIDE)' : 'MY INTERNS'}
-          </Text>
-          <Text variant="h1" style={s.heroNumber}>
-            {data.totalInterns}
-          </Text>
+    <Screen scroll={false}>
+      <ScrollView
+        ref={scrollRef}
+        style={s.container}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={s.heroCard}>
+          <View style={s.heroContent}>
+            <Text variant="overline" tone="muted" style={s.heroLabel}>
+              {isAdmin ? 'TOTAL INTERNS (ORG-WIDE)' : 'MY INTERNS'}
+            </Text>
+            <Text variant="h1" style={s.heroNumber}>
+              {data.totalInterns}
+            </Text>
+          </View>
+          <View style={s.heroAccentBadge}>
+            <View style={s.heroPulseDot} />
+            <Text variant="caption" style={s.heroBadgeText}>Live</Text>
+          </View>
         </View>
-        <View style={s.heroAccentBadge}>
-          <View style={s.heroPulseDot} />
-          <Text variant="caption" style={s.heroBadgeText}>Live</Text>
-        </View>
-      </View>
 
-      <View style={s.tileGrid}>
-        <KpiTile label="Present Today" value={data.presentTodayCount} color={theme.colors.success} />
-        <KpiTile label="Late Today" value={data.lateTodayCount} color={theme.colors.warning} />
-        <KpiTile label="Absent Today" value={data.absentTodayCount} color={theme.colors.error} />
-        <KpiTile label="On Leave" value={data.onLeaveTodayCount} color={theme.colors.textMuted} />
-      </View>
-
-      {isAdmin ? (
         <View style={s.tileGrid}>
-          <KpiTile label="Mentors" value={data.totalMentors} color={theme.colors.primary} />
-          <KpiTile label="Departments" value={data.totalDepartments} color={theme.colors.primary} />
+          <KpiTile label="Present Today" value={data.presentTodayCount} color={theme.colors.success} />
+          <KpiTile label="Late Today" value={data.lateTodayCount} color={theme.colors.warning} />
+          <KpiTile label="Absent Today" value={data.absentTodayCount} color={theme.colors.error} />
+          <KpiTile label="On Leave" value={data.onLeaveTodayCount} color={theme.colors.textMuted} />
         </View>
-      ) : null}
 
-      <ChartSection title="7-DAY ATTENDANCE TREND">
-        {(showTable) =>
-          showTable ? (
-            <TrendTable data={data.sevenDayTrend} />
-          ) : data.sevenDayTrend.length === 0 ? (
-            <EmptyChartNote />
-          ) : (
-            <LineChart
-              height={180}
-              dataSet={[
-                { data: data.sevenDayTrend.map((p) => ({ value: p.presentCount, label: shortDate(p.date) })), color: theme.colors.success },
-                { data: data.sevenDayTrend.map((p) => ({ value: p.lateCount, label: shortDate(p.date) })), color: theme.colors.warning },
-                { data: data.sevenDayTrend.map((p) => ({ value: p.absentCount, label: shortDate(p.date) })), color: theme.colors.error },
-              ]}
-              yAxisColor="transparent"
-              xAxisColor={theme.colors.border}
-              rulesColor={theme.colors.border}
-              rulesType="dashed"
-              yAxisTextStyle={{ color: theme.colors.textSecondary, fontSize: 10 }}
-              xAxisLabelTextStyle={{ color: theme.colors.textSecondary, fontSize: 10 }}
-              curved
-              thickness={2.5}
-              noOfSections={4}
-            />
-          )
-        }
-      </ChartSection>
+        {isAdmin ? (
+          <View style={s.tileGrid}>
+            <KpiTile label="Mentors" value={data.totalMentors} color={theme.colors.primary} />
+            <KpiTile label="Departments" value={data.totalDepartments} color={theme.colors.primary} />
+          </View>
+        ) : null}
 
-      {isAdmin ? (
-        <ChartSection title="INTERNS BY DEPARTMENT">
+        <ChartSection key={`trend-${resetKey}`} title="7-DAY ATTENDANCE TREND">
           {(showTable) =>
             showTable ? (
-              <DepartmentTable data={data.internsByDepartment} />
-            ) : data.internsByDepartment.length === 0 ? (
+              <TrendTable data={data.sevenDayTrend} />
+            ) : data.sevenDayTrend.length === 0 ? (
               <EmptyChartNote />
             ) : (
-              <BarChart
-                data={data.internsByDepartment.map((d, i) => ({
-                  value: d.count,
-                  label: d.departmentName,
-                  frontColor: theme.charts.categorical[i % theme.charts.categorical.length],
-                  labelTextStyle: { color: theme.colors.textSecondary, fontSize: 10 },
-                }))}
-                horizontal
-                height={Math.max(120, data.internsByDepartment.length * 36)}
-                barWidth={18}
-                barBorderRadius={4}
-                yAxisTextStyle={{ color: theme.colors.textSecondary, fontSize: 10 }}
-                xAxisColor={theme.colors.border}
+              <LineChart
+                height={180}
+                dataSet={[
+                  { data: data.sevenDayTrend.map((p) => ({ value: p.presentCount, label: shortDate(p.date) })), color: theme.colors.success },
+                  { data: data.sevenDayTrend.map((p) => ({ value: p.lateCount, label: shortDate(p.date) })), color: theme.colors.warning },
+                  { data: data.sevenDayTrend.map((p) => ({ value: p.absentCount, label: shortDate(p.date) })), color: theme.colors.error },
+                ]}
                 yAxisColor="transparent"
+                xAxisColor={theme.colors.border}
+                rulesColor={theme.colors.border}
+                rulesType="dashed"
+                yAxisTextStyle={{ color: theme.colors.textSecondary, fontSize: 10 }}
+                xAxisLabelTextStyle={{ color: theme.colors.textSecondary, fontSize: 10 }}
+                curved
+                thickness={2.5}
+                noOfSections={4}
               />
             )
           }
         </ChartSection>
-      ) : null}
 
-      <ChartSection title="VERIFICATION STATUS">
-        {(showTable) =>
-          showTable ? (
-            <VerificationTable data={data.verificationBreakdown} />
-          ) : data.verificationBreakdown.length === 0 ? (
-            <EmptyChartNote />
-          ) : (
-            <View style={s.donutRow}>
-              <PieChart
-                data={data.verificationBreakdown.map((v, i) => ({
-                  value: v.count,
-                  color: theme.charts.categorical[i % theme.charts.categorical.length],
-                  text: String(v.count),
-                  textColor: theme.colors.textPrimary,
-                }))}
-                donut
-                radius={60}
-                innerRadius={42}
-                innerCircleColor={theme.colors.surface}
-              />
-              <View style={s.legendCol}>
-                {data.verificationBreakdown.map((v, i) => (
-                  <View key={v.status} style={s.legendRow}>
-                    <View style={[s.legendDot, { backgroundColor: theme.charts.categorical[i % theme.charts.categorical.length] }]} />
-                    <Text variant="caption" style={s.legendText} numberOfLines={1}>
-                      {v.status}
-                    </Text>
-                    <Text variant="caption" style={s.legendCount}>
-                      {v.count}
-                    </Text>
-                  </View>
-                ))}
+        {isAdmin ? (
+          <ChartSection key={`dept-${resetKey}`} title="INTERNS BY DEPARTMENT">
+            {(showTable) =>
+              showTable ? (
+                <DepartmentTable data={data.internsByDepartment} />
+              ) : data.internsByDepartment.length === 0 ? (
+                <EmptyChartNote />
+              ) : (
+                <BarChart
+                  data={data.internsByDepartment.map((d, i) => ({
+                    value: d.count,
+                    label: d.departmentName,
+                    frontColor: theme.charts.categorical[i % theme.charts.categorical.length],
+                    labelTextStyle: { color: theme.colors.textSecondary, fontSize: 10 },
+                  }))}
+                  horizontal
+                  height={Math.max(120, data.internsByDepartment.length * 36)}
+                  barWidth={18}
+                  barBorderRadius={4}
+                  yAxisTextStyle={{ color: theme.colors.textSecondary, fontSize: 10 }}
+                  xAxisColor={theme.colors.border}
+                  yAxisColor="transparent"
+                />
+              )
+            }
+          </ChartSection>
+        ) : null}
+
+        <ChartSection key={`verif-${resetKey}`} title="VERIFICATION STATUS">
+          {(showTable) =>
+            showTable ? (
+              <VerificationTable data={data.verificationBreakdown} />
+            ) : data.verificationBreakdown.length === 0 ? (
+              <EmptyChartNote />
+            ) : (
+              <View style={s.donutRow}>
+                <PieChart
+                  data={data.verificationBreakdown.map((v, i) => ({
+                    value: v.count,
+                    color: theme.charts.categorical[i % theme.charts.categorical.length],
+                    text: String(v.count),
+                    textColor: theme.colors.textPrimary,
+                  }))}
+                  donut
+                  radius={60}
+                  innerRadius={42}
+                  innerCircleColor={theme.colors.surface}
+                />
+                <View style={s.legendCol}>
+                  {data.verificationBreakdown.map((v, i) => (
+                    <View key={v.status} style={s.legendRow}>
+                      <View style={[s.legendDot, { backgroundColor: theme.charts.categorical[i % theme.charts.categorical.length] }]} />
+                      <Text variant="caption" style={s.legendText} numberOfLines={1}>
+                        {v.status}
+                      </Text>
+                      <Text variant="caption" style={s.legendCount}>
+                        {v.count}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
               </View>
-            </View>
-          )
-        }
-      </ChartSection>
+            )
+          }
+        </ChartSection>
+      </ScrollView>
     </Screen>
   );
 }
@@ -295,8 +309,8 @@ function VerificationTable({ data }: { data: DashboardSummaryDto['verificationBr
 
 const makeStyles = (t: AppTheme) => ({
   container: {
-    paddingHorizontal: t.spacing.md,
-    paddingTop: t.spacing.sm,
+    paddingHorizontal: t.spacing.xs, // Left right padding kam kar di hai
+    paddingTop: t.spacing.xs,
   },
   heroCard: {
     backgroundColor: t.colors.surface,
@@ -304,7 +318,7 @@ const makeStyles = (t: AppTheme) => ({
     borderWidth: 1,
     borderColor: t.colors.border,
     paddingVertical: t.spacing.lg,
-    paddingHorizontal: t.spacing.lg,
+    paddingHorizontal: t.spacing.md,
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
@@ -345,30 +359,30 @@ const makeStyles = (t: AppTheme) => ({
   tileGrid: {
     flexDirection: 'row' as const,
     flexWrap: 'wrap' as const,
-    gap: t.spacing.sm,
+    gap: t.spacing.xs,
     marginBottom: t.spacing.md,
   },
   tile: {
-    flexBasis: '47%' as const,
+    flexBasis: '48%' as const,
     flexGrow: 1,
     backgroundColor: t.colors.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: t.colors.border,
-    padding: t.spacing.md,
+    padding: t.spacing.sm,
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    gap: t.spacing.sm,
+    gap: t.spacing.xs,
     elevation: 1,
   },
   tileIconBadge: {
-    minWidth: 42,
-    height: 42,
+    minWidth: 40,
+    height: 40,
     borderRadius: 12,
     backgroundColor: t.colors.surfaceSunken,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
   },
   tileLabel: {
     flex: 1,
@@ -380,7 +394,7 @@ const makeStyles = (t: AppTheme) => ({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: t.colors.border,
-    padding: t.spacing.lg,
+    padding: t.spacing.md,
     marginBottom: t.spacing.md,
     elevation: 2,
   },

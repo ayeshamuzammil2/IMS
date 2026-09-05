@@ -41,18 +41,21 @@ export function IdCardOversightScreen() {
   const [internProfileId, setInternProfileId] = useState<number | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       return () => {
-        // Jab bhi user is screen se baahar jayega, search reset ho jayegi
+        // Screen blur hone par sabhi filters, search, aur selection reset ho jayenge
         setShowSearch(false);
         setSearch('');
+        setDepartmentId(null);
+        setInternProfileId(null);
+        setSelected(new Set());
       };
     }, [])
   );
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [busyId, setBusyId] = useState<number | null>(null);
 
   // Departments Query
   const { data: departmentOptions = [] } = useQuery({ 

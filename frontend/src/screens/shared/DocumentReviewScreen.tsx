@@ -111,12 +111,14 @@ export function DocumentReviewScreen() {
     useCallback(() => {
       refetch();
       return () => {
+        // Jab bhi user is screen se baahar jayega, sabhi filters, search, aur modals reset ho jayenge
         setShowSearch(false);
         setSearch('');
         setDepartmentFilter(null);
         setInternFilter(null);
         setPreviewItem(null);
         setRejectTarget(null);
+        setRemarks('');
       };
     }, [refetch]),
   );
@@ -359,7 +361,7 @@ const makeStyles = (t: AppTheme) => ({
   filterWrapper: {
     marginTop: t.spacing.xs,
   },
- iconButton: {
+  iconButton: {
     width: 36,
     height: 36,
     borderRadius: 10,

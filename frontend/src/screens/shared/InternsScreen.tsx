@@ -140,7 +140,7 @@ export function InternsScreen() {
       };
     }, [])
   );
-  
+
   const toggleSearch = () => {
     if (showSearch) {
       setSearch('');

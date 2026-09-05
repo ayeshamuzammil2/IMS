@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Image, Pressable, Alert } from 'react-native';
 import { DrawerContentScrollView, DrawerItemList, type DrawerContentComponentProps } from '@react-navigation/drawer';
 import { Power } from 'lucide-react-native';
@@ -15,6 +15,16 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   const { user, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
 
+  // ScrollView ka ref top par reset karne ke liye
+  const scrollRef = useRef<any>(null);
+
+  // Jab bhi drawer navigation ki state badle (close/reopen ho), top par scroll reset kar do
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ y: 0, animated: false });
+    }
+  }, [props.state]);
+
   const handleSignOut = () => {
     Alert.alert('Sign out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -22,8 +32,12 @@ export function DrawerContent(props: DrawerContentComponentProps) {
         text: 'Sign out',
         style: 'destructive',
         onPress: async () => {
-          setSigningOut(true);
-          await signOut();
+          try {
+            setSigningOut(true);
+            await signOut();
+          } finally {
+            setSigningOut(false);
+          }
         },
       },
     ]);
@@ -54,7 +68,12 @@ export function DrawerContent(props: DrawerContentComponentProps) {
         </View>
       </Pressable>
 
-      <DrawerContentScrollView {...props} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
+      <DrawerContentScrollView
+        {...props}
+        ref={scrollRef}
+        contentContainerStyle={s.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <DrawerItemList {...props} />
       </DrawerContentScrollView>
 
@@ -85,12 +104,12 @@ const makeStyles = (t: AppTheme) => ({
     paddingBottom: t.spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: t.colors.border,
-    alignItems: 'flex-start' as const, // Strict Left Alignment
+    alignItems: 'flex-start' as const,
   },
   logo: { 
     width: 120, 
     height: 120,
-    alignSelf: 'center' as const, // Pure Left Align
+    alignSelf: 'center' as const,
   },
   userCard: {
     flexDirection: 'row' as const,
@@ -108,7 +127,7 @@ const makeStyles = (t: AppTheme) => ({
   footer: {
     paddingHorizontal: t.spacing.md,
     paddingTop: t.spacing.md,
-    paddingBottom: t.spacing.xl, // Sign out ko niche se upar kiya
+    paddingBottom: t.spacing.xl,
     borderTopWidth: 1,
     borderTopColor: t.colors.border,
   },

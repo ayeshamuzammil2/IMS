@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View,
   TextInput,
@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Send, Mail, ChevronLeft, MessageCircle } from 'lucide-react-native';
 import { Text } from '../../components/primitives/Text';
@@ -28,6 +29,17 @@ export function ChatScreen() {
   const [draft, setDraft] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+
+  // Screen Focus Reset Handler
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        // Screen chhorne par active contact selection aur message draft reset ho jayenge
+        setSelected(null);
+        setDraft('');
+      };
+    }, [])
+  );
 
   // Dynamic Keyboard Height Listener
   useEffect(() => {

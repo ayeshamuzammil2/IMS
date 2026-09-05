@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { View, Pressable, ActivityIndicator, FlatList } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
@@ -12,12 +12,11 @@ import { SelectField } from '../../components/forms/SelectField';
 import { attendanceApi, type AttendanceHistoryRowDto } from '../../api/resources/attendance.api';
 import { departmentsApi } from '../../api/resources/departments.api';
 import { toCsv } from '../../lib/csv';
-import { writeTextAndShare } from '../../lib/downloadAndShare';
+import { writeTextToDownloads } from '../../lib/downloadAndShare';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
 import { useAuth } from '../../providers/AuthProvider';
 import type { AppTheme } from '../../theme/types';
-import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 
 function isoDaysAgo(days: number): string {
@@ -28,7 +27,19 @@ function isoDaysAgo(days: number): string {
 
 function formatTime(iso: string | null): string {
   if (!iso) return '-';
-  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '-';
+
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+
+  hours = hours % 12;
+  hours = hours ? hours : 12; // 0 hour is 12 AM
+  const formattedHours = String(hours).padStart(2, '0');
+
+  return `${formattedHours}:${minutes}:${seconds} ${ampm}`;
 }
 
 const statusTone: Record<string, 'muted' | 'success' | 'warning' | 'error'> = {
@@ -58,13 +69,15 @@ export function AttendanceHistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       return () => {
-        // Jab bhi user is screen se baahar jayega, search reset ho jayegi
         setShowSearch(false);
         setSearch('');
+        setDepartmentId(null);
+        setStartDate(isoDaysAgo(6));
+        setEndDate(isoDaysAgo(0));
       };
     }, [])
   );
-  
+
   const { data: departmentOptions = [] } = useQuery({
     queryKey: ['departments', 'lookup'],
     queryFn: departmentsApi.lookup,
@@ -82,7 +95,6 @@ export function AttendanceHistoryScreen() {
     enabled: !!startDate && !!endDate,
   });
 
-  // Client-side Filter Logic for Search Query
   const filteredRows = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return rows;
@@ -116,7 +128,9 @@ export function AttendanceHistoryScreen() {
         { header: 'Arrival Time', value: (r) => (r.arrivalAtUtc ? formatTime(r.arrivalAtUtc) : '') },
         { header: 'Departure Time', value: (r) => (r.departureAtUtc ? formatTime(r.departureAtUtc) : '') },
       ]);
-      await writeTextAndShare(csv, `attendance-${startDate}-to-${endDate}.csv`, 'text/csv');
+      const fileName = `attendance-${startDate}-to-${endDate}.csv`;
+      await writeTextToDownloads(csv, fileName, 'text/csv');
+      Toast.show({ type: 'success', text1: 'Saved to Phone Downloads!', text2: fileName });
     } catch (error: any) {
       Toast.show({ type: 'error', text1: 'Could not export CSV', text2: error?.message });
     } finally {
@@ -231,7 +245,7 @@ export function AttendanceHistoryScreen() {
           )}
         </View>
 
-        {/* Search Icon Row (Filter ke niche Right side par) */}
+        {/* Search Icon Row */}
         <View style={s.searchIconRow}>
           <Pressable onPress={toggleSearch} style={[s.iconButton, showSearch && s.iconButtonActive]} hitSlop={8}>
             {showSearch ? (
@@ -255,7 +269,7 @@ export function AttendanceHistoryScreen() {
           </View>
         )}
 
-        {/* Export CSV Row - Right corner directly above Cards List */}
+        {/* Export CSV Row */}
         <View style={s.exportRow}>
           <Button
             label="Export CSV"

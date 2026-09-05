@@ -38,19 +38,22 @@ export function TeamAttendanceScreen() {
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
 
-  useFocusEffect(
-    useCallback(() => {
-      return () => {
-        // Jab bhi user is screen se baahar jayega, search reset ho jayegi
-        setShowSearch(false);
-        setSearch('');
-      };
-    }, [])
-  );
   const { data: rows = [], isLoading, refetch } = useQuery({
     queryKey: ['attendance', 'team-today', departmentId],
     queryFn: () => attendanceApi.teamToday(departmentId ?? undefined),
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+      return () => {
+        // Screen chhorne par Department Filter + Search state teeno reset ho jayenge
+        setDepartmentId(null);
+        setShowSearch(false);
+        setSearch('');
+      };
+    }, [refetch])
+  );
 
   const { data: departmentOptions = [] } = useQuery({
     queryKey: ['departments', 'lookup'],
@@ -72,12 +75,6 @@ export function TeamAttendanceScreen() {
         r.internCode?.toLowerCase().includes(q),
     );
   }, [rows, search]);
-
-  useFocusEffect(
-    useCallback(() => {
-      refetch();
-    }, [refetch]),
-  );
 
   const toggleSearch = () => {
     if (showSearch) {
@@ -202,7 +199,7 @@ export function TeamAttendanceScreen() {
           </View>
         )}
 
-        {/* Search Icon Row (Filter ke niche Right side par) */}
+        {/* Search Icon Row */}
         <View style={s.searchIconRow}>
           <Pressable onPress={toggleSearch} style={[s.iconButton, showSearch && s.iconButtonActive]} hitSlop={8}>
             {showSearch ? (
@@ -246,7 +243,7 @@ export function TeamAttendanceScreen() {
           ListEmptyComponent={
             <View style={s.emptyBox}>
               <Text variant="body" tone="muted">
-                {search.trim() ? 'No attendance records found matching your search.' : 'No interns to show today.'}
+                {search.trim() ? 'No records found matching your search.' : 'No interns to show today.'}
               </Text>
             </View>
           }
@@ -287,7 +284,6 @@ const makeStyles = (t: AppTheme) => ({
   },
   filterWrapper: {
     marginTop: t.spacing.xs,
-    
   },
   searchIconRow: {
     alignItems: 'flex-end' as const,

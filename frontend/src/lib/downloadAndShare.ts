@@ -5,19 +5,10 @@ import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
 import { getAccessToken } from '../api/client';
 
-// Lock flag to prevent concurrent IntentLauncher calls
 let isIntentLaunching = false;
 
-/**
- * Opens a locally-stored file directly. On Android this launches the file straight in the
- * user's default viewer/handler - no "share via..." app chooser - which behaves like a direct
- * open/download. iOS has no equivalent direct-open primitive for arbitrary files, so it falls
- * back to the native share sheet, from which "Save to Files" downloads it locally.
- */
 export async function openFileDirect(uri: string, mimeType: string): Promise<void> {
-  if (isIntentLaunching) {
-    return; // Ignore duplicate calls while an activity is already starting
-  }
+  if (isIntentLaunching) return;
 
   if (Platform.OS === 'android') {
     try {
@@ -30,7 +21,7 @@ export async function openFileDirect(uri: string, mimeType: string): Promise<voi
         type: mimeType,
       });
     } catch (error) {
-      console.warn('IntentLauncher failed, falling back to Sharing:', error);
+      console.warn('IntentLauncher failed:', error);
       const available = await Sharing.isAvailableAsync();
       if (available) {
         await Sharing.shareAsync(uri, { mimeType });
@@ -60,22 +51,46 @@ export async function downloadAndShare(url: string, fileName: string, mimeType =
 
     await openFileDirect(file.uri, mimeType);
   } catch (error) {
-    console.warn('Download and share error:', error);
+    console.warn('Download error:', error);
   }
 }
 
-export async function writeTextAndShare(content: string, fileName: string, mimeType?: string): Promise<void> {
+export async function writeTextAndShare(content: string, fileName: string, mimeType = 'text/csv'): Promise<void> {
   try {
     const file = new File(Paths.cache, fileName);
     if (file.exists) file.delete();
     file.create();
     file.write(content);
 
-    const available = await Sharing.isAvailableAsync();
-    if (available) {
-      await Sharing.shareAsync(file.uri, mimeType ? { mimeType } : undefined);
-    }
+    await openFileDirect(file.uri, mimeType);
   } catch (error) {
-    console.warn('Write and share error:', error);
+    console.warn('Write error:', error);
   }
+}
+
+/**
+ * File ko phone storage mein direct save karta hai.
+ * Android par StorageAccessFramework use karke Downloads folder mein save karega.
+ */
+export async function writeTextToDownloads(content: string, fileName: string, mimeType = 'text/csv'): Promise<void> {
+  if (Platform.OS === 'android') {
+    const permissions = await FileSystemLegacy.StorageAccessFramework.requestDirectoryPermissionsAsync();
+    if (permissions.granted) {
+      const uri = await FileSystemLegacy.StorageAccessFramework.createFileAsync(
+        permissions.directoryUri,
+        fileName,
+        mimeType
+      );
+      await FileSystemLegacy.writeAsStringAsync(uri, content, {
+        encoding: FileSystemLegacy.EncodingType.UTF8,
+      });
+      return;
+    }
+  }
+
+  // iOS ya fallback ke liye direct document directory mein write
+  const fileUri = `${FileSystemLegacy.documentDirectory}${fileName}`;
+  await FileSystemLegacy.writeAsStringAsync(fileUri, content, {
+    encoding: FileSystemLegacy.EncodingType.UTF8,
+  });
 }

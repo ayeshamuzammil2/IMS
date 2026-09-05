@@ -48,15 +48,6 @@ export function AttendanceReviewScreen() {
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
 
-  useFocusEffect(
-    useCallback(() => {
-      return () => {
-        // Jab bhi user is screen se baahar jayega, search reset ho jayegi
-        setShowSearch(false);
-        setSearch('');
-      };
-    }, [])
-  );
   const { data: queue = [], isLoading: queueLoading, refetch: refetchQueue } = useQuery({
     queryKey: ['attendance', 'review', 'queue'],
     queryFn: attendanceReviewApi.getQueue,
@@ -70,7 +61,12 @@ export function AttendanceReviewScreen() {
     useCallback(() => {
       refetchQueue();
       refetchOverrides();
-    }, [refetchQueue, refetchOverrides]),
+      return () => {
+        // Screen chhorne par search reset ho jayegi
+        setShowSearch(false);
+        setSearch('');
+      };
+    }, [refetchQueue, refetchOverrides])
   );
 
   const filteredQueue = useMemo(() => {

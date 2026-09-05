@@ -22,6 +22,30 @@ import type { AppTheme } from '../../theme/types';
 import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 
+// Helper: Format Phone (+92 3XX XXXXXXX)
+function formatPhoneInput(text: string): string {
+  let digits = text.replace(/\D/g, '');
+  if (digits.startsWith('92')) {
+    digits = digits.slice(2);
+  } else if (digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+  digits = digits.slice(0, 10);
+  if (digits.length === 0) return '+92 ';
+  return `+92 ${digits}`;
+}
+
+// Helper: Format CNIC (XXXXX-XXXXXXX-X)
+function formatCnicInput(text: string): string {
+  const digits = text.replace(/\D/g, '').slice(0, 13);
+  if (digits.length <= 5) {
+    return digits;
+  } else if (digits.length <= 12) {
+    return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+  } else {
+    return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`;
+  }
+}
 
 const passwordFields = {
   password: passwordSchema,
@@ -105,11 +129,11 @@ export function MentorsScreen() {
 
   const createForm = useForm<CreateInput, any, CreateOutput>({
     resolver: zodResolver(createSchema),
-    defaultValues: { fullName: '', email: '', cnic: '', phone: '', departmentId: 0, password: '', confirmPassword: '' },
+    defaultValues: { fullName: '', email: '', cnic: '', phone: '+92 ', departmentId: 0, password: '', confirmPassword: '' },
   });
   const updateForm = useForm<UpdateValues>({
     resolver: zodResolver(updateSchema),
-    defaultValues: { fullName: '', phone: '', cnic: '' },
+    defaultValues: { fullName: '', phone: '+92 ', cnic: '' },
   });
   const resetPasswordForm = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
@@ -122,8 +146,10 @@ export function MentorsScreen() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['mentors'] });
 
   const createMutation = useMutation({
-    mutationFn: (values: CreateOutput) =>
-      mentorsApi.create({ ...values, phone: values.phone?.trim() ? values.phone : null }),
+    mutationFn: (values: CreateOutput) => {
+      const cleanPhone = values.phone?.trim() === '+92' ? null : values.phone?.trim();
+      return mentorsApi.create({ ...values, phone: cleanPhone || null });
+    },
     onSuccess: () => {
       Toast.show({ type: 'success', text1: 'Mentor created', text2: 'Share the password you set with them directly.' });
       invalidate();
@@ -134,8 +160,10 @@ export function MentorsScreen() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: UpdateValues }) =>
-      mentorsApi.update(id, { ...body, phone: body.phone?.trim() ? body.phone : null, cnic: body.cnic?.trim() ? body.cnic : null }),
+    mutationFn: ({ id, body }: { id: number; body: UpdateValues }) => {
+      const cleanPhone = body.phone?.trim() === '+92' ? null : body.phone?.trim();
+      return mentorsApi.update(id, { ...body, phone: cleanPhone || null, cnic: body.cnic?.trim() ? body.cnic : null });
+    },
     onSuccess: () => {
       Toast.show({ type: 'success', text1: 'Mentor updated' });
       invalidate();
@@ -211,13 +239,17 @@ export function MentorsScreen() {
 
   const openCreate = () => {
     setEditing(null);
-    createForm.reset({ fullName: '', email: '', cnic: '', phone: '', departmentId: 0, password: '', confirmPassword: '' });
+    createForm.reset({ fullName: '', email: '', cnic: '', phone: '+92 ', departmentId: 0, password: '', confirmPassword: '' });
     setModalOpen(true);
   };
 
   const openEdit = (mentor: MentorDto) => {
     setEditing(mentor);
-    updateForm.reset({ fullName: mentor.fullName, phone: mentor.phone ?? '', cnic: mentor.cnic ?? '' });
+    updateForm.reset({ 
+      fullName: mentor.fullName, 
+      phone: mentor.phone ? formatPhoneInput(mentor.phone) : '+92 ', 
+      cnic: mentor.cnic ? formatCnicInput(mentor.cnic) : '' 
+    });
     setModalOpen(true);
   };
 
@@ -441,13 +473,27 @@ export function MentorsScreen() {
               control={updateForm.control}
               name="cnic"
               render={({ field }) => (
-                <Input label="CNIC" placeholder="42101-1234567-1" value={field.value} onChangeText={field.onChange} />
+                <Input
+                  label="CNIC"
+                  placeholder="42101-1234567-1"
+                  value={field.value}
+                  onChangeText={(val) => field.onChange(formatCnicInput(val))}
+                  keyboardType="number-pad"
+                />
               )}
             />
             <Controller
               control={updateForm.control}
               name="phone"
-              render={({ field }) => <Input label="Phone" value={field.value} onChangeText={field.onChange} keyboardType="phone-pad" />}
+              render={({ field }) => (
+                <Input
+                  label="Phone"
+                  value={field.value}
+                  onChangeText={(val) => field.onChange(formatPhoneInput(val))}
+                  keyboardType="phone-pad"
+                  placeholder="+92 3XX XXXXXXX"
+                />
+              )}
             />
           </>
         ) : (
@@ -489,7 +535,8 @@ export function MentorsScreen() {
                   required
                   placeholder="42101-1234567-1"
                   value={field.value}
-                  onChangeText={field.onChange}
+                  onChangeText={(val) => field.onChange(formatCnicInput(val))}
+                  keyboardType="number-pad"
                   error={createForm.formState.errors.cnic?.message}
                 />
               )}
@@ -497,7 +544,15 @@ export function MentorsScreen() {
             <Controller
               control={createForm.control}
               name="phone"
-              render={({ field }) => <Input label="Phone" value={field.value} onChangeText={field.onChange} keyboardType="phone-pad" />}
+              render={({ field }) => (
+                <Input
+                  label="Phone"
+                  value={field.value}
+                  onChangeText={(val) => field.onChange(formatPhoneInput(val))}
+                  keyboardType="phone-pad"
+                  placeholder="+92 3XX XXXXXXX"
+                />
+              )}
             />
             <Controller
               control={createForm.control}

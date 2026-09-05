@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { View, Pressable, ActivityIndicator, FlatList } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
@@ -13,7 +13,6 @@ import { departmentsApi } from '../../api/resources/departments.api';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
 import type { AppTheme } from '../../theme/types';
-import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 
 const statusTone: Record<string, 'muted' | 'success' | 'warning' | 'error'> = {
@@ -41,19 +40,21 @@ export function CertificateOversightScreen() {
   const [internProfileId, setInternProfileId] = useState<number | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       return () => {
-        // Jab bhi user is screen se baahar jayega, search reset ho jayegi
+        // Jab bhi user is screen se baahar jayega, sabhi filters, search aur selections reset ho jayenge
         setShowSearch(false);
         setSearch('');
+        setDepartmentId(null);
+        setInternProfileId(null);
+        setSelected(new Set());
       };
     }, [])
   );
-
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [busyId, setBusyId] = useState<number | null>(null);
 
   // Departments Query
   const { data: departmentOptions = [] } = useQuery({

@@ -52,9 +52,11 @@ export function DepartmentsScreen() {
   useFocusEffect(
     useCallback(() => {
       return () => {
-        // Jab bhi user is screen se baahar jayega, search reset ho jayegi
+        // Jab bhi user is screen se baahar jayega, search aur modals reset ho jayenge
         setShowSearch(false);
         setSearch('');
+        setModalOpen(false);
+        setEditing(null);
       };
     }, [])
   );
