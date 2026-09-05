@@ -95,16 +95,20 @@ const makeStyles = (t: AppTheme) => ({
   cardWrapper: {
     alignSelf: 'center' as const,
     width: 275,
-    backgroundColor: t.colors.surface,
+    backgroundColor: '#E8F5E9', // Fixed Mint Green (Ignores Dark/Light Mode)
     borderRadius: t.radii.lg ?? 16,
     borderWidth: 1.5,
-    borderColor: t.colors.border,
+    borderColor: '#C8E6C9', // Fixed Mint Border
     overflow: 'hidden' as const,
-    ...t.shadows.md,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
   },
   topBar: {
     height: 7,
-    backgroundColor: t.colors.primary,
+    backgroundColor: '#006633', // Fixed PIA Green Top Bar
     width: '100%' as const,
   },
   cardBody: {
@@ -112,7 +116,7 @@ const makeStyles = (t: AppTheme) => ({
     paddingTop: t.spacing.xs,
     paddingBottom: t.spacing.lg,
     alignItems: 'center' as const,
-    backgroundColor: t.colors.surface,
+    backgroundColor: '#E8F5E9', // Fixed Mint Green Body Background
   },
   headerContainer: {
     alignItems: 'center' as const,
@@ -124,7 +128,7 @@ const makeStyles = (t: AppTheme) => ({
     marginBottom: -6,
   },
   brand: {
-    color: t.colors.primary,
+    color: '#006633', // Fixed Brand Title Color
     fontWeight: '900' as const,
     fontSize: 18,
     lineHeight: 22,
@@ -132,16 +136,16 @@ const makeStyles = (t: AppTheme) => ({
     marginTop: -4,
   },
   badge: {
-    backgroundColor: t.colors.border,
+    backgroundColor: '#C8E6C9', // Fixed Light Mint Badge Fill
     paddingHorizontal: 12,
     paddingVertical: 2,
     borderRadius: 20,
     marginTop: 3,
     borderWidth: 0.8,
-    borderColor: t.colors.border,
+    borderColor: '#A5D6A7', // Fixed Badge Border
   },
   badgeText: {
-    color: t.colors.textPrimary,
+    color: '#1B4D2E', // Fixed Dark Green Badge Label
     fontSize: 9.5,
     fontWeight: '800' as const,
     letterSpacing: 0.8,
@@ -149,12 +153,12 @@ const makeStyles = (t: AppTheme) => ({
   photoContainer: {
     marginVertical: 6,
     padding: 3,
-    backgroundColor: t.colors.surface,
+    backgroundColor: '#FFFFFF', // Fixed White Image Frame Background
     borderRadius: t.radii.md ?? 10,
     borderWidth: 2,
-    borderColor: t.colors.primary,
+    borderColor: '#006633', // Fixed Dark Green Image Border
     elevation: 3,
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
@@ -165,12 +169,12 @@ const makeStyles = (t: AppTheme) => ({
     borderRadius: (t.radii.md ?? 10) - 2,
   },
   photoPlaceholder: {
-    backgroundColor: t.colors.skeleton,
+    backgroundColor: '#E0E0E0', // Fixed Skeleton Color
   },
   name: {
     fontSize: 16.5,
     fontWeight: '800' as const,
-    color: t.colors.textPrimary,
+    color: '#111827', // Fixed Primary Dark Text (Ignores Theme)
     marginTop: 2,
     textAlign: 'center' as const,
     letterSpacing: 0.2,
@@ -178,30 +182,30 @@ const makeStyles = (t: AppTheme) => ({
   designation: {
     fontSize: 12,
     fontWeight: '700' as const,
-    color: t.colors.primary,
+    color: '#006633', // Fixed Designation Accent Color
     marginTop: 1,
   },
   divider: {
     width: '85%' as const,
     height: 1.5,
-    backgroundColor: t.colors.border,
+    backgroundColor: '#A5D6A7', // Fixed Divider Color
     marginVertical: 8,
     borderRadius: 1,
   },
   deptText: {
     fontSize: 11.5,
     fontWeight: '700' as const,
-    color: t.colors.textSecondary,
+    color: '#374151', // Fixed Secondary Dark Gray Text
     marginBottom: 1,
   },
   email: {
     fontSize: 10.5,
-    color: t.colors.textMuted,
+    color: '#4B5563', // Fixed Muted Dark Text
     textAlign: 'center' as const,
     marginBottom: 4,
   },
   idBadge: {
-    backgroundColor: t.colors.primary,
+    backgroundColor: '#006633', // Fixed PIA Green Badge Fill
     paddingHorizontal: 14,
     paddingVertical: 4,
     borderRadius: 8,
@@ -209,7 +213,7 @@ const makeStyles = (t: AppTheme) => ({
     elevation: 1,
   },
   idBadgeText: {
-    color: t.colors.surface,
+    color: '#FFFFFF', // Fixed White Text
     fontSize: 11,
     fontWeight: '800' as const,
     letterSpacing: 0.8,
@@ -217,7 +221,7 @@ const makeStyles = (t: AppTheme) => ({
   emergencyText: {
     fontSize: 10,
     fontWeight: '600' as const,
-    color: t.colors.textMuted,
+    color: '#6B7280', // Fixed Contact Info Muted Color
     marginTop: 3,
   },
 });

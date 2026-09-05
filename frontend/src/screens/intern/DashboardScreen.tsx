@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { Pressable, View, ActivityIndicator } from 'react-native';
+import React, { useCallback, useState, useRef } from 'react';
+import { Pressable, View, ActivityIndicator, ScrollView } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
@@ -53,6 +53,8 @@ export function DashboardScreen() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
 
+  const scrollRef = useRef<ScrollView>(null);
+
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['documents', 'dashboard'],
     queryFn: documentsApi.getDashboard,
@@ -61,6 +63,9 @@ export function DashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       refetch();
+      if (scrollRef.current) {
+        scrollRef.current.scrollTo({ y: 0, animated: false });
+      }
     }, [refetch]),
   );
 
@@ -82,83 +87,89 @@ export function DashboardScreen() {
   );
 
   return (
-    <Screen scroll style={s.container}>
-      {/* Profile Header */}
-      <View style={s.profileHeader}>
-        <View style={s.photoWrap}>
-          {data.approvedPhotoFileId ? (
-            <AuthImage fileId={data.approvedPhotoFileId} size={110} style={s.photo} />
-          ) : (
-            <RoleAvatar name={data.fullName} size={110} />
-          )}
-          <Pressable onPress={goToDocuments} style={s.editButton} hitSlop={4}>
-            <Pencil size={14} color={theme.colors.onPrimary} />
-          </Pressable>
-        </View>
-
-        <Text variant="h1" style={s.name}>
-          {data.fullName}
-        </Text>
-        <Text variant="caption" style={s.internCode}>
-          {data.internCode}
-        </Text>
-      </View>
-
-      <VerificationBanner status={data.verificationStatus} />
-
-      {/* Internship Details Card */}
-      <View style={s.card}>
-        <View style={s.cardHeader}>
-          <ShieldCheck size={16} color={theme.colors.primary} />
-          <Text variant="overline" style={s.cardTitle}>
-            INTERNSHIP DETAILS
-          </Text>
-        </View>
-
-        <View style={s.detailsGroup}>
-          <Row label="Department" value={data.departmentName} />
-          <Row label="Mentor" value={data.mentorName} />
-          <Row label="Start Date" value={formatDate(data.internshipStartDate)} />
-          <Row label="End Date" value={formatDate(data.internshipEndDate)} />
-          <Row label="Daily Hours" value={`${formatTime(data.dailyStartTime)} - ${formatTime(data.dailyEndTime)}`} />
-          <Row label="University" value={data.universityName} />
-          <Row label="Degree Program" value={data.degreeProgram} />
-          <Row label="Email" value={data.email} />
-          <Row label="Phone" value={data.phone ? formatPhone(data.phone) : null} />
-          <Row label="CNIC" value={formatCnic(data.cnic)} isLast />
-        </View>
-      </View>
-
-      {/* Self Details Card */}
-      <View style={s.card}>
-        <View style={s.cardHeader}>
-          <User size={16} color={theme.colors.primary} />
-          <Text variant="overline" style={s.cardTitle}>
-            PERSONAL DETAILS
-          </Text>
-        </View>
-
-        {isSelfDetailsSubmitted ? (
-          <View style={s.detailsGroup}>
-            <Row label="Address" value={data.address} />
-            <Row label="Emergency Contact Name" value={data.emergencyContactName} />
-            <Row label="Emergency Contact Phone" value={data.emergencyContactPhone ? formatPhone(data.emergencyContactPhone) : null} />
-            <Row label="Blood Group" value={data.bloodGroup} isLast />
-
-            <View style={s.noticeBox}>
-              <Info size={15} color={theme.colors.textSecondary} />
-              <Text variant="caption" style={s.noticeText}>
-                To modify or update these details, please contact your mentor.
-              </Text>
-            </View>
+    <Screen scroll={false}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={s.container}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Profile Header */}
+        <View style={s.profileHeader}>
+          <View style={s.photoWrap}>
+            {data.approvedPhotoFileId ? (
+              <AuthImage fileId={data.approvedPhotoFileId} size={110} style={s.photo} />
+            ) : (
+              <RoleAvatar name={data.fullName} size={110} />
+            )}
+            <Pressable onPress={goToDocuments} style={s.editButton} hitSlop={4}>
+              <Pencil size={14} color={theme.colors.onPrimary} />
+            </Pressable>
           </View>
-        ) : (
-          <SelfDetailsForm
-            initial={data}
-            onSubmitted={() => queryClient.invalidateQueries({ queryKey: ['documents', 'dashboard'] })}
-          />
-        )}
-      </View>
+
+          <Text variant="h1" style={s.name}>
+            {data.fullName}
+          </Text>
+          <Text variant="caption" style={s.internCode}>
+            {data.internCode}
+          </Text>
+        </View>
+
+        <VerificationBanner status={data.verificationStatus} />
+
+        {/* Internship Details Card */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <ShieldCheck size={16} color={theme.colors.primary} />
+            <Text variant="overline" style={s.cardTitle}>
+              INTERNSHIP DETAILS
+            </Text>
+          </View>
+
+          <View style={s.detailsGroup}>
+            <Row label="Department" value={data.departmentName} />
+            <Row label="Mentor" value={data.mentorName} />
+            <Row label="Start Date" value={formatDate(data.internshipStartDate)} />
+            <Row label="End Date" value={formatDate(data.internshipEndDate)} />
+            <Row label="Daily Hours" value={`${formatTime(data.dailyStartTime)} - ${formatTime(data.dailyEndTime)}`} />
+            <Row label="University" value={data.universityName} />
+            <Row label="Degree Program" value={data.degreeProgram} />
+            <Row label="Email" value={data.email} />
+            <Row label="Phone" value={data.phone ? formatPhone(data.phone) : null} />
+            <Row label="CNIC" value={formatCnic(data.cnic)} isLast />
+          </View>
+        </View>
+
+        {/* Self Details Card */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <User size={16} color={theme.colors.primary} />
+            <Text variant="overline" style={s.cardTitle}>
+              PERSONAL DETAILS
+            </Text>
+          </View>
+
+          {isSelfDetailsSubmitted ? (
+            <View style={s.detailsGroup}>
+              <Row label="Address" value={data.address} />
+              <Row label="Emergency Contact Name" value={data.emergencyContactName} />
+              <Row label="Emergency Contact Phone" value={data.emergencyContactPhone ? formatPhone(data.emergencyContactPhone) : null} />
+              <Row label="Blood Group" value={data.bloodGroup} isLast />
+
+              <View style={s.noticeBox}>
+                <Info size={15} color={theme.colors.textSecondary} />
+                <Text variant="caption" style={s.noticeText}>
+                  To modify or update these details, please contact your mentor.
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <SelfDetailsForm
+              initial={data}
+              onSubmitted={() => queryClient.invalidateQueries({ queryKey: ['documents', 'dashboard'] })}
+            />
+          )}
+        </View>
+      </ScrollView>
     </Screen>
   );
 }
@@ -227,7 +238,7 @@ function Row({ label, value, isLast }: { label: string; value?: string | null; i
 
 const makeStyles = (t: AppTheme) => ({
   container: {
-    paddingHorizontal: 22,
+    paddingHorizontal: 3,
     paddingTop: t.spacing.md,
     paddingBottom: t.spacing.xl,
   },

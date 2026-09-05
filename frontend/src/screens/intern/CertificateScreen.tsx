@@ -110,13 +110,13 @@ export function CertificateScreen() {
 
   return (
     <Screen scroll style={s.container}>
-      {/* Main Status Header Card */}
+      {/* Main Status Header Card (Compact Sizing) */}
       <View style={[s.statusCard, { borderColor: activeToneColor }]}>
         <View style={[s.iconBadge, { backgroundColor: `${activeToneColor}15` }]}>
-          <IconComponent size={28} color={activeToneColor} />
+          <IconComponent size={22} color={activeToneColor} />
         </View>
 
-        <Text variant="h1" style={s.statusTitleText}>
+        <Text variant="h2" style={s.statusTitleText}>
           {config.title}
         </Text>
 
@@ -183,7 +183,7 @@ export function CertificateScreen() {
 
 const makeStyles = (t: AppTheme) => ({
   container: {
-    paddingHorizontal: 22,
+    paddingHorizontal: 18,
     paddingTop: t.spacing.md,
     paddingBottom: t.spacing.xl,
   },
@@ -201,36 +201,36 @@ const makeStyles = (t: AppTheme) => ({
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
     borderWidth: 1.5,
-    paddingVertical: t.spacing.lg,
-    paddingHorizontal: t.spacing.md,
-    marginBottom: t.spacing.md,
+    paddingVertical: t.spacing.sm,
+    paddingHorizontal: t.spacing.sm,
+    marginBottom: t.spacing.sm,
     shadowColor: t.colors.textPrimary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   iconBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    marginBottom: t.spacing.xs,
+    marginBottom: 4,
   },
   statusTitleText: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '800' as const,
     color: t.colors.textPrimary,
     textAlign: 'center' as const,
-    marginTop: 4,
-    marginBottom: 4,
+    marginTop: 2,
+    marginBottom: 2,
   },
   statusDescText: {
     color: t.colors.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
     textAlign: 'center' as const,
-    paddingHorizontal: t.spacing.sm,
+    paddingHorizontal: t.spacing.xs,
   },
   card: {
     backgroundColor: t.colors.surface,

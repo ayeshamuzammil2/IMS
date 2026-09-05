@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
@@ -72,6 +72,7 @@ export function IdCardScreen() {
   const theme = useTheme();
   const [downloading, setDownloading] = useState(false);
 
+  const scrollRef = useRef<ScrollView>(null);
   const cardShotRef = useRef<any>(null);
 
   const { data, isLoading, refetch } = useQuery({
@@ -82,6 +83,10 @@ export function IdCardScreen() {
   useFocusEffect(
     useCallback(() => {
       refetch();
+      setDownloading(false);
+      if (scrollRef.current) {
+        scrollRef.current.scrollTo({ y: 0, animated: false });
+      }
     }, [refetch]),
   );
 
@@ -119,98 +124,104 @@ export function IdCardScreen() {
   const activeToneColor = config.tone === 'muted' ? theme.colors.textMuted : theme.colors[stateTone[config.tone]];
 
   return (
-    <Screen scroll style={s.container}>
-      {/* Live Preview Card */}
-      {data.status !== 'Draft' ? (
-        <View style={s.previewCardWrapper}>
-          <IdCardPreview
-            ref={cardShotRef}
-            fullName={data.internFullName ?? ''}
-            designation={data.designation ?? ''}
-            email={data.email}
-            departmentName={data.departmentName}
-            cardNumber={data.cardNumber}
-            emergencyContactPhone={data.emergencyContactPhone}
-            photoFileId={data.photoFileId}
-          />
-        </View>
-      ) : null}
-
-      {/* Main Status Header Card */}
-      <View style={[s.statusCard, { borderColor: activeToneColor }]}>
-        <View style={[s.iconBadge, { backgroundColor: `${activeToneColor}15` }]}>
-          <IconComponent size={28} color={activeToneColor} />
-        </View>
-        
-        <Text variant="h1" style={s.statusTitleText}>
-          {config.title}
-        </Text>
-        
-        <Text variant="caption" style={s.statusDescText}>
-          {config.description}
-        </Text>
-      </View>
-
-      {/* Meta Card with Clean Row-Based Alignment */}
-      {(data.cardNumber || data.validUntil) && (
-        <View style={s.card}>
-          <View style={s.cardHeader}>
-            <IdCardIcon size={16} color={theme.colors.primary} />
-            <Text variant="overline" style={s.cardTitle}>
-              CARD DETAILS
-            </Text>
-          </View>
-
-          <View style={s.detailsGroup}>
-            {data.cardNumber ? (
-              <View style={s.detailRow}>
-                <Text variant="caption" style={s.detailLabel}>Card No</Text>
-                <Text variant="body" style={s.detailValue}>{data.cardNumber}</Text>
-              </View>
-            ) : null}
-
-            {data.cardNumber && data.validUntil ? <View style={s.rowDivider} /> : null}
-
-            {data.validUntil ? (
-              <View style={s.detailRow}>
-                <Text variant="caption" style={s.detailLabel}>Valid Until</Text>
-                <Text variant="body" style={s.detailValue}>
-                  {new Date(data.validUntil).toLocaleDateString()}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-      )}
-
-      {/* Actions Group */}
-      <View style={s.actionsGroup}>
-        <Button
-          label={downloading ? 'Downloading...' : 'Download ID Card (PDF)'}
-          onPress={handleDownload}
-          disabled={!canDownload || downloading}
-          loading={downloading}
-          fullWidth
-          style={s.actionButton}
-        />
-        
-        {!canDownload ? (
-          <View style={s.reasonBox}>
-            <AlertCircle size={14} color={theme.colors.textSecondary} />
-            <Text variant="caption" style={s.reasonText}>
-              Download unlocks after admin approval
-            </Text>
+    <Screen scroll={false}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={s.container}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Live Preview Card */}
+        {data.status !== 'Draft' ? (
+          <View style={s.previewCardWrapper}>
+            <IdCardPreview
+              ref={cardShotRef}
+              fullName={data.internFullName ?? ''}
+              designation={data.designation ?? ''}
+              email={data.email}
+              departmentName={data.departmentName}
+              cardNumber={data.cardNumber}
+              emergencyContactPhone={data.emergencyContactPhone}
+              photoFileId={data.photoFileId}
+            />
           </View>
         ) : null}
-      </View>
+
+        {/* Main Status Header Card (Compact Sleek Sizing) */}
+        <View style={[s.statusCard, { borderColor: activeToneColor }]}>
+          <View style={[s.iconBadge, { backgroundColor: `${activeToneColor}15` }]}>
+            <IconComponent size={22} color={activeToneColor} />
+          </View>
+          
+          <Text variant="h2" style={s.statusTitleText}>
+            {config.title}
+          </Text>
+          
+          <Text variant="caption" style={s.statusDescText}>
+            {config.description}
+          </Text>
+        </View>
+
+        {/* Meta Card with Clean Row-Based Alignment */}
+        {(data.cardNumber || data.validUntil) && (
+          <View style={s.card}>
+            <View style={s.cardHeader}>
+              <IdCardIcon size={16} color={theme.colors.primary} />
+              <Text variant="overline" style={s.cardTitle}>
+                CARD DETAILS
+              </Text>
+            </View>
+
+            <View style={s.detailsGroup}>
+              {data.cardNumber ? (
+                <View style={s.detailRow}>
+                  <Text variant="caption" style={s.detailLabel}>Card No</Text>
+                  <Text variant="body" style={s.detailValue}>{data.cardNumber}</Text>
+                </View>
+              ) : null}
+
+              {data.cardNumber && data.validUntil ? <View style={s.rowDivider} /> : null}
+
+              {data.validUntil ? (
+                <View style={s.detailRow}>
+                  <Text variant="caption" style={s.detailLabel}>Valid Until</Text>
+                  <Text variant="body" style={s.detailValue}>
+                    {new Date(data.validUntil).toLocaleDateString()}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        )}
+
+        {/* Actions Group */}
+        <View style={s.actionsGroup}>
+          <Button
+            label={downloading ? 'Downloading...' : 'Download ID Card (PDF)'}
+            onPress={handleDownload}
+            disabled={!canDownload || downloading}
+            loading={downloading}
+            fullWidth
+            style={s.actionButton}
+          />
+          
+          {!canDownload ? (
+            <View style={s.reasonBox}>
+              <AlertCircle size={14} color={theme.colors.textSecondary} />
+              <Text variant="caption" style={s.reasonText}>
+                Download unlocks after admin approval
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </ScrollView>
     </Screen>
   );
 }
 
 const makeStyles = (t: AppTheme) => ({
   container: {
-    paddingHorizontal: 22,
-    paddingTop: t.spacing.md,
+    paddingHorizontal: 3,
+    paddingTop:1,
     paddingBottom: t.spacing.xl,
   },
   centerLoading: {
@@ -225,41 +236,42 @@ const makeStyles = (t: AppTheme) => ({
   previewCardWrapper: {
     marginBottom: t.spacing.md,
   },
+  
   statusCard: {
     alignItems: 'center' as const,
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
-    borderWidth: 1.5,
-    paddingVertical: t.spacing.lg,
-    paddingHorizontal: t.spacing.md,
-    marginBottom: t.spacing.md,
+    borderWidth: 1,
+    paddingVertical: t.spacing.sm, 
+    paddingHorizontal: t.spacing.sm,
+    marginBottom: t.spacing.sm,
     shadowColor: t.colors.textPrimary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   iconBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 44, 
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    marginBottom: t.spacing.xs,
+    marginBottom: 4,
   },
   statusTitleText: {
-    fontSize: 20,
+    fontSize: 16, 
     fontWeight: '800' as const,
     color: t.colors.textPrimary,
     textAlign: 'center' as const,
-    marginTop: 4,
-    marginBottom: 4,
+    marginTop: 2,
+    marginBottom: 2,
   },
   statusDescText: {
     color: t.colors.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
     textAlign: 'center' as const,
-    paddingHorizontal: t.spacing.sm,
+    paddingHorizontal: t.spacing.xs,
   },
   card: {
     backgroundColor: t.colors.surface,

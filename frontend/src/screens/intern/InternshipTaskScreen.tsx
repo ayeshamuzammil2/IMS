@@ -56,11 +56,12 @@ export function InternshipTaskScreen() {
   if (assignments.length === 0) {
     return (
       <Screen scroll style={s.container}>
+        {/* Compact Empty Card */}
         <View style={s.emptyCard}>
           <View style={s.emptyIconWrapper}>
-            <FolderKanban size={32} color={theme.colors.textMuted} />
+            <FolderKanban size={22} color={theme.colors.textMuted} />
           </View>
-          <Text variant="h1" style={s.emptyTitle}>
+          <Text variant="h2" style={s.emptyTitle}>
             No Projects Assigned
           </Text>
           <Text variant="caption" style={s.emptyText}>
@@ -168,8 +169,8 @@ function StatusBadge({ status }: { status: string }) {
 
 const makeStyles = (t: AppTheme) => ({
   container: {
-    paddingHorizontal: 22,
-    paddingTop: t.spacing.md,
+    paddingHorizontal: 18,
+    paddingTop: 16,
     paddingBottom: t.spacing.xl,
   },
   centerLoading: {
@@ -187,41 +188,42 @@ const makeStyles = (t: AppTheme) => ({
     borderRadius: t.radii.lg,
     borderWidth: 1.5,
     borderColor: t.colors.border,
-    paddingVertical: t.spacing.xl,
-    paddingHorizontal: t.spacing.lg,
-    marginTop: t.spacing.md,
+    paddingVertical: t.spacing.sm,
+    paddingHorizontal: t.spacing.sm,
+    marginBottom: t.spacing.sm,
     shadowColor: t.colors.textPrimary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   emptyIconWrapper: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: t.colors.surfaceSunken,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    marginBottom: t.spacing.xs,
+    marginBottom: 4,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800' as const,
     color: t.colors.textPrimary,
     textAlign: 'center' as const,
-    marginTop: 4,
-    marginBottom: 4,
+    marginTop: 2,
+    marginBottom: 2,
   },
   emptyText: {
     color: t.colors.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
     textAlign: 'center' as const,
+    paddingHorizontal: t.spacing.xs,
   },
   card: {
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: t.colors.border,
     padding: t.spacing.lg,
     marginBottom: t.spacing.md,

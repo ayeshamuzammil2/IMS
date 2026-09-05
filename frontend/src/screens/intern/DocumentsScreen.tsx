@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { View, ActivityIndicator, Modal, Pressable } from 'react-native';
+import React, { useCallback, useState, useRef } from 'react';
+import { View, ActivityIndicator, Modal, Pressable, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
@@ -41,6 +41,8 @@ export function DocumentsScreen() {
   const [uploadingType, setUploadingType] = useState<DocumentTypeKey | null>(null);
   const [previewDoc, setPreviewDoc] = useState<DocumentDto | null>(null);
 
+  const scrollRef = useRef<ScrollView>(null);
+
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['documents', 'dashboard'],
     queryFn: documentsApi.getDashboard,
@@ -49,6 +51,11 @@ export function DocumentsScreen() {
   useFocusEffect(
     useCallback(() => {
       refetch();
+      setUploadingType(null);
+      setPreviewDoc(null);
+      if (scrollRef.current) {
+        scrollRef.current.scrollTo({ y: 0, animated: false });
+      }
     }, [refetch]),
   );
 
@@ -124,122 +131,128 @@ export function DocumentsScreen() {
   }
 
   return (
-    <Screen scroll style={s.screenContainer}>
-      {data?.verificationStatus ? (
-        <EnhancedVerificationBanner status={data.verificationStatus} />
-      ) : null}
+    <Screen scroll={false}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={s.screenContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {data?.verificationStatus ? (
+          <EnhancedVerificationBanner status={data.verificationStatus} />
+        ) : null}
 
-      <View style={s.listContainer}>
-        {REQUIRED_TYPES.map((typeConfig) => {
-          const doc = documentsByType.get(typeConfig.key);
-          const isImg = isImageFile(doc);
+        <View style={s.listContainer}>
+          {REQUIRED_TYPES.map((typeConfig) => {
+            const doc = documentsByType.get(typeConfig.key);
+            const isImg = isImageFile(doc);
 
-          return (
-            <View key={typeConfig.key} style={s.card}>
-              <View style={s.cardHeader}>
-                <Pressable
-                  onPress={() => doc && handleDocumentClick(doc)}
-                  disabled={!doc}
-                  style={[s.avatarBadge, doc && !isImg && s.pdfAvatarBadge]}
-                >
-                  {doc?.fileId ? (
-                    isImg ? (
-                      <AuthImage fileId={doc.fileId} size={44} style={s.avatarImage} />
+            return (
+              <View key={typeConfig.key} style={s.card}>
+                <View style={s.cardHeader}>
+                  <Pressable
+                    onPress={() => doc && handleDocumentClick(doc)}
+                    disabled={!doc}
+                    style={[s.avatarBadge, doc && !isImg && s.pdfAvatarBadge]}
+                  >
+                    {doc?.fileId ? (
+                      isImg ? (
+                        <AuthImage fileId={doc.fileId} size={44} style={s.avatarImage} />
+                      ) : (
+                        <File size={20} color={theme.colors.primary} />
+                      )
                     ) : (
-                      <File size={20} color={theme.colors.primary} />
-                    )
-                  ) : (
-                    <FileText size={20} color={theme.colors.textMuted} />
-                  )}
-                </Pressable>
+                      <FileText size={20} color={theme.colors.textMuted} />
+                    )}
+                  </Pressable>
 
-                <View style={s.cardHeaderText}>
-                  <Text variant="bodyStrong" style={s.cardTitle} numberOfLines={1}>
-                    {typeConfig.label}
-                  </Text>
-                  <Text variant="caption" tone="muted" style={s.subText} numberOfLines={2}>
-                    {typeConfig.helper}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={s.statusRow}>
-                <View style={s.metaLeftGroup}>
-                  <Text variant="caption" tone="muted" style={s.deptText} numberOfLines={1}>
-                    Status
-                  </Text>
-                </View>
-
-                <StatusBadge status={doc?.status ?? null} />
-              </View>
-
-              {doc?.status === 'Rejected' && doc.remarks ? (
-                <View style={s.remarksCard}>
-                  <View style={s.remarksHeader}>
-                    <AlertCircle size={15} color={theme.colors.error} />
-                    <Text variant="overline" style={s.remarksTitle}>
-                      REJECTION REASON
+                  <View style={s.cardHeaderText}>
+                    <Text variant="bodyStrong" style={s.cardTitle} numberOfLines={1}>
+                      {typeConfig.label}
+                    </Text>
+                    <Text variant="caption" tone="muted" style={s.subText} numberOfLines={2}>
+                      {typeConfig.helper}
                     </Text>
                   </View>
-                  <Text variant="caption" style={s.remarksText}>
-                    {doc.remarks}
-                  </Text>
                 </View>
-              ) : null}
 
-              <View style={s.divider} />
+                <View style={s.statusRow}>
+                  <View style={s.metaLeftGroup}>
+                    <Text variant="caption" tone="muted" style={s.deptText} numberOfLines={1}>
+                      Status
+                    </Text>
+                  </View>
 
-              <View style={s.actionRow}>
-                <Button
-                  label={doc ? 'Re-upload' : 'Upload'}
-                  size="sm"
-                  variant={doc?.status === 'Rejected' ? 'danger' : 'primary'}
-                  loading={uploadingType === typeConfig.key}
-                  onPress={() => handleUpload(typeConfig)}
-                  style={s.actionBtn}
-                />
+                  <StatusBadge status={doc?.status ?? null} />
+                </View>
+
+                {doc?.status === 'Rejected' && doc.remarks ? (
+                  <View style={s.remarksCard}>
+                    <View style={s.remarksHeader}>
+                      <AlertCircle size={15} color={theme.colors.error} />
+                      <Text variant="overline" style={s.remarksTitle}>
+                        REJECTION REASON
+                      </Text>
+                    </View>
+                    <Text variant="caption" style={s.remarksText}>
+                      {doc.remarks}
+                    </Text>
+                  </View>
+                ) : null}
+
+                <View style={s.divider} />
+
+                <View style={s.actionRow}>
+                  <Button
+                    label={doc ? 'Re-upload' : 'Upload'}
+                    size="sm"
+                    variant={doc?.status === 'Rejected' ? 'danger' : 'primary'}
+                    loading={uploadingType === typeConfig.key}
+                    onPress={() => handleUpload(typeConfig)}
+                    style={s.actionBtn}
+                  />
+                </View>
               </View>
-            </View>
-          );
-        })}
+            );
+          })}
 
-        <ExtraDocumentCard
-          doc={extraDocument}
-          uploading={uploadingType === 'ExtraDocument'}
-          onUploadFile={handleUploadExtraFile}
-          onDocumentClick={handleDocumentClick}
-          onSubmitLink={async (url) => {
-            setUploadingType('ExtraDocument');
-            try {
-              await documentsApi.submitExtraLink(url);
-              Toast.show({ type: 'success', text1: 'Link submitted', text2: 'Awaiting review by your mentor.' });
-              invalidate();
-            } catch (error: any) {
-              Toast.show({ type: 'error', text1: 'Could not submit link', text2: error?.response?.data?.message ?? error?.message });
-            } finally {
-              setUploadingType(null);
-            }
-          }}
-        />
-      </View>
-
-      <Modal visible={Boolean(previewDoc)} transparent animationType="fade" onRequestClose={() => setPreviewDoc(null)}>
-        <View style={s.modalOverlay}>
-          <View style={s.modalContainer}>
-            <View style={s.modalHeader}>
-              <Text variant="body" style={s.modalTitle}>
-                Document Preview
-              </Text>
-              <Pressable onPress={() => setPreviewDoc(null)} hitSlop={10}>
-                <X size={20} color={theme.colors.textPrimary} />
-              </Pressable>
-            </View>
-            {previewDoc?.fileId ? (
-              <AuthImage fileId={previewDoc.fileId} style={s.previewImage} contentFit="contain" />
-            ) : null}
-          </View>
+          <ExtraDocumentCard
+            doc={extraDocument}
+            uploading={uploadingType === 'ExtraDocument'}
+            onUploadFile={handleUploadExtraFile}
+            onDocumentClick={handleDocumentClick}
+            onSubmitLink={async (url) => {
+              setUploadingType('ExtraDocument');
+              try {
+                await documentsApi.submitExtraLink(url);
+                Toast.show({ type: 'success', text1: 'Link submitted', text2: 'Awaiting review by your mentor.' });
+                invalidate();
+              } catch (error: any) {
+                Toast.show({ type: 'error', text1: 'Could not submit link', text2: error?.response?.data?.message ?? error?.message });
+              } finally {
+                setUploadingType(null);
+              }
+            }}
+          />
         </View>
-      </Modal>
+
+        <Modal visible={Boolean(previewDoc)} transparent animationType="fade" onRequestClose={() => setPreviewDoc(null)}>
+          <View style={s.modalOverlay}>
+            <View style={s.modalContainer}>
+              <View style={s.modalHeader}>
+                <Text variant="body" style={s.modalTitle}>
+                  Document Preview
+                </Text>
+                <Pressable onPress={() => setPreviewDoc(null)} hitSlop={10}>
+                  <X size={20} color={theme.colors.textPrimary} />
+                </Pressable>
+              </View>
+              {previewDoc?.fileId ? (
+                <AuthImage fileId={previewDoc.fileId} style={s.previewImage} contentFit="contain" />
+              ) : null}
+            </View>
+          </View>
+        </Modal>
+      </ScrollView>
     </Screen>
   );
 }
@@ -287,6 +300,12 @@ function ExtraDocumentCard({
   const theme = useTheme();
   const [link, setLink] = useState(doc?.externalLinkUrl ?? '');
   const isImg = isImageFile(doc);
+
+  useFocusEffect(
+    useCallback(() => {
+      setLink(doc?.externalLinkUrl ?? '');
+    }, [doc?.externalLinkUrl])
+  );
 
   return (
     <View style={s.card}>
@@ -412,8 +431,9 @@ function StatusBadge({ status }: { status: DocumentDto['status'] | null }) {
 
 const makeStyles = (t: AppTheme) => ({
   screenContainer: {
-    paddingHorizontal: t.spacing.lg,
-    paddingTop: t.spacing.lg,
+    paddingHorizontal: 1,
+    paddingTop: 0,
+    paddingBottom: t.spacing.xl,
   },
   bannerCard: {
     flexDirection: 'row' as const,
@@ -448,7 +468,6 @@ const makeStyles = (t: AppTheme) => ({
   },
   listContainer: {
     gap: t.spacing.md,
-    paddingBottom: t.spacing.xl * 1.5,
   },
   card: {
     backgroundColor: t.colors.surface,

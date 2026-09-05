@@ -102,6 +102,13 @@ export function AttendanceScreen() {
       return () => {
         watchSubscription.current?.remove();
         watchSubscription.current = null;
+        
+        setPosition(null);
+        setLocationError(null);
+        setStartingEvent(null);
+        setActiveSession(null);
+        setCooldownEndsAt(null);
+        setCooldownSecondsLeft(0);
       };
     }, [startWatching, refetch]),
   );
@@ -206,7 +213,7 @@ export function AttendanceScreen() {
     <Screen scroll style={s.container}>
       <View style={[s.statusCard, { borderColor: geofenceState ? activeToneColor : theme.colors.border }]}>
         <View style={[s.iconBadge, { backgroundColor: geofenceState ? `${activeToneColor}15` : theme.colors.surfaceSunken }]}>
-          <Navigation size={28} color={activeToneColor} />
+          <Navigation size={22} color={activeToneColor} />
         </View>
         <Text variant="h1" style={s.distanceText}>
           {distance !== null ? `${distance.toFixed(0)}m` : '--'}
@@ -359,8 +366,8 @@ function formatTime(iso: string | null): string {
 
 const makeStyles = (t: AppTheme) => ({
   container: {
-    paddingHorizontal: 22, // Extra breathing space on both left & right edges
-    paddingTop: t.spacing.md,
+    paddingHorizontal: 18,
+    paddingTop: 15,
     paddingBottom: t.spacing.xl,
   },
   centerLoading: {
@@ -377,7 +384,7 @@ const makeStyles = (t: AppTheme) => ({
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
     borderWidth: 1.5,
-    paddingVertical: t.spacing.lg,
+    paddingVertical: t.spacing.sm, 
     paddingHorizontal: t.spacing.md,
     marginBottom: t.spacing.md,
     shadowColor: t.colors.textPrimary,
@@ -387,15 +394,15 @@ const makeStyles = (t: AppTheme) => ({
     elevation: 3,
   },
   iconBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 44, 
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    marginBottom: t.spacing.xs,
+    marginBottom: 2,
   },
   distanceText: {
-    fontSize: 32,
+    fontSize: 26, 
     fontWeight: '800' as const,
     color: t.colors.textPrimary,
     letterSpacing: -0.5,
@@ -409,7 +416,7 @@ const makeStyles = (t: AppTheme) => ({
     fontWeight: '600' as const,
   },
   badgeContainer: {
-    marginTop: t.spacing.md,
+    marginTop: t.spacing.xs, 
     width: '100%' as const,
   },
   statusBanner: {
@@ -417,7 +424,7 @@ const makeStyles = (t: AppTheme) => ({
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     gap: 6,
-    paddingVertical: 6,
+    paddingVertical: 4,
     paddingHorizontal: 12,
     borderRadius: t.radii.full,
   },
