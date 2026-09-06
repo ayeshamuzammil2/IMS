@@ -35,6 +35,7 @@ export function TeamAttendanceScreen() {
   const isAdmin = user?.role === 'Admin';
 
   const [departmentId, setDepartmentId] = useState<number | null>(null);
+  const [internFilter, setInternFilter] = useState<number | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -47,8 +48,8 @@ export function TeamAttendanceScreen() {
     useCallback(() => {
       refetch();
       return () => {
-        // Screen chhorne par Department Filter + Search state teeno reset ho jayenge
         setDepartmentId(null);
+        setInternFilter(null);
         setShowSearch(false);
         setSearch('');
       };
@@ -61,20 +62,41 @@ export function TeamAttendanceScreen() {
     enabled: isAdmin,
   });
 
-  const deptSelectOptions = useMemo(
-    () => departmentOptions.map((d) => ({ value: d.id, label: d.name })),
-    [departmentOptions],
-  );
+  const departmentSelectOptions = useMemo(() => {
+    const list = departmentOptions.map((d) => ({ value: String(d.id), label: d.name }));
+    return [{ value: 'all', label: 'All Departments' }, ...list];
+  }, [departmentOptions]);
+
+  const internSelectOptions = useMemo(() => {
+    const seen = new Map<number, string>();
+    for (const r of rows) {
+      if (!seen.has(r.internProfileId)) {
+        seen.set(r.internProfileId, `${r.internFullName} (${r.internCode})`);
+      }
+    }
+    const list = Array.from(seen.entries()).map(([value, label]) => ({
+      value: String(value),
+      label,
+    }));
+    return [{ value: 'all', label: 'All Interns' }, ...list];
+  }, [rows]);
+
+  const handleDepartmentChange = (value: string) => {
+    setDepartmentId(value === 'all' ? null : Number(value));
+    setInternFilter(null);
+  };
 
   const filteredRows = useMemo(() => {
-    if (!search.trim()) return rows;
-    const q = search.toLowerCase().trim();
-    return rows.filter(
-      (r) =>
-        r.internFullName?.toLowerCase().includes(q) ||
-        r.internCode?.toLowerCase().includes(q),
-    );
-  }, [rows, search]);
+    const term = search.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (internFilter && r.internProfileId !== internFilter) return false;
+      if (!term) return true;
+      return (
+        r.internFullName?.toLowerCase().includes(term) ||
+        r.internCode?.toLowerCase().includes(term)
+      );
+    });
+  }, [rows, internFilter, search]);
 
   const toggleSearch = () => {
     if (showSearch) {
@@ -177,7 +199,7 @@ export function TeamAttendanceScreen() {
   return (
     <Screen scroll={false} style={s.screenContainer}>
       <View style={s.headerContainer}>
-        {/* Header Label Row */}
+        {/* Header Label & Search Icon Row */}
         <View style={s.headerRow}>
           <View style={s.headerTitleContainer}>
             <View style={s.titleIndicator} />
@@ -185,23 +207,8 @@ export function TeamAttendanceScreen() {
               {filteredRows.length} {filteredRows.length === 1 ? 'INTERN' : 'INTERNS'} TODAY
             </Text>
           </View>
-        </View>
 
-        {/* Admin Department Filter */}
-        {isAdmin && (
-          <View style={s.filterWrapper}>
-            <SelectField
-              placeholder="All departments"
-              value={departmentId}
-              options={deptSelectOptions}
-              onChange={setDepartmentId}
-            />
-          </View>
-        )}
-
-        {/* Search Icon Row */}
-        <View style={s.searchIconRow}>
-          <Pressable onPress={toggleSearch} style={[s.iconButton, showSearch && s.iconButtonActive]} hitSlop={8}>
+          <Pressable onPress={toggleSearch} style={[s.iconButtonHeader, showSearch && s.iconButtonActive]} hitSlop={8}>
             {showSearch ? (
               <X size={18} color={theme.colors.primary} />
             ) : (
@@ -216,12 +223,42 @@ export function TeamAttendanceScreen() {
             <Input
               placeholder="Search by name or intern code..."
               value={search}
-              onChangeText={setSearch}
+              onChangeText={(val) => {
+                setSearch(val);
+                if (val.trim()) setInternFilter(null);
+              }}
               autoCapitalize="none"
               autoFocus
             />
           </View>
         )}
+
+        {/* Admin Department Filter */}
+        {isAdmin && (
+          <View style={s.filterSpacing}>
+            <SelectField
+              label="Department"
+              placeholder="All Departments"
+              value={departmentId ? String(departmentId) : 'all'}
+              options={departmentSelectOptions}
+              onChange={handleDepartmentChange}
+            />
+          </View>
+        )}
+
+        {/* Intern Filter */}
+        <View style={s.filterSpacing}>
+          <SelectField
+            label="Intern"
+            placeholder="All Interns"
+            value={internFilter ? String(internFilter) : 'all'}
+            options={internSelectOptions}
+            onChange={(val) => {
+              setInternFilter(val === 'all' ? null : Number(val));
+              if (val !== 'all') setSearch('');
+            }}
+          />
+        </View>
       </View>
 
       {isLoading ? (
@@ -243,7 +280,7 @@ export function TeamAttendanceScreen() {
           ListEmptyComponent={
             <View style={s.emptyBox}>
               <Text variant="body" tone="muted">
-                {search.trim() ? 'No records found matching your search.' : 'No interns to show today.'}
+                {search.trim() || internFilter ? 'No records found matching your search criteria.' : 'No interns to show today.'}
               </Text>
             </View>
           }
@@ -256,17 +293,17 @@ export function TeamAttendanceScreen() {
 const makeStyles = (t: AppTheme) => ({
   screenContainer: {
     paddingHorizontal: t.spacing.lg,
-    paddingTop: t.spacing.lg,
+    paddingTop: 8,
   },
   headerContainer: {
     marginTop: t.spacing.sm,
-    marginBottom: t.spacing.lg,
+    marginBottom: t.spacing.md,
   },
   headerRow: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
-    marginBottom: t.spacing.sm,
+    marginBottom: t.spacing.xs,
   },
   headerTitleContainer: {
     flexDirection: 'row' as const,
@@ -282,17 +319,13 @@ const makeStyles = (t: AppTheme) => ({
   headerLabel: {
     letterSpacing: 1,
   },
-  filterWrapper: {
+  filterSpacing: {
     marginTop: t.spacing.xs,
   },
-  searchIconRow: {
-    alignItems: 'flex-end' as const,
-    marginTop: t.spacing.sm,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  iconButtonHeader: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: t.colors.surface,
     borderWidth: 1,
     borderColor: t.colors.border,
@@ -301,10 +334,11 @@ const makeStyles = (t: AppTheme) => ({
   },
   iconButtonActive: {
     borderColor: t.colors.primary,
-    backgroundColor: t.colors.surfaceSunken,
+    backgroundColor: `${t.colors.primary}10`,
   },
   searchContainer: {
-    marginTop: t.spacing.sm,
+    marginTop: t.spacing.xs,
+    marginBottom: t.spacing.xs,
   },
   list: { flex: 1 },
   listContent: {

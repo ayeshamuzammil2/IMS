@@ -39,6 +39,19 @@ export const certificatesApi = {
 
   issue: (internProfileId: number) => client.post<CertificateDto>(endpoints.certificates.issue(internProfileId)).then((r) => r.data),
 
+  // NAYE METHODS YAHAN HAIN
+  uploadForIntern: (internProfileId: number, file: { uri: string; name: string; mimeType: string | null }) => {
+    const form = new FormData();
+    form.append('File', { uri: file.uri, name: file.name, type: file.mimeType ?? 'application/octet-stream' } as unknown as Blob);
+    // Note: URL route apne backend ke hisaab se adjust kar lena
+    return client
+      .post<CertificateDto>(`/certificates/intern/${internProfileId}/upload`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+      .then((r) => r.data);
+  },
+
+  delete: (internProfileId: number) =>
+    client.delete(`/certificates/intern/${internProfileId}`).then((r) => r.data),
+
   templates: {
     list: () => client.get<CertificateTemplateDto[]>(endpoints.certificates.templates.list).then((r) => r.data),
 

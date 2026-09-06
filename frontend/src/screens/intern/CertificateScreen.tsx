@@ -184,7 +184,7 @@ export function CertificateScreen() {
 const makeStyles = (t: AppTheme) => ({
   container: {
     paddingHorizontal: 18,
-    paddingTop: t.spacing.md,
+    paddingTop: 18,
     paddingBottom: t.spacing.xl,
   },
   centerLoading: {

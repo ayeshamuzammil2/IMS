@@ -32,4 +32,7 @@ export const idCardsApi = {
   approve: (internProfileId: number) => client.post<IdCardDto>(endpoints.idcards.approve(internProfileId)).then((r) => r.data),
 
   issue: (internProfileId: number) => client.post<IdCardDto>(endpoints.idcards.issue(internProfileId)).then((r) => r.data),
+
+  // Optional: Agar backend par delete/remove ID card ki API hai ya banani pade
+  delete: (internProfileId: number) => client.delete(`/idcards/intern/${internProfileId}`).then((r) => r.data),
 };

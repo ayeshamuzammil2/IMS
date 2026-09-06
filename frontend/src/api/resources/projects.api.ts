@@ -45,5 +45,12 @@ export const projectsApi = {
       })
       .then((r) => r.data),
 
+  update: (assignmentId: number, input: AssignProjectInput) =>
+    client
+      .put<ProjectAssignmentDto>(endpoints.projects.update(assignmentId), buildAssignForm(input), {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data),
+
   delete: (assignmentId: number) => client.delete(endpoints.projects.delete(assignmentId)),
 };

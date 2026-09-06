@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Pressable, ActivityIndicator, FlatList } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
@@ -19,12 +19,94 @@ import type { AppTheme } from '../../theme/types';
 
 type ReasonAction = 'Rejected' | 'ResubmitRequested';
 
+const GithubReviewCard = ({ item, isAdmin, theme, s, setReasonModal, handleApprove, busyId }: any) => {
+  return (
+    <View style={s.card}>
+      <View style={s.cardHeader}>
+        <View style={s.avatarBadge}>
+          <GitBranch size={20} color={theme.colors.primary} />
+        </View>
+        <View style={s.cardHeaderText}>
+          <Text variant="bodyStrong" style={s.cardTitle} numberOfLines={1}>
+            {item.internFullName}
+          </Text>
+          <Text variant="caption" tone="muted" style={s.emailText} numberOfLines={1}>
+            Code: {item.internCode} · v{item.version}
+          </Text>
+        </View>
+        <ChevronRight size={18} color={theme.colors.textMuted} />
+      </View>
+
+      <View style={s.statusRow}>
+        <View style={s.metaLeftGroup}>
+          <Text variant="caption" tone="brand" numberOfLines={1} style={s.mentorText}>
+            {item.repositoryUrl}
+          </Text>
+        </View>
+        <View style={[s.badge, { backgroundColor: theme.colors.warningBg || '#FFFBEB' }]}>
+          <Text variant="caption" style={[s.badgeText, { color: theme.colors.warning || '#D97706' }]}>
+            Pending Review
+          </Text>
+        </View>
+      </View>
+
+      <View style={s.divider} />
+
+      <View style={s.actionsRowContainer}>
+        {isAdmin && item.departmentName ? (
+          <Text variant="caption" tone="muted" style={{ paddingLeft: 4 }}>
+            Dept: {item.departmentName}
+          </Text>
+        ) : (
+          <Text variant="caption" tone="muted" style={{ paddingLeft: 4 }}>
+            Review action
+          </Text>
+        )}
+
+        <View style={s.actionsRow}>
+          <Pressable
+            hitSlop={8}
+            style={[s.actionIcon, { backgroundColor: '#FEF2F2' }]}
+            onPress={() => setReasonModal({ item, action: 'Rejected' })}
+            disabled={busyId === item.submissionId}
+          >
+            <X size={16} color={theme.colors.error} />
+          </Pressable>
+
+          <Pressable
+            hitSlop={8}
+            style={s.actionIcon}
+            onPress={() => setReasonModal({ item, action: 'ResubmitRequested' })}
+            disabled={busyId === item.submissionId}
+          >
+            <RotateCcw size={16} color={theme.colors.textSecondary} />
+          </Pressable>
+
+          <Pressable
+            hitSlop={8}
+            style={s.actionIcon}
+            onPress={() => handleApprove(item)}
+            disabled={busyId === item.submissionId}
+          >
+            {busyId === item.submissionId ? (
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            ) : (
+              <Check size={16} color={theme.colors.primary} />
+            )}
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+};
+
 export function GithubReviewScreen() {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'Admin';
   const queryClient = useQueryClient();
+
   const [reasonModal, setReasonModal] = useState<{ item: GithubReviewQueueItemDto; action: ReasonAction } | null>(null);
   const [reason, setReason] = useState('');
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -67,7 +149,6 @@ export function GithubReviewScreen() {
     return [{ value: 'all', label: 'All Interns' }, ...list];
   }, [departmentScopedQueue]);
 
-  // Handle live search text updates
   const handleSearchChange = (text: string) => {
     setSearch(text);
     if (text.trim() && internFilter) {
@@ -94,15 +175,21 @@ export function GithubReviewScreen() {
   };
 
   const toggleSearch = () => {
-    if (showSearch) {
-      setSearch('');
-    }
+    if (showSearch) setSearch('');
     setShowSearch((prev) => !prev);
   };
 
   useFocusEffect(
     useCallback(() => {
       refetch();
+      return () => {
+        setShowSearch(false);
+        setSearch('');
+        setDepartmentFilter(null);
+        setInternFilter(null);
+        setReasonModal(null);
+        setReason('');
+      };
     }, [refetch]),
   );
 
@@ -137,9 +224,36 @@ export function GithubReviewScreen() {
   };
 
   return (
-    <Screen scroll>
-      {/* Filters Inside Clean White Card Wrapper */}
-      <View style={s.filterWrapper}>
+    <Screen scroll={false} style={s.screenContainer}>
+      <View style={s.headerContainer}>
+        {/* Header Label Row */}
+        <View style={s.headerRow}>
+          <View style={s.headerTitleContainer}>
+            <View style={s.titleIndicator} />
+            <Text variant="overline" tone="muted" style={s.headerLabel}>
+              {filteredQueue.length} {filteredQueue.length === 1 ? 'SUBMISSION' : 'SUBMISSIONS'} AWAITING
+            </Text>
+          </View>
+
+          <Pressable onPress={toggleSearch} style={[s.iconButton, showSearch && s.iconButtonActive]} hitSlop={8}>
+            {showSearch ? <X size={18} color={theme.colors.primary} /> : <Search size={18} color={theme.colors.textMuted} />}
+          </Pressable>
+        </View>
+
+        {/* Expandable Search Input */}
+        {showSearch && (
+          <View style={s.searchContainer}>
+            <Input
+              placeholder="Search by intern name, code, or repo URL..."
+              value={search}
+              onChangeText={handleSearchChange}
+              autoCapitalize="none"
+              autoFocus
+            />
+          </View>
+        )}
+
+        {/* Filters */}
         {isAdmin && (
           <View style={s.filterSpacing}>
             <SelectField
@@ -152,120 +266,53 @@ export function GithubReviewScreen() {
           </View>
         )}
 
-        <SelectField
-          label="Intern"
-          placeholder="Select Intern"
-          value={internFilter ? String(internFilter) : 'all'}
-          options={internSelectOptions}
-          onChange={(val) => {
-            setInternFilter(val === 'all' ? null : Number(val));
-            if (val !== 'all') setSearch('');
-          }}
-        />
-
-        {showSearch && (
-          <View style={s.searchContainer}>
-            <Input
-              placeholder="Search by intern name, code, or repo URL..."
-              value={search}
-              onChangeText={handleSearchChange}
-              autoCapitalize="none"
-              autoFocus
-            />
-          </View>
-        )}
-      </View>
-
-      {/* Search Icon OUTSIDE of White Card */}
-      <View style={s.searchIconRow}>
-        <Pressable onPress={toggleSearch} style={s.iconButton} hitSlop={8}>
-          {showSearch ? (
-            <X size={20} color={theme.colors.textSecondary} />
-          ) : (
-            <Search size={20} color={theme.colors.textSecondary} />
-          )}
-        </Pressable>
-      </View>
-
-      <View style={s.headerRow}>
-        <Text variant="body" tone="secondary">
-          {filteredQueue.length} submission{filteredQueue.length === 1 ? '' : 's'} awaiting review
-        </Text>
+        <View style={s.filterSpacing}>
+          <SelectField
+            label="Intern"
+            placeholder="Select Intern"
+            value={internFilter ? String(internFilter) : 'all'}
+            options={internSelectOptions}
+            onChange={(val) => {
+              setInternFilter(val === 'all' ? null : Number(val));
+              if (val !== 'all') setSearch('');
+            }}
+          />
+        </View>
       </View>
 
       {isLoading ? (
-        <Text variant="body" tone="muted">
-          Loading...
-        </Text>
-      ) : filteredQueue.length === 0 ? (
-        <View style={s.emptyContainer}>
-          <GitBranch size={32} color={theme.colors.textMuted} />
-          <Text variant="body" tone="muted">
-            {queue.length === 0 ? 'Nothing to review right now.' : 'No submissions match these filters.'}
+        <View style={s.centerBox}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <Text variant="caption" tone="muted" style={{ marginTop: 12 }}>
+            Loading submissions...
           </Text>
         </View>
       ) : (
-        filteredQueue.map((item) => (
-          <View key={item.submissionId} style={s.card}>
-            <View style={s.cardMain}>
-              <View style={{ flex: 1 }}>
-                <Text variant="bodyStrong" style={s.nameText}>
-                  {item.internFullName}
-                </Text>
-                <Text variant="caption" tone="muted">
-                  {item.internCode} · v{item.version}
-                </Text>
-                {isAdmin && item.departmentName ? (
-                  <Text variant="caption" tone="secondary">
-                    {item.departmentName}
-                  </Text>
-                ) : null}
-                <Text variant="body" tone="brand" numberOfLines={1} style={{ marginTop: theme.spacing.xs }}>
-                  {item.repositoryUrl}
-                </Text>
-              </View>
-              <ChevronRight size={18} color={theme.colors.textMuted} />
+        <FlatList
+          data={filteredQueue}
+          keyExtractor={(item) => item.submissionId.toString()}
+          renderItem={({ item }) => (
+            <GithubReviewCard
+              item={item}
+              isAdmin={isAdmin}
+              theme={theme}
+              s={s}
+              setReasonModal={setReasonModal}
+              handleApprove={handleApprove}
+              busyId={busyId}
+            />
+          )}
+          style={s.list}
+          contentContainerStyle={filteredQueue.length === 0 ? s.emptyListContent : s.listContent}
+          ListEmptyComponent={
+            <View style={s.emptyBox}>
+              <GitBranch size={32} color={theme.colors.textMuted} />
+              <Text variant="body" tone="muted" style={{ marginTop: 8 }}>
+                {queue.length === 0 ? 'Nothing to review right now.' : 'No submissions match these filters.'}
+              </Text>
             </View>
-
-            <View style={s.badgeRow}>
-              <View style={[s.badge, { backgroundColor: theme.colors.warningBg }]}>
-                <Text variant="caption" tone="warning">
-                  Pending Review
-                </Text>
-              </View>
-            </View>
-
-            <View style={s.divider} />
-
-            <View style={s.iconActionRow}>
-              <Pressable
-                onPress={() => {
-                  setReason('');
-                  setReasonModal({ item, action: 'Rejected' });
-                }}
-                disabled={busyId === item.submissionId}
-                style={s.iconBtn}
-              >
-                <X size={20} color={theme.colors.error} />
-              </Pressable>
-
-              <Pressable
-                onPress={() => {
-                  setReason('');
-                  setReasonModal({ item, action: 'ResubmitRequested' });
-                }}
-                disabled={busyId === item.submissionId}
-                style={s.iconBtn}
-              >
-                <RotateCcw size={18} color={theme.colors.textSecondary} />
-              </Pressable>
-
-              <Pressable onPress={() => handleApprove(item)} disabled={busyId === item.submissionId} style={s.iconBtn}>
-                <Check size={20} color={theme.colors.primary} />
-              </Pressable>
-            </View>
-          </View>
-        ))
+          }
+        />
       )}
 
       <FormModal
@@ -289,69 +336,126 @@ export function GithubReviewScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
-  filterWrapper: {
-    backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
-    borderWidth: 1,
-    borderColor: t.colors.border,
-    padding: t.spacing.md,
-    marginBottom: t.spacing.xs,
-    ...t.shadows.sm,
+  screenContainer: {
+    paddingHorizontal: t.spacing.lg,
+    paddingTop: 8,
+  },
+  headerContainer: {
+    marginTop: t.spacing.sm,
+    marginBottom: t.spacing.md,
+  },
+  headerRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: t.spacing.sm,
+  },
+  headerTitleContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+  },
+  titleIndicator: {
+    width: 4,
+    height: 14,
+    borderRadius: 2,
+    backgroundColor: t.colors.primary,
+  },
+  headerLabel: {
+    letterSpacing: 1,
   },
   filterSpacing: {
-    marginBottom: t.spacing.sm,
-  },
-  searchIconRow: {
-    alignItems: 'flex-end' as const,
     marginTop: t.spacing.xs,
-    marginBottom: t.spacing.sm,
   },
   iconButton: {
-    padding: 10,
-    borderRadius: t.radii.md,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     backgroundColor: t.colors.surface,
     borderWidth: 1,
     borderColor: t.colors.border,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
+  iconButtonActive: {
+    borderColor: t.colors.primary,
+    backgroundColor: t.colors.surfaceSunken,
+  },
   searchContainer: {
-    marginTop: t.spacing.sm,
+    marginTop: t.spacing.xs,
+    marginBottom: t.spacing.xs,
   },
-  headerRow: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'center' as const,
-    marginBottom: t.spacing.md,
+  list: { flex: 1 },
+  listContent: {
+    gap: t.spacing.md,
+    paddingBottom: t.spacing.xl * 1.5,
   },
-  emptyContainer: {
+  emptyListContent: {
+    flexGrow: 1,
     alignItems: 'center' as const,
-    padding: t.spacing.xl,
-    gap: t.spacing.sm,
+    justifyContent: 'center' as const,
   },
   card: {
     backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: t.colors.border,
     padding: t.spacing.lg,
-    marginBottom: t.spacing.md,
-    ...t.shadows.sm,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  cardMain: {
+  cardHeader: {
     flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: t.spacing.md,
+  },
+  avatarBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: t.colors.surfaceSunken,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  cardHeaderText: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    flexShrink: 1,
+  },
+  emailText: {
+    marginTop: 3,
+  },
+  statusRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
-    alignItems: 'flex-start' as const,
+    marginTop: 12,
+    paddingLeft: 2,
   },
-  nameText: { fontSize: 16, fontWeight: '600' as const },
-  badgeRow: {
+  metaLeftGroup: {
     flexDirection: 'row' as const,
-    marginTop: t.spacing.sm,
+    alignItems: 'center' as const,
+    gap: 8,
+    flex: 1,
+  },
+  mentorText: {
+    fontSize: 12,
   },
   badge: {
-    paddingHorizontal: t.spacing.sm,
-    paddingVertical: 3,
-    borderRadius: t.radii.full,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 9999,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '600' as const,
   },
   divider: {
     height: 1,
@@ -359,10 +463,31 @@ const makeStyles = (t: AppTheme) => ({
     marginTop: t.spacing.md,
     marginBottom: t.spacing.sm,
   },
-  iconActionRow: {
+  actionsRowContainer: {
     flexDirection: 'row' as const,
-    justifyContent: 'flex-end' as const,
-    gap: t.spacing.lg,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
   },
-  iconBtn: { padding: 4 },
+  actionsRow: {
+    flexDirection: 'row' as const,
+    gap: t.spacing.md,
+    justifyContent: 'flex-end' as const,
+    alignItems: 'center' as const,
+    paddingTop: 4,
+    marginLeft: 'auto',
+  },
+  actionIcon: {
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: t.colors.surfaceSunken,
+  },
+  emptyBox: {
+    paddingVertical: t.spacing.xl * 2,
+    alignItems: 'center' as const,
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
 });
