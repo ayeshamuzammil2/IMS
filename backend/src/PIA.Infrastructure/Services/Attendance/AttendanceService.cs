@@ -103,8 +103,6 @@ public sealed class AttendanceService(
                 $"Please wait {RetryCooldownSeconds} seconds after a failed attempt before trying again.");
         }
 
-        // "Camera launch" = a challenge session actually being issued - a geofence/cooldown
-        // rejection above never opens the camera, so it correctly doesn't count against this limit.
         var attemptsToday = await db.AttendanceChallengeSessions.CountAsync(
             s => s.InternProfileId == profile.Id && s.DatePk == todayPk && s.EventType == eventType, ct);
         if (attemptsToday >= MaxDailyAttemptsPerDirection)
@@ -151,7 +149,6 @@ public sealed class AttendanceService(
         var flags = new List<string>();
         var riskScore = 0;
 
-        // Stage 0: atomic session consume.
         var consumed = await db.AttendanceChallengeSessions
             .Where(s => s.Id == sessionId && s.InternProfileId == internProfileId && s.State == ChallengeSessionState.Issued)
             .ExecuteUpdateAsync(setters => setters
@@ -176,7 +173,6 @@ public sealed class AttendanceService(
         var todayPk = clock.TodayInPakistan;
         var day = await db.AttendanceDays.FirstOrDefaultAsync(d => d.InternProfileId == internProfileId && d.WorkDate == todayPk, ct);
 
-        // Stage 1: re-run all gates.
         var (arrivalBlockers, departureBlockers) = await ComputeBlockersAsync(profile, department, todayPk, day, ct);
         var relevantBlockers = session.EventType == AttendanceEventType.Arrival ? arrivalBlockers : departureBlockers;
         if (relevantBlockers.Count > 0)
@@ -191,7 +187,6 @@ public sealed class AttendanceService(
             throw new ValidationException("frames", "At least one frame is required.");
         }
 
-        // Stage 2/3: geofence recompute (never trust the client's own classification from issue time).
         var distance = GeoCalculator.DistanceInMeters((double)department.Latitude, (double)department.Longitude, (double)request.Latitude, (double)request.Longitude);
         var geofence = GeoCalculator.Classify(distance, (double)request.AccuracyMeters, department.GeofenceRadiusMeters);
         if (geofence == GeofenceState.Outside)
@@ -201,9 +196,6 @@ public sealed class AttendanceService(
                 $"You are {distance:F0} m from {department.Name}. Move within {department.GeofenceRadiusMeters} m to mark {session.EventType}.");
         }
 
-        // Stage 4: location integrity - an uncertain (low-accuracy) fix goes to review, never a
-        // hard fail, but a confirmed mock-location signal is a hard fail (spec-mandated override
-        // of this codebase's usual "never hard-fail on an inconclusive location signal" stance).
         var requiresReview = geofence == GeofenceState.Uncertain;
         if (geofence == GeofenceState.Uncertain) flags.Add("UncertainGeofence");
         if (request.Mocked == true)
@@ -212,7 +204,6 @@ public sealed class AttendanceService(
             throw new BusinessRuleException(BusinessRuleCodes.MockLocationDetected, "Mock location detected. Attendance blocked.");
         }
 
-        // Stage 5: timing.
         var pkNow = clock.ToPakistan(now);
         if (pkNow.Hour < Options.EarliestMarkHourLocal || pkNow.Hour > Options.LatestMarkHourLocal)
         {
@@ -232,9 +223,6 @@ public sealed class AttendanceService(
             isEarly = localTimeNow < profile.DailyEndTime.Add(TimeSpan.FromMinutes(-Options.EarlyLeaveGraceMinutes));
         }
 
-        // Stage 6: attestation - stubbed until Phase 9 wires Play Integrity (graded Off first).
-
-        // Read + decode every frame once; stage 7 (pHash replay) and stage 8 (decode) apply per frame.
         var decodedFrames = new List<(SubmitChallengeFrame Source, byte[] Bytes, SKBitmap Bitmap, ulong Phash, byte[] Sha256, BoundingBoxDto? ResolvedBbox)>();
         try
         {
@@ -250,51 +238,42 @@ public sealed class AttendanceService(
                     throw new BusinessRuleException(BusinessRuleCodes.CorruptFile, "One of the submitted frames could not be processed. Please try again.");
                 }
 
-                // frame.Telemetry.BoundingBox is measured against VisionCamera's face-detector
-                // analysis frame, not the still photo in `bytes`/`bitmap` - the two are captured at
-                // different resolutions, so the telemetry box is in the wrong coordinate space to
-                // crop this bitmap with (confirmed via FaceEnrollmentService's debug crops: cropping
-                // with it landed on background, not the face). Detect the face directly in the
-                // actual captured photo so the box used for cropping always matches the bitmap it's
-                // applied to; fall back to the telemetry box only if the server detector model isn't
-                // installed.
                 var resolvedBbox = await faceDetector.DetectFaceAsync(bytes, ct) ?? frame.Telemetry.BoundingBox;
-
                 decodedFrames.Add((frame, bytes, bitmap, PerceptualHash.Compute(bitmap), SHA256.HashData(bytes), resolvedBbox));
             }
 
-            var recentMedia = await db.AttendanceMedia.AsNoTracking()
+            var recentMediaQuery = db.AttendanceMedia.AsNoTracking()
                 .Where(m => m.InternProfileId == profile.Id)
                 .OrderByDescending(m => m.CreatedAtUtc)
-                .Take(500)
-                .Select(m => new { m.Sha256, m.Phash })
-                .ToListAsync(ct);
+                .Take(500);
 
-            // Exact-byte match (SHA256) is a hard signal - it means the literal same file was
-            // submitted before, which is exactly what this check exists to catch. The perceptual
-            // hash is a much softer, fuzzier signal meant to catch a photo of a screen showing an
-            // old selfie (which re-compresses/re-photographs the image, changing its exact bytes
-            // but not its overall visual structure) - it is NOT meant to catch two genuinely
-            // different live captures that simply look similar because they were taken by the same
-            // person, in the same spot, under the same lighting, a few hours apart (arrival vs
-            // departure is exactly this scenario). A Hamming distance of <=6 was catching that
-            // legitimate case; <=2 keeps only near-exact visual duplicates, which is what an actual
-            // replay attack produces.
-            var isReplay = decodedFrames.Any(f => recentMedia.Any(m =>
-                m.Sha256.AsSpan().SequenceEqual(f.Sha256) || PerceptualHash.HammingDistance(m.Phash, f.Phash) <= 2));
-            if (isReplay)
+            if (session.EventType == AttendanceEventType.Arrival)
             {
-                await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedReplayDetected, ct);
-                await HardFailSessionAsync(session, ct);
-                throw new BusinessRuleException(BusinessRuleCodes.FrameReplayDetected, "One of these photos has already been used for attendance.");
+                var recentMedia = await recentMediaQuery.Select(m => new { m.Sha256, m.Phash }).ToListAsync(ct);
+                var isReplay = decodedFrames.Any(f => recentMedia.Any(m =>
+                    m.Sha256.AsSpan().SequenceEqual(f.Sha256) || PerceptualHash.HammingDistance(m.Phash, f.Phash) <= 2));
+                
+                if (isReplay)
+                {
+                    await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedReplayDetected, ct);
+                    await HardFailSessionAsync(session, ct);
+                    throw new BusinessRuleException(BusinessRuleCodes.FrameReplayDetected, "One of these photos has already been used for attendance.");
+                }
+            }
+            else
+            {
+                // Departure me Phash (visual similarity) ko bypass karna zaroori hai taake Arrival photo duplicate na lage
+                var recentMedia = await recentMediaQuery.Select(m => new { m.Sha256 }).ToListAsync(ct);
+                var isReplay = decodedFrames.Any(f => recentMedia.Any(m => m.Sha256.AsSpan().SequenceEqual(f.Sha256)));
+                
+                if (isReplay)
+                {
+                    await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedReplayDetected, ct);
+                    await HardFailSessionAsync(session, ct);
+                    throw new BusinessRuleException(BusinessRuleCodes.FrameReplayDetected, "Exact same photo file detected.");
+                }
             }
 
-            // Stage 9 (server-side face detect) is a bounding-box presence check only in this
-            // phase - full MLKit-equivalent server detection is not part of the free stack;
-            // frames without a usable client-reported box simply can't feed the crop-dependent
-            // stages below and are treated as quality-degraded rather than rejected outright.
-
-            // Stage 10: quality (blur).
             var blurVariances = decodedFrames.Select(f => ComputeBlurVariance(f.Bitmap)).ToList();
             var sharpestIndex = blurVariances.IndexOf(blurVariances.Max());
             if (blurVariances[sharpestIndex] < 15)
@@ -303,7 +282,6 @@ public sealed class AttendanceService(
                 riskScore += 10;
             }
 
-            // Stage 11: client-observation vs server-detection / challenge-response consistency.
             var issuedActions = JsonSerializer.Deserialize<ChallengeSpecDto>(session.ChallengeJson)?.Steps
                 .Select(s => s.Action.ToString()).ToHashSet() ?? [];
             var performedActions = decodedFrames.Select(f => f.Source.Telemetry.Action).ToHashSet();
@@ -326,8 +304,6 @@ public sealed class AttendanceService(
                 riskScore += 15;
             }
 
-            // Video-replay defense subsystem - geometry/signal detectors. Parallax is the only
-            // hard-fail among these; the rest are score contributors per the fusion design.
             var detectorFrames = decodedFrames.Select(f => new DetectorFrame(
                 f.Source.Telemetry.Index, f.Bitmap, f.Source.Telemetry.TimestampMs, f.Source.Telemetry.Action,
                 f.Source.Telemetry.Yaw, f.Source.Telemetry.Pitch, f.Source.Telemetry.Roll,
@@ -341,23 +317,16 @@ public sealed class AttendanceService(
                 await ThrowFaceFailureAsync(profile, BusinessRuleCodes.SpoofDetected, "This does not appear to be a live, three-dimensional face.", ct);
             }
             AddSoftDetectorFlag(flags, ref riskScore, parallaxResult, weight: 0);
-
             AddSoftDetectorFlag(flags, ref riskScore, specularAnalyzer.Analyze(detectorFrames), weight: 15);
             AddSoftDetectorFlag(flags, ref riskScore, bandingDetector.Analyze(detectorFrames[sharpestIndex]), weight: 20);
             AddSoftDetectorFlag(flags, ref riskScore, moireDetector.Analyze(detectorFrames[sharpestIndex]), weight: 20);
             AddSoftDetectorFlag(flags, ref riskScore, compressionDetector.Analyze(detectorFrames[sharpestIndex]), weight: 15);
 
-            // Stages 13-14: PAD ensemble + embedding match - only enforced when a real model is
-            // configured. Without one, this degrades to the same GeofenceOnly mode Phase 4 shipped.
-            decimal? padLiveBest = null, padLiveMean = null;
-            decimal? matchSimilarity = null;
+            decimal? padLiveBest = null, padLiveMean = null, matchSimilarity = null;
             var verificationMode = VerificationMode.GeofenceOnly;
 
             if (faceProvider.IsConfigured)
             {
-                // FaceEnrollmentStatus is already gated earlier via ComputeBlockersAsync's
-                // FaceNotReady blocker (Stage 1 above), which throws before any of this code runs.
-
                 var padScores = new List<PadResult>();
                 foreach (var f in decodedFrames)
                 {
@@ -377,18 +346,6 @@ public sealed class AttendanceService(
 
                     if (replayBest >= Face.PadReplayHardFailThreshold)
                     {
-                        // NOTE: PAD (MiniFASNet) is intentionally never a hard-fail gate here.
-                        // Empirical testing (feeding the bundled/official model random noise,
-                        // solid colors, and genuine live selfies from real phone cameras) showed it
-                        // returns a near-constant high "replay" score regardless of input content -
-                        // it was trained on controlled kiosk/IR capture conditions and does not
-                        // generalize to arbitrary phone selfie cameras. Hard-failing on it would
-                        // reject every genuine live attempt. It still counts toward risk scoring
-                        // below so an unusually high replay signal is visible to reviewers, but the
-                        // actual anti-spoof guarantee here comes from the active challenge-response
-                        // capture (held pose/blink/turn, enforced above) and the geometry-based
-                        // parallaxDetector (hard-failed separately above) - both of which respond to
-                        // real capture behavior rather than static image texture.
                         flags.Add("HighReplayScore");
                         riskScore += 25;
                     }
@@ -399,13 +356,6 @@ public sealed class AttendanceService(
                     }
                 }
 
-                // Cross-check against EVERY captured frame, not just the single sharpest one.
-                // Deciding identity off one frame meant one unlucky/lucky crop (odd angle, partial
-                // occlusion, a bounding box that grabbed some background) could flip accept/reject
-                // between two otherwise-identical attempts by the same wrong person - exactly the
-                // "rejected once, then accepted on retry with a visibly different face" failure
-                // mode this is closing. Every frame with a valid crop now casts its own vote, and
-                // both the average AND a majority of individual frames must clear the threshold.
                 var template = await db.FaceTemplates.AsNoTracking()
                     .Where(t => t.InternProfileId == internProfileId && t.IsActive)
                     .OrderByDescending(t => t.Version)
@@ -413,15 +363,9 @@ public sealed class AttendanceService(
 
                 if (template?.Embedding is null)
                 {
-                    // FaceEnrollmentStatus.Active is supposed to guarantee an active template
-                    // exists (ComputeBlockersAsync's FaceNotReady blocker gates on it) - if that
-                    // invariant is ever violated (e.g. a template revoked without the status
-                    // being flipped back), fail closed instead of silently skipping the identity
-                    // check and letting the attempt through as if it had passed.
                     await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedFaceMismatch, ct);
                     await HardFailSessionAsync(session, ct);
-                    throw new BusinessRuleException(BusinessRuleCodes.FaceVerificationUnavailable,
-                        "No enrolled face on record. Please contact your administrator.");
+                    throw new BusinessRuleException(BusinessRuleCodes.FaceVerificationUnavailable, "No enrolled face on record. Please contact your administrator.");
                 }
 
                 var storedEmbedding = BytesToFloats(template.Embedding);
@@ -439,25 +383,21 @@ public sealed class AttendanceService(
 
                 if (frameSimilarities.Count == 0)
                 {
-                    // Not one frame produced a usable crop/embedding - there is nothing to verify
-                    // identity against, so this must never be treated as an implicit pass.
                     await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedFaceMismatch, ct);
                     await HardFailSessionAsync(session, ct);
-                    throw new BusinessRuleException(BusinessRuleCodes.FaceVerificationUnavailable,
-                        "Could not verify your face from the captured frames. Please try again with better lighting, facing the camera directly.");
+                    throw new BusinessRuleException(BusinessRuleCodes.FaceVerificationUnavailable, "Could not verify your face from the captured frames. Please try again with better lighting, facing the camera directly.");
                 }
 
                 var meanSimilarity = frameSimilarities.Average();
                 var passingFrames = frameSimilarities.Count(s => s >= Face.MatchThreshold);
-                var majorityPassed = passingFrames * 2 >= frameSimilarities.Count; // >= 50%
+                var majorityPassed = passingFrames * 2 >= frameSimilarities.Count;
                 matchSimilarity = (decimal)meanSimilarity;
 
                 if (meanSimilarity < Face.MatchThreshold || !majorityPassed)
                 {
                     await RecordRejectedEventAsync(profile, session, request, distance, geofence, AttendanceEventOutcome.RejectedFaceMismatch, ct);
                     await HardFailSessionAsync(session, ct);
-                    await ThrowFaceFailureAsync(profile, BusinessRuleCodes.FaceMismatch,
-                        "Scanned face does not match your uploaded profile picture.", ct);
+                    await ThrowFaceFailureAsync(profile, BusinessRuleCodes.FaceMismatch, "Face Mismatch! This person is not the account owner.", ct);
                 }
                 if (meanSimilarity < Face.MatchThreshold + 0.05)
                 {
@@ -473,8 +413,6 @@ public sealed class AttendanceService(
                 }
             }
 
-            // Stage 15: device attestation - graded Off/FlagOnly/Enforce so a real device
-            // population's honest-failure rate can be measured before ever blocking on it.
             var attestationVerdict = await playIntegrityVerifier.VerifyAsync(request.AttestationToken, ct);
             if (attestationVerdict == PlayIntegrityVerdict.Failed)
             {
@@ -495,7 +433,6 @@ public sealed class AttendanceService(
                 requiresReview = true;
             }
 
-            // Persist: attempt row, media rows (one per frame), event, day upsert, session close.
             var attemptNumber = await db.AttendanceVerificationAttempts.CountAsync(a => a.InternProfileId == internProfileId && a.DatePk == todayPk, ct) + 1;
             var attempt = new AttendanceVerificationAttempt
             {
@@ -617,7 +554,7 @@ public sealed class AttendanceService(
             await db.SaveChangesAsync(ct);
 
             var message = requiresReview
-                ? $"{session.EventType} marked at {clock.ToPakistan(now):h:mm tt} (PKT) - flagged for mentor review."
+                ? $"{session.EventType} marked at {clock.ToPakistan(now):h:mm tt} (PKT)"
                 : $"{session.EventType} marked at {clock.ToPakistan(now):h:mm tt} (PKT).";
 
             return new SubmitAttendanceResult(
@@ -639,9 +576,6 @@ public sealed class AttendanceService(
         }
     }
 
-    /// <summary>Cheap categorical check, run before any ML stage: a claimed TurnLeft frame's yaw
-    /// should be more negative than a claimed TurnRight frame's yaw. Soft signal only - sign
-    /// conventions can vary by device/mirroring, so this never hard-fails by itself.</summary>
     private static bool TurnDirectionsConsistent(IReadOnlyList<ChallengeFrameTelemetryDto> telemetry)
     {
         var leftYaws = telemetry.Where(t => t.Action == nameof(ChallengeActionType.TurnLeft) && t.Yaw is not null).Select(t => t.Yaw!.Value).ToList();
@@ -693,10 +627,6 @@ public sealed class AttendanceService(
         return floats;
     }
 
-    /// <summary>Tracks every device an intern has attempted attendance from, with its most recent
-    /// attestation verdict - the "device binding" record an admin would consult before deciding
-    /// whether a device looks suspicious. Never itself a gate; RejectedAttestationFailed above is
-    /// what gates, this is just the audit trail feeding that decision.</summary>
     private async Task UpsertDeviceBindingAsync(int internProfileId, string deviceId, string? deviceModel, PlayIntegrityVerdict verdict, CancellationToken ct)
     {
         var binding = await db.DeviceBindings.FirstOrDefaultAsync(b => b.InternProfileId == internProfileId && b.DeviceId == deviceId, ct);
@@ -755,9 +685,6 @@ public sealed class AttendanceService(
         {
             AddBoth(AttendanceBlocker.NotVerified);
         }
-        // Dual-lock: only enforced when a real face provider is configured - without one, the
-        // system already degrades to geofence-only attendance for everyone (see README), and
-        // enrollment itself can't complete, so requiring it here would brick attendance entirely.
         if (faceProvider.IsConfigured &&
             (profile.ProfilePhotoStatus != ProfilePhotoStatus.Approved || profile.FaceEnrollmentStatus != FaceEnrollmentStatus.Active))
         {
@@ -829,10 +756,6 @@ public sealed class AttendanceService(
         await db.SaveChangesAsync(ct);
     }
 
-    /// <summary>Every face-verification rejection path (spoof, liveness, mismatch) routes through
-    /// here instead of throwing directly: it counts the strike and, at the 5th consecutive failure,
-    /// replaces the specific rejection with a full account lockout instead. Always throws - there is
-    /// no normal return.</summary>
     private async Task ThrowFaceFailureAsync(InternProfile profile, string code, string message, CancellationToken ct)
     {
         profile.ConsecutiveFaceFailures++;
@@ -850,9 +773,6 @@ public sealed class AttendanceService(
         throw new BusinessRuleException(code, message);
     }
 
-    /// <summary>Locks login entirely (AuthService.LoginAsync checks IsLockedForUnofficialActivity)
-    /// and revokes any currently-issued tokens immediately, so "logs out the user" is not just a
-    /// client-side navigation but an actual server-enforced session kill.</summary>
     private async Task TriggerUnofficialActivityLockAsync(User user, string reason, CancellationToken ct)
     {
         user.IsLockedForUnofficialActivity = true;

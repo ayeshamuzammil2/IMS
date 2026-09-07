@@ -305,7 +305,7 @@ public sealed class FaceEnrollmentService(
             {
                 await HardFailAsync(session, ct);
                 throw new BusinessRuleException(BusinessRuleCodes.FaceMismatch,
-                    "Your live capture does not match your approved profile photo closely enough. Please contact your mentor if this repeats.");
+                    "Face verification failed. Your live capture does not match closely enough. Please contact your mentor if this repeats.");
             }
         }
         else
