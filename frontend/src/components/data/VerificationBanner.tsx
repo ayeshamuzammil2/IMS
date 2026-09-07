@@ -27,7 +27,7 @@ export function VerificationBanner({ status }: { status: VerificationStatus }) {
       bg: theme.colors.surface,
       iconBg: theme.colors.warningBg,
       tone: 'warning',
-      label: 'Verification Pending — mentor review in progress.',
+      label: 'Verification Pending — Your documents are currently under review.',
       Icon: ShieldAlert,
     },
     PendingSubmission: {
@@ -41,7 +41,7 @@ export function VerificationBanner({ status }: { status: VerificationStatus }) {
       bg: theme.colors.surface,
       iconBg: theme.colors.errorBg,
       tone: 'error',
-      label: 'Document Rejected — please resubmit your files.',
+      label: 'Document Rejected — please resubmit your files again.',
       Icon: ShieldX,
     },
   };

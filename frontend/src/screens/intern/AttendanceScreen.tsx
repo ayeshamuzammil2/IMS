@@ -263,14 +263,14 @@ export function AttendanceScreen() {
 
         <View style={s.metricsRow}>
           <MetricBox
-            label="Arrival"
+            label="CHECK IN"
             value={today.arrivalMarked ? formatTime(today.arrivalAtUtc) : 'Not marked'}
             badge={today.arrivalIsLate ? 'Late' : today.arrivalMarked ? 'On Time' : null}
             isLate={today.arrivalIsLate}
           />
           <View style={s.metricDivider} />
           <MetricBox
-            label="Departure"
+            label="CHECK OUT"
             value={today.departureMarked ? formatTime(today.departureAtUtc) : 'Not marked'}
             badge={today.departureIsEarly ? 'Early' : today.departureMarked ? 'Done' : null}
             isLate={today.departureIsEarly}
@@ -280,7 +280,7 @@ export function AttendanceScreen() {
 
       <View style={s.actionsGroup}>
         <Button
-          label={startingEvent === 'Arrival' ? 'Initializing...' : 'Mark Arrival'}
+          label={startingEvent === 'Arrival' ? 'Initializing...' : 'Check IN'}
           onPress={() => onStart('Arrival')}
           disabled={arrivalBlocked || startingEvent !== null}
           loading={startingEvent === 'Arrival'}
@@ -297,7 +297,7 @@ export function AttendanceScreen() {
         ) : null}
 
         <Button
-          label={startingEvent === 'Departure' ? 'Initializing...' : 'Mark Departure'}
+          label={startingEvent === 'Departure' ? 'Initializing...' : 'Check OUT'}
           variant="outline"
           onPress={() => onStart('Departure')}
           disabled={departureBlocked || startingEvent !== null}

@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { Pressable, View, ActivityIndicator, ScrollView } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -69,6 +69,31 @@ export function DashboardScreen() {
     }, [refetch]),
   );
 
+  // Purane status ko track karne ke liye useRef ka istemal
+  const prevStatusRef = useRef(data?.verificationStatus);
+
+  useEffect(() => {
+    const currentStatus = data?.verificationStatus?.toUpperCase();
+    const prevStatus = prevStatusRef.current?.toUpperCase();
+
+    // Sirf tab Toast dikhao jab status update hua ho aur pehli dafa load na ho raha ho
+    if (
+      currentStatus && 
+      ['VERIFIED', 'APPROVED', 'COMPLETED'].includes(currentStatus) &&
+      prevStatus !== currentStatus && 
+      prevStatus !== undefined 
+    ) {
+      Toast.show({ 
+        type: 'success', 
+        text1: 'Verification Completed', 
+        text2: 'Your documents verification has been successfully completed.' 
+      });
+    }
+
+    // Current status ko ref mein save kar lein next time compare karne ke liye
+    prevStatusRef.current = data?.verificationStatus;
+  }, [data?.verificationStatus]);
+
   const goToDocuments = () => (navigation.getParent()?.navigate as (name: string) => void)?.('Documents');
 
   if (isLoading || !data) {
@@ -85,6 +110,8 @@ export function DashboardScreen() {
   const isSelfDetailsSubmitted = Boolean(
     data.address || data.emergencyContactName || data.emergencyContactPhone || data.bloodGroup
   );
+
+  const isVerified = ['VERIFIED', 'APPROVED', 'COMPLETED'].includes((data.verificationStatus || '').toUpperCase());
 
   return (
     <Screen scroll={false}>
@@ -114,7 +141,8 @@ export function DashboardScreen() {
           </Text>
         </View>
 
-        <VerificationBanner status={data.verificationStatus} />
+        {/* Verification banner sirf tab dikhega jab verification pending/incomplete ho */}
+        {!isVerified && <VerificationBanner status={data.verificationStatus} />}
 
         {/* Internship Details Card */}
         <View style={s.card}>
@@ -183,14 +211,28 @@ function SelfDetailsForm({ initial, onSubmitted }: { initial: InternDashboardDto
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
+    const cleanAddress = address.trim();
+    const cleanEmName = emergencyName.trim();
+    const cleanEmPhone = emergencyPhone.trim() === '+92' ? '' : emergencyPhone.trim();
+    const cleanBloodGroup = bloodGroup.trim();
+
+    // Validation Check: Make sure fields are not empty before submitting
+    if (!cleanAddress || !cleanEmName || !cleanEmPhone || !cleanBloodGroup) {
+      Toast.show({ 
+        type: 'error', 
+        text1: 'Missing Details', 
+        text2: 'Please fill in your self details first before saving.' 
+      });
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const cleanEmPhone = emergencyPhone.trim() === '+92' ? null : emergencyPhone.trim();
       await documentsApi.submitSelfDetails({
-        address: address.trim() || null,
-        emergencyContactName: emergencyName.trim() || null,
+        address: cleanAddress,
+        emergencyContactName: cleanEmName,
         emergencyContactPhone: cleanEmPhone,
-        bloodGroup: bloodGroup.trim() || null,
+        bloodGroup: cleanBloodGroup,
       });
       Toast.show({ type: 'success', text1: 'Details saved successfully' });
       onSubmitted();
