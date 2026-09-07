@@ -18,7 +18,7 @@ public sealed class FileStorageOptions
         [FileCategory.AttendanceChallengeFrame] = new CategoryLimits { MaxSizeBytes = 1 * 1024 * 1024, AllowedExtensions = [".jpg", ".jpeg", ".png"] },
         [FileCategory.ProjectFile] = new CategoryLimits { MaxSizeBytes = 20 * 1024 * 1024, AllowedExtensions = [".pdf", ".jpg", ".jpeg", ".png"] },
         [FileCategory.CertificateTemplate] = new CategoryLimits { MaxSizeBytes = 5 * 1024 * 1024, AllowedExtensions = [".docx"] },
-        [FileCategory.GeneratedCertificate] = new CategoryLimits { MaxSizeBytes = 10 * 1024 * 1024, AllowedExtensions = [".pdf"] },
+        [FileCategory.GeneratedCertificate] = new CategoryLimits { MaxSizeBytes = 10 * 1024 * 1024, AllowedExtensions = [".pdf", ".docx"] },
         [FileCategory.GeneratedIdCard] = new CategoryLimits { MaxSizeBytes = 10 * 1024 * 1024, AllowedExtensions = [".pdf"] },
     };
 

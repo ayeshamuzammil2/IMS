@@ -11,6 +11,7 @@ import { Button } from '../../components/primitives/Button';
 import { SelectField } from '../../components/forms/SelectField';
 import { internsApi } from '../../api/resources/interns.api';
 import { certificatesApi } from '../../api/resources/certificates.api';
+import { filesApi, extensionForContentType } from '../../api/resources/files.api';
 import { apiBaseUrl } from '../../api/client';
 import { downloadAndShare } from '../../lib/downloadAndShare';
 import { useThemedStyles } from '../../theme/useThemedStyles';
@@ -84,7 +85,16 @@ const InternCertificateCard = ({ intern, isAdmin, theme, s }: any) => {
     }
     setDownloading(true);
     try {
-      await downloadAndShare(`${apiBaseUrl}/api/files/${cert.generatedFileId}`, `certificate-${intern.internCode}.pdf`);
+      // The certificate file can be a generated .pdf OR a mentor-uploaded .docx - fetch its real
+      // content type instead of assuming .pdf, otherwise a .docx opens with the wrong
+      // extension/mime type and most viewers refuse to open it (looks like "not viewable").
+      const meta = await filesApi.meta(cert.generatedFileId);
+      const extension = extensionForContentType(meta.contentType) || '.pdf';
+      await downloadAndShare(
+        `${apiBaseUrl}/api/files/${cert.generatedFileId}`,
+        `certificate-${intern.internCode}${extension}`,
+        meta.contentType,
+      );
     } catch (error: any) {
       Toast.show({ type: 'error', text1: 'Could not open preview', text2: error?.message });
     } finally {

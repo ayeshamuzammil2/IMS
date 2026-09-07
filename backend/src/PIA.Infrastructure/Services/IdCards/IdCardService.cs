@@ -64,6 +64,16 @@ public sealed class IdCardService(
 
         var profile = await LoadProfileWithScopeCheckAsync(internProfileId, ct);
 
+        // An ID card carries the intern's address/emergency contact/blood group - all of which
+        // come from self-details. Generating one before the intern has submitted them would bake
+        // in blank/stale data, so this must gate generation the same way the approved-photo check
+        // does below.
+        if (!profile.SelfDetailsSubmitted)
+        {
+            throw new BusinessRuleException(BusinessRuleCodes.IdCardSelfDetailsRequired,
+                "Cannot generate an ID card: this intern has not submitted their self details yet.");
+        }
+
         if (profile.ApprovedPhotoFileId is not { } photoFileId)
         {
             throw new BusinessRuleException(BusinessRuleCodes.IdCardNoPhoto,

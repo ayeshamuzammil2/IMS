@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Modal, ActivityIndicator } from 'react-native';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -15,6 +15,12 @@ import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
 import type { AppTheme } from '../../theme/types';
 
+// Same pattern/duration as AttendanceScreen's retry cooldown - after a failed face
+// match/verification, force a short pause before letting the intern try enrollment again instead
+// of immediately re-opening the camera.
+const RETRY_COOLDOWN_SECONDS = 15;
+const FACE_FAILURE_CODES = new Set(['FACE_MISMATCH', 'FACE_VERIFICATION_UNAVAILABLE']);
+
 export function FaceEnrollmentScreen() {
   const s = useThemedStyles(makeStyles);
   const theme = useTheme();
@@ -22,6 +28,20 @@ export function FaceEnrollmentScreen() {
   const [consentGiven, setConsentGiven] = useState(false);
   const [activeSession, setActiveSession] = useState<EnrollmentSessionResponse | null>(null);
   const [starting, setStarting] = useState(false);
+  const [cooldownEndsAt, setCooldownEndsAt] = useState<number | null>(null);
+  const [cooldownSecondsLeft, setCooldownSecondsLeft] = useState(0);
+
+  useEffect(() => {
+    if (!cooldownEndsAt) return;
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((cooldownEndsAt - Date.now()) / 1000));
+      setCooldownSecondsLeft(remaining);
+      if (remaining <= 0) setCooldownEndsAt(null);
+    };
+    tick();
+    const interval = setInterval(tick, 250);
+    return () => clearInterval(interval);
+  }, [cooldownEndsAt]);
 
   // Always fetch a fresh copy of "me" when this screen is focused - faceEnrollmentStatus can
   // change from another session (e.g. an admin unlocking re-enrollment) and this screen must
@@ -35,11 +55,16 @@ export function FaceEnrollmentScreen() {
   useFocusEffect(
     useCallback(() => {
       meQuery.refetch();
+      return () => {
+        setCooldownEndsAt(null);
+        setCooldownSecondsLeft(0);
+      };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
 
   const isLocked = meQuery.data?.faceEnrollmentStatus === 'Active' && !meQuery.data?.faceReEnrollmentAllowed;
+  const onCooldown = cooldownSecondsLeft > 0;
 
   const submitMutation = useMutation({
     mutationFn: async (frames: CapturedFrame[]) => {
@@ -56,6 +81,11 @@ export function FaceEnrollmentScreen() {
       }
     },
     onError: (error: any) => {
+      if (FACE_FAILURE_CODES.has(error?.code)) {
+        Toast.show({ type: 'error', text1: 'Face verification failed', text2: error?.message });
+        setCooldownEndsAt(Date.now() + RETRY_COOLDOWN_SECONDS * 1000);
+        return;
+      }
       Toast.show({ type: 'error', text1: 'Enrollment failed', text2: error?.message });
     },
   });
@@ -153,13 +183,19 @@ export function FaceEnrollmentScreen() {
       </View>
 
       <Button
-        label={starting ? 'Starting Session...' : 'Start Enrollment'}
+        label={starting ? 'Starting Session...' : onCooldown ? `Please wait ${cooldownSecondsLeft}s...` : 'Start Enrollment'}
         onPress={onStart}
-        disabled={!consentGiven || starting}
+        disabled={!consentGiven || starting || onCooldown}
         loading={starting}
         fullWidth
         style={s.startButton}
       />
+
+      {onCooldown ? (
+        <Text variant="caption" tone="muted" style={s.cooldownText}>
+          Please wait {cooldownSecondsLeft}s before trying again.
+        </Text>
+      ) : null}
 
       <Modal visible={activeSession !== null} animationType="slide" onRequestClose={() => setActiveSession(null)}>
         {activeSession ? (
@@ -238,4 +274,5 @@ const makeStyles = (t: AppTheme) => ({
   paragraph: { marginBottom: t.spacing.sm, lineHeight: 22 },
   consentRow: { marginTop: t.spacing.sm, marginBottom: t.spacing.xs },
   startButton: { marginTop: t.spacing.xs },
+  cooldownText: { textAlign: 'center' as const, marginTop: t.spacing.xs },
 });

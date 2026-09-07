@@ -54,7 +54,7 @@ export function ForgotPasswordScreen() {
       await authApi.forgotPassword({
         email: values.email.trim(),
         newPassword: values.password,
-      } as any);
+      });
 
       Toast.show({
         type: 'success',

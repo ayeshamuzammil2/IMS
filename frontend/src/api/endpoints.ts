@@ -11,6 +11,9 @@ export const endpoints = {
     me: '/auth/me',
     forgotPassword: '/auth/forgot-password',
   },
+  files: {
+    meta: (fileId: string) => `/files/${fileId}/meta`,
+  },
   departments: {
     list: '/departments',
     lookup: '/departments/lookup',

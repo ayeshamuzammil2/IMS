@@ -8,6 +8,7 @@ import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
 import { certificatesApi, type CertificateStatusKey } from '../../api/resources/certificates.api';
+import { filesApi, extensionForContentType } from '../../api/resources/files.api';
 import { apiBaseUrl } from '../../api/client';
 import { downloadAndShare } from '../../lib/downloadAndShare';
 import { useThemedStyles } from '../../theme/useThemedStyles';
@@ -84,7 +85,15 @@ export function CertificateScreen() {
     if (!data?.generatedFileId) return;
     setDownloading(true);
     try {
-      await downloadAndShare(`${apiBaseUrl}/api/files/${data.generatedFileId}`, `certificate-${data.internCode ?? 'me'}.pdf`);
+      // Same reasoning as the mentor's preview: this can be a generated .pdf or a mentor-uploaded
+      // .docx, so ask the server for the real content type instead of assuming .pdf.
+      const meta = await filesApi.meta(data.generatedFileId);
+      const extension = extensionForContentType(meta.contentType) || '.pdf';
+      await downloadAndShare(
+        `${apiBaseUrl}/api/files/${data.generatedFileId}`,
+        `certificate-${data.internCode ?? 'me'}${extension}`,
+        meta.contentType,
+      );
     } catch (error: any) {
       Toast.show({ type: 'error', text1: 'Could not open certificate', text2: error?.message });
     } finally {

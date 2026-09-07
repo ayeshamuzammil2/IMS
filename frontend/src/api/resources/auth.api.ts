@@ -23,6 +23,7 @@ export interface ChangePasswordRequest {
 
 export interface ForgotPasswordRequest {
   email: string;
+  newPassword: string;
 }
 
 export interface MeResponse {

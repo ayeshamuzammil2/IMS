@@ -18,29 +18,47 @@ public sealed class DocumentReviewService(
 {
     public async Task<IReadOnlyList<DocumentReviewQueueItemDto>> GetPendingAsync(CancellationToken ct)
     {
-        var query = db.InternDocuments.AsNoTracking()
-            .Where(d => d.Status == DocumentStatus.Pending)
-            .Join(db.InternProfiles.Include(p => p.User).ThenInclude(u => u.Department), d => d.InternProfileId, p => p.Id,
-                (d, p) => new { Document = d, Profile = p });
-
+        var profileQuery = db.InternProfiles.Include(p => p.User).ThenInclude(u => u.Department).AsQueryable();
         if (currentUser.Role == UserRole.Mentor)
         {
-            query = query.Where(x => x.Profile.MentorId == currentUser.UserId);
+            profileQuery = profileQuery.Where(p => p.MentorId == currentUser.UserId);
         }
 
-        var rows = await query.OrderBy(x => x.Document.UploadedAtUtc).ToListAsync(ct);
+        var profileIds = await profileQuery.Select(p => p.Id).ToListAsync(ct);
 
-        var fileIds = rows.Where(x => x.Document.FileId.HasValue).Select(x => x.Document.FileId!.Value).ToList();
+        // A re-upload doesn't replace the old row - it adds a new, higher Version for the same
+        // (InternProfileId, DocumentType) - so grouping down to just the latest version per type
+        // here is what keeps 10 reuploads of the same profile photo from showing up as 10 separate
+        // queue entries. This mirrors how VerificationRecomputer and the intern's own dashboard
+        // already collapse to "latest per type"; this queue was the one place that hadn't.
+        var allDocs = await db.InternDocuments.AsNoTracking()
+            .Where(d => profileIds.Contains(d.InternProfileId))
+            .ToListAsync(ct);
+
+        var latestPending = allDocs
+            .GroupBy(d => (d.InternProfileId, d.DocumentType))
+            .Select(g => g.OrderByDescending(d => d.Version).First())
+            .Where(d => d.Status == DocumentStatus.Pending)
+            .OrderBy(d => d.UploadedAtUtc)
+            .ToList();
+
+        var profilesById = await profileQuery.Where(p => profileIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct);
+
+        var fileIds = latestPending.Where(d => d.FileId.HasValue).Select(d => d.FileId!.Value).ToList();
         var contentTypesByFileId = await db.StoredFiles.AsNoTracking()
             .Where(f => fileIds.Contains(f.Id))
             .ToDictionaryAsync(f => f.Id, f => f.ContentType, ct);
 
-        return rows.Select(x => new DocumentReviewQueueItemDto(
-            x.Document.Id, x.Profile.Id, x.Profile.User.FullName, x.Profile.InternCode,
-            x.Profile.User.DepartmentId, x.Profile.User.Department?.Name,
-            x.Document.DocumentType.ToString(), x.Document.FileId,
-            x.Document.FileId.HasValue ? contentTypesByFileId.GetValueOrDefault(x.Document.FileId.Value) : null,
-            x.Document.ExternalLinkUrl, x.Document.Version, x.Document.UploadedAtUtc)).ToList();
+        return latestPending.Select(d =>
+        {
+            var p = profilesById[d.InternProfileId];
+            return new DocumentReviewQueueItemDto(
+                d.Id, p.Id, p.User.FullName, p.InternCode,
+                p.User.DepartmentId, p.User.Department?.Name,
+                d.DocumentType.ToString(), d.FileId,
+                d.FileId.HasValue ? contentTypesByFileId.GetValueOrDefault(d.FileId.Value) : null,
+                d.ExternalLinkUrl, d.Version, d.UploadedAtUtc);
+        }).ToList();
     }
 
     public async Task DecideAsync(int documentId, ReviewDocumentRequest request, CancellationToken ct)

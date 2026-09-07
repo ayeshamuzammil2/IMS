@@ -15,7 +15,6 @@ public sealed class AuthService(
     IUserSecurityService security,
     IJwtTokenService jwtTokenService,
     IRefreshTokenService refreshTokenService,
-    ITempPasswordGenerator tempPasswordGenerator,
     IEmailQueue emailQueue,
     IAuditLogger auditLogger,
     IClock clock) : IAuthService
@@ -108,21 +107,26 @@ public sealed class AuthService(
         // staff/intern system, not a public consumer product.
         if (user is null) throw new ValidationException("email", "This email address is not registered.");
 
-        var tempPassword = tempPasswordGenerator.Generate();
-        user.PasswordHash = hasher.Hash(tempPassword);
-        user.MustResetPassword = true;
+        // The user chooses their own new password on this screen (enforced by
+        // ForgotPasswordRequestValidator), so this sets it directly rather than emailing a
+        // system-generated temp password - that older flow silently discarded whatever the user
+        // typed, so logging in with it afterwards always failed with "invalid credentials".
+        passwordPolicy.Validate(request.NewPassword, user.Email, user.FullName, user.PasswordHash);
+
+        user.PasswordHash = hasher.Hash(request.NewPassword);
+        user.MustResetPassword = false;
+        user.PasswordChangedAtUtc = clock.UtcNow;
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         await db.SaveChangesAsync(ct);
         await security.InvalidateAsync(user.Id, "Forgot-password reset", ct);
 
         var html = $"""
             <p>Hello {System.Net.WebUtility.HtmlEncode(user.FullName)},</p>
-            <p>Your password has been reset. Your new temporary password is:</p>
-            <p style="font-size:20px;font-weight:bold;letter-spacing:1px;">{System.Net.WebUtility.HtmlEncode(tempPassword)}</p>
-            <p>Please sign in with this password - you will be asked to set a new one immediately.</p>
+            <p>Your password has just been reset from the Forgot Password screen.</p>
+            <p>You can now sign in with your new password.</p>
             <p>If you did not request this, contact your administrator right away.</p>
             """;
-        await emailQueue.EnqueueAsync(user.Email, user.FullName, "Your PIA Wings password", html, "password-reset-by-request", ct);
+        await emailQueue.EnqueueAsync(user.Email, user.FullName, "Your PIA Wings password was reset", html, "password-reset-by-request", ct);
         await auditLogger.LogAsync("Auth.ForgotPasswordReset", nameof(User), user.Id.ToString(), null, ct);
     }
 

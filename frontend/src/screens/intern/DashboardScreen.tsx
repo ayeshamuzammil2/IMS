@@ -239,7 +239,7 @@ function Row({ label, value, isLast }: { label: string; value?: string | null; i
 const makeStyles = (t: AppTheme) => ({
   container: {
     paddingHorizontal: 3,
-    paddingTop: t.spacing.md,
+    paddingTop: 5,
     paddingBottom: t.spacing.xl,
   },
   centerLoading: {

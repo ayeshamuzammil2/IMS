@@ -64,6 +64,12 @@ public sealed class CertificateService(
                 "This intern is not yet eligible for a certificate - verification must be complete and the internship period must have ended.");
         }
 
+        if (profile.GithubStatus != GithubStatus.Approved)
+        {
+            throw new BusinessRuleException(BusinessRuleCodes.CertificateGithubNotApproved,
+                "This intern is not yet eligible for a certificate - their GitHub repository must be approved by their mentor first.");
+        }
+
         var template = await db.CertificateTemplates.AsNoTracking().FirstOrDefaultAsync(t => t.Id == request.TemplateId, ct)
             ?? throw new NotFoundException(nameof(CertificateTemplate), request.TemplateId);
 
@@ -136,6 +142,13 @@ public sealed class CertificateService(
     public async Task<CertificateDto> UploadAsync(int internProfileId, UploadCertificateRequest request, CancellationToken ct)
     {
         var profile = await LoadProfileWithScopeCheckAsync(internProfileId, ct);
+
+        if (profile.GithubStatus != GithubStatus.Approved)
+        {
+            throw new BusinessRuleException(BusinessRuleCodes.CertificateGithubNotApproved,
+                "This intern is not yet eligible for a certificate - their GitHub repository must be approved by their mentor first.");
+        }
+
         var certificate = await db.Certificates.FirstOrDefaultAsync(c => c.InternProfileId == internProfileId, ct);
 
         // A Mentor can fix/replace a certificate up until it's Issued - past that point it's a

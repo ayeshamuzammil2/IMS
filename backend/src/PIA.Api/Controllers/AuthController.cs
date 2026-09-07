@@ -74,6 +74,6 @@ public sealed class AuthController(IAuthService authService, ICurrentUser curren
         // Throws a 400 ValidationException (handled by GlobalExceptionHandler) if the email
         // isn't registered - see AuthService.ForgotPasswordAsync.
         await authService.ForgotPasswordAsync(request, ct);
-        return Ok(new { message = "A new password has been sent to your email." });
+        return Ok(new { message = "Your password has been reset. You can now sign in with your new password." });
     }
 }
