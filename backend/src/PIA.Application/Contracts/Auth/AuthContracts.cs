@@ -29,5 +29,9 @@ public sealed record MeResponse(
     int? DepartmentId,
     string? DepartmentName,
     int? InternProfileId,
-    bool MustResetPassword
+    bool MustResetPassword,
+    /// <summary>Null for non-interns. Lets the app gate the "Start Enrollment" UI before the
+    /// intern ever attempts a submit, instead of only surfacing the lock as a submit-time error.</summary>
+    string? FaceEnrollmentStatus,
+    bool FaceReEnrollmentAllowed
 );

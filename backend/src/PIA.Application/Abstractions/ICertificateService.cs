@@ -29,4 +29,15 @@ public interface ICertificateService
     Task<CertificateDto> ApproveAsync(int internProfileId, CancellationToken ct);
 
     Task<CertificateDto> IssueAsync(int internProfileId, CancellationToken ct);
+
+    /// <summary>Mentor/Admin-facing - manually attaches/replaces the certificate document for an
+    /// intern. Used to fix a generated document by hand instead of re-rendering from a template.
+    /// Mirrors GenerateAsync's eligibility and scope rules, but a Mentor may not edit a
+    /// certificate that has already been Issued - only Admin can at that point.</summary>
+    Task<CertificateDto> UploadAsync(int internProfileId, UploadCertificateRequest request, CancellationToken ct);
+
+    /// <summary>Mentor/Admin-facing - deletes the certificate row (and its generated file) for an
+    /// intern, letting them start over. A Mentor may not delete a certificate that has already
+    /// been Issued - only Admin can at that point.</summary>
+    Task DeleteAsync(int internProfileId, CancellationToken ct);
 }

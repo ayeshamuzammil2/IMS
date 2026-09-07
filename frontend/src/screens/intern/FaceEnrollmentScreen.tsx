@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
-import { View, Modal } from 'react-native';
-import { useMutation } from '@tanstack/react-query';
-import { useNavigation } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
+import { View, Modal, ActivityIndicator } from 'react-native';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
-import { ShieldCheck } from 'lucide-react-native';
+import { ShieldCheck, Lock } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
 import { ChallengeCaptureView } from '../../components/capture/ChallengeCaptureView';
 import { enrollmentApi, type EnrollmentSessionResponse, type CapturedFrame } from '../../api/resources/attendance.api';
+import { authApi } from '../../api/resources/auth.api';
 import { getOrCreateDeviceId } from '../../lib/deviceId';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
@@ -21,6 +22,24 @@ export function FaceEnrollmentScreen() {
   const [consentGiven, setConsentGiven] = useState(false);
   const [activeSession, setActiveSession] = useState<EnrollmentSessionResponse | null>(null);
   const [starting, setStarting] = useState(false);
+
+  // Always fetch a fresh copy of "me" when this screen is focused - faceEnrollmentStatus can
+  // change from another session (e.g. an admin unlocking re-enrollment) and this screen must
+  // never let an already-enrolled-and-locked intern see the Start Enrollment flow again.
+  const meQuery = useQuery({
+    queryKey: ['auth', 'me', 'faceEnrollmentGate'],
+    queryFn: authApi.me,
+    staleTime: 0,
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      meQuery.refetch();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
+
+  const isLocked = meQuery.data?.faceEnrollmentStatus === 'Active' && !meQuery.data?.faceReEnrollmentAllowed;
 
   const submitMutation = useMutation({
     mutationFn: async (frames: CapturedFrame[]) => {
@@ -53,6 +72,34 @@ export function FaceEnrollmentScreen() {
       setStarting(false);
     }
   };
+
+  if (meQuery.isLoading) {
+    return (
+      <Screen scroll={false}>
+        <View style={s.centerLoading}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (isLocked) {
+    return (
+      <Screen scroll style={s.container}>
+        <View style={s.card}>
+          <View style={s.iconWrap}>
+            <Lock size={56} color={theme.colors.textMuted} />
+          </View>
+          <Text variant="bodyStrong" style={{ textAlign: 'center', marginBottom: 8 }}>
+            Already Enrolled
+          </Text>
+          <Text variant="body" tone="secondary" style={s.message}>
+            Your face is already enrolled and locked. Contact your admin to re-enroll.
+          </Text>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen scroll>
@@ -119,9 +166,6 @@ export function FaceEnrollmentScreen() {
           <ChallengeCaptureView
             challenge={activeSession.challenge}
             onComplete={(frames) => {
-              // Close the camera modal right away - the submit is a background network call,
-              // there's no reason to keep the camera session alive (and racing against it) while
-              // it's in flight.
               setActiveSession(null);
               submitMutation.mutate(frames);
             }}
@@ -142,6 +186,25 @@ export function FaceEnrollmentScreen() {
 }
 
 const makeStyles = (t: AppTheme) => ({
+  container: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  card: {
+    backgroundColor: t.colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  iconWrap: { alignItems: 'center' as const, marginTop: t.spacing.md, marginBottom: t.spacing.md },
+  message: { textAlign: 'center' as const, lineHeight: 22 },
+  centerLoading: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const, paddingTop: t.spacing.xl * 2 },
   header: { alignItems: 'center' as const, gap: t.spacing.xs, marginTop: t.spacing.md, marginBottom: t.spacing.xl },
   title: { textAlign: 'center' as const, letterSpacing: 0.5 },
   cardContainer: {

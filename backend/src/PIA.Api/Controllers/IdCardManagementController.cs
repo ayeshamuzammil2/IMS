@@ -23,6 +23,13 @@ public sealed class IdCardManagementController(IIdCardService idCardService) : C
     public async Task<IActionResult> Submit(int internProfileId, [FromBody] SubmitIdCardRequest request, CancellationToken ct) =>
         Ok(await idCardService.SubmitAsync(internProfileId, request, ct));
 
+    [HttpDelete("{internProfileId:int}")]
+    public async Task<IActionResult> Delete(int internProfileId, CancellationToken ct)
+    {
+        await idCardService.DeleteAsync(internProfileId, ct);
+        return NoContent();
+    }
+
     [HttpPost("{internProfileId:int}/approve")]
     [Authorize(Policy = Policies.Admin)]
     public async Task<IActionResult> Approve(int internProfileId, CancellationToken ct) =>

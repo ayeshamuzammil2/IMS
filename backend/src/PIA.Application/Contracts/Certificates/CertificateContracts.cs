@@ -29,4 +29,10 @@ public sealed record CertificateDto(
 
 public sealed record GenerateCertificateRequest(int TemplateId);
 
+/// <summary>Mentor/Admin-facing manual replace - lets a mentor attach/replace the certificate
+/// document directly (e.g. a hand-edited copy) instead of re-rendering from a template. Content
+/// is a raw Stream, matching IFileStorage.FileSaveRequest - the Api-layer controller does the
+/// IFormFile translation.</summary>
+public sealed record UploadCertificateRequest(Stream Content, string FileName, string? ContentType);
+
 public sealed record GeneratedFileResult(byte[] Content, string FileName, string ContentType);

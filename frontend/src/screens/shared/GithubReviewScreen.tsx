@@ -3,7 +3,8 @@ import { View, Pressable, ActivityIndicator, FlatList } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { GitBranch, ChevronRight, Check, X, RotateCcw, Search } from 'lucide-react-native';
+import * as Clipboard from 'expo-clipboard';
+import { GitBranch, ChevronRight, Check, X, RotateCcw, Search, Copy } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
@@ -20,6 +21,15 @@ import type { AppTheme } from '../../theme/types';
 type ReasonAction = 'Rejected' | 'ResubmitRequested';
 
 const GithubReviewCard = ({ item, isAdmin, theme, s, setReasonModal, handleApprove, busyId }: any) => {
+  const handleCopyLink = async () => {
+    if (!item.repositoryUrl) return;
+    await Clipboard.setStringAsync(item.repositoryUrl);
+    Toast.show({
+      type: 'success',
+      text1: 'Link copied to clipboard',
+    });
+  };
+
   return (
     <View style={s.card}>
       <View style={s.cardHeader}>
@@ -37,12 +47,18 @@ const GithubReviewCard = ({ item, isAdmin, theme, s, setReasonModal, handleAppro
         <ChevronRight size={18} color={theme.colors.textMuted} />
       </View>
 
+      {/* GitHub Repository Link & Copy Button */}
+      <View style={s.repoRow}>
+        <Text variant="caption" tone="brand" numberOfLines={1} style={s.repoText}>
+          {item.repositoryUrl}
+        </Text>
+        <Pressable hitSlop={8} onPress={handleCopyLink} style={s.copyButton}>
+          <Copy size={14} color={theme.colors.primary} />
+        </Pressable>
+      </View>
+
+      {/* Pending Review Badge Shifted to Next Row Below */}
       <View style={s.statusRow}>
-        <View style={s.metaLeftGroup}>
-          <Text variant="caption" tone="brand" numberOfLines={1} style={s.mentorText}>
-            {item.repositoryUrl}
-          </Text>
-        </View>
         <View style={[s.badge, { backgroundColor: theme.colors.warningBg || '#FFFBEB' }]}>
           <Text variant="caption" style={[s.badgeText, { color: theme.colors.warning || '#D97706' }]}>
             Pending Review
@@ -430,21 +446,29 @@ const makeStyles = (t: AppTheme) => ({
   emailText: {
     marginTop: 3,
   },
-  statusRow: {
+  repoRow: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
     marginTop: 12,
     paddingLeft: 2,
-  },
-  metaLeftGroup: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
     gap: 8,
+  },
+  repoText: {
+    fontSize: 12,
     flex: 1,
   },
-  mentorText: {
-    fontSize: 12,
+  copyButton: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: t.colors.surfaceSunken,
+  },
+  statusRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'flex-start' as const,
+    marginTop: 8,
+    paddingLeft: 2,
   },
   badge: {
     flexDirection: 'row' as const,

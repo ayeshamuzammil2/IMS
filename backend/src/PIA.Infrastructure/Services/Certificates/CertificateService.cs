@@ -133,6 +133,64 @@ public sealed class CertificateService(
         return ToDto(certificate, profile);
     }
 
+    public async Task<CertificateDto> UploadAsync(int internProfileId, UploadCertificateRequest request, CancellationToken ct)
+    {
+        var profile = await LoadProfileWithScopeCheckAsync(internProfileId, ct);
+        var certificate = await db.Certificates.FirstOrDefaultAsync(c => c.InternProfileId == internProfileId, ct);
+
+        // A Mentor can fix/replace a certificate up until it's Issued - past that point it's a
+        // final, handed-out document and only Admin may touch it.
+        if (certificate?.Status == CertificateStatus.Issued && currentUser.Role == UserRole.Mentor)
+        {
+            throw new ForbiddenException("An issued certificate can only be edited by an administrator.");
+        }
+
+        var storedFile = await fileStorage.SaveAsync(new FileSaveRequest(
+            request.Content, request.FileName, request.ContentType,
+            FileCategory.GeneratedCertificate, profile.UserId, currentUser.UserId), ct);
+
+        var certificateNumber = certificate?.CertificateNumber ?? $"CERT-{profile.InternCode}";
+
+        if (certificate is null)
+        {
+            certificate = new Certificate
+            {
+                InternProfileId = internProfileId,
+                CertificateNumber = certificateNumber,
+                CreatedAtUtc = clock.UtcNow,
+            };
+            db.Certificates.Add(certificate);
+        }
+
+        certificate.GeneratedFileId = storedFile.Id;
+        certificate.RenderedBy = CertificateRenderedBy.BuiltInLayout;
+        certificate.Status = CertificateStatus.PendingApproval;
+        certificate.RejectionReason = null;
+        await db.SaveChangesAsync(ct);
+
+        return ToDto(certificate, profile);
+    }
+
+    public async Task DeleteAsync(int internProfileId, CancellationToken ct)
+    {
+        var profile = await LoadProfileWithScopeCheckAsync(internProfileId, ct);
+        var certificate = await db.Certificates.FirstOrDefaultAsync(c => c.InternProfileId == internProfileId, ct)
+            ?? throw new NotFoundException(nameof(Certificate), internProfileId);
+
+        if (certificate.Status == CertificateStatus.Issued && currentUser.Role == UserRole.Mentor)
+        {
+            throw new ForbiddenException("An issued certificate can only be deleted by an administrator.");
+        }
+
+        if (certificate.GeneratedFileId is { } fileId)
+        {
+            await fileStorage.SoftDeleteAsync(fileId, ct);
+        }
+
+        db.Certificates.Remove(certificate);
+        await db.SaveChangesAsync(ct);
+    }
+
     private async Task<(Certificate Certificate, InternProfile Profile)> LoadCertificateAsync(int internProfileId, CancellationToken ct)
     {
         var profile = await db.InternProfiles.Include(p => p.User).ThenInclude(u => u.Department).FirstOrDefaultAsync(p => p.Id == internProfileId, ct)

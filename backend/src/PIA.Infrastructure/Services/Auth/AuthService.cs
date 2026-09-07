@@ -134,7 +134,8 @@ public sealed class AuthService(
 
         return new MeResponse(
             user.Id, user.Role.ToString(), user.FullName, user.Email, user.Phone, user.Cnic,
-            null, user.DepartmentId, user.Department?.Name, user.InternProfile?.Id, user.MustResetPassword);
+            null, user.DepartmentId, user.Department?.Name, user.InternProfile?.Id, user.MustResetPassword,
+            user.InternProfile?.FaceEnrollmentStatus.ToString(), user.InternProfile?.FaceReEnrollmentAllowed ?? false);
     }
 
     public async Task<LoginResponse> RefreshAsync(RefreshRequest request, string? ip, CancellationToken ct)

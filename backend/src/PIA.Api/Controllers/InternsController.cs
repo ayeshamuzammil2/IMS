@@ -75,6 +75,20 @@ public sealed class InternsController(IInternService interns, IFaceEnrollmentSer
         await faceEnrollment.RevokeAsync(id, request.Reason, ct);
         return NoContent();
     }
+
+    /// <summary>Admin-facing one-time unlock: face enrollment locks automatically after the
+    /// intern's first successful capture, and this is the only way to let them submit a new one
+    /// without wiping today's attendance eligibility (see IFaceEnrollmentService.RevokeAsync for
+    /// the "wipe and start over" alternative).</summary>
+    [HttpPost("{id:int}/unlock-face-enrollment")]
+    [Authorize(Policy = Policies.Admin)]
+    public async Task<IActionResult> UnlockFaceEnrollment(int id, [FromBody] UnlockFaceEnrollmentRequest request, CancellationToken ct)
+    {
+        await faceEnrollment.UnlockReEnrollmentAsync(id, request.Reason, ct);
+        return NoContent();
+    }
 }
 
 public sealed record EraseBiometricsRequest(string Reason);
+
+public sealed record UnlockFaceEnrollmentRequest(string Reason);

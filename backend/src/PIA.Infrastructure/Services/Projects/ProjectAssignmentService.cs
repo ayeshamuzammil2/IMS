@@ -69,6 +69,36 @@ public sealed class ProjectAssignmentService(
         return ToDto(assignment, profile.User.FullName, profile.InternCode);
     }
 
+    public async Task<ProjectAssignmentDto> UpdateAsync(int assignmentId, AssignProjectRequest request, CancellationToken ct)
+    {
+        var assignment = await db.ProjectAssignments.FirstOrDefaultAsync(a => a.Id == assignmentId, ct)
+            ?? throw new NotFoundException(nameof(ProjectAssignment), assignmentId);
+
+        // Same scope check as assigning/deleting: a Mentor may only edit assignments that belong
+        // to their own mentees; Admin can edit any.
+        var profile = await LoadProfileWithScopeCheckAsync(assignment.InternProfileId, ct);
+
+        if (request.Content is not null)
+        {
+            if (assignment.FileId is not null)
+            {
+                await fileStorage.SoftDeleteAsync(assignment.FileId.Value, ct);
+            }
+
+            var stored = await fileStorage.SaveAsync(new FileSaveRequest(
+                request.Content, request.FileName ?? "project-brief", request.ContentType, FileCategory.ProjectFile,
+                profile.UserId, currentUser.UserId), ct);
+            assignment.FileId = stored.Id;
+        }
+
+        assignment.Title = request.Title;
+        assignment.Description = request.Description;
+        assignment.DueDate = request.DueDate;
+        await db.SaveChangesAsync(ct);
+
+        return ToDto(assignment, profile.User.FullName, profile.InternCode);
+    }
+
     public async Task DeleteAsync(int assignmentId, CancellationToken ct)
     {
         var assignment = await db.ProjectAssignments.FirstOrDefaultAsync(a => a.Id == assignmentId, ct)

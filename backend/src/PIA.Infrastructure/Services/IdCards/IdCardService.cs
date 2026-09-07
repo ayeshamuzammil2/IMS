@@ -144,6 +144,26 @@ public sealed class IdCardService(
         return ToDto(card, profile);
     }
 
+    public async Task DeleteAsync(int internProfileId, CancellationToken ct)
+    {
+        await LoadProfileWithScopeCheckAsync(internProfileId, ct);
+        var card = await db.IdCards.FirstOrDefaultAsync(c => c.InternProfileId == internProfileId, ct)
+            ?? throw new NotFoundException(nameof(IdCard), internProfileId);
+
+        if (card.Status == IdCardStatus.Issued && currentUser.Role == UserRole.Mentor)
+        {
+            throw new ForbiddenException("An issued ID card can only be deleted by an administrator.");
+        }
+
+        if (card.GeneratedFileId is { } fileId)
+        {
+            await fileStorage.SoftDeleteAsync(fileId, ct);
+        }
+
+        db.IdCards.Remove(card);
+        await db.SaveChangesAsync(ct);
+    }
+
     private async Task<(IdCard Card, InternProfile Profile)> LoadCardAsync(int internProfileId, CancellationToken ct)
     {
         var profile = await db.InternProfiles.Include(p => p.User).ThenInclude(u => u.Department).FirstOrDefaultAsync(p => p.Id == internProfileId, ct)

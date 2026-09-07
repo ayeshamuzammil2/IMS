@@ -19,4 +19,9 @@ public interface IIdCardService
     Task<IdCardDto> ApproveAsync(int internProfileId, CancellationToken ct);
 
     Task<IdCardDto> IssueAsync(int internProfileId, CancellationToken ct);
+
+    /// <summary>Mentor/Admin-facing - deletes the ID card row (and its generated file) for an
+    /// intern, letting them start over. A Mentor may not delete a card that has already been
+    /// Issued - only Admin can at that point.</summary>
+    Task DeleteAsync(int internProfileId, CancellationToken ct);
 }

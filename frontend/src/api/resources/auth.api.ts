@@ -37,6 +37,9 @@ export interface MeResponse {
   departmentName: string | null;
   internProfileId: number | null;
   mustResetPassword: boolean;
+  /** Null for non-interns. 'Active' means face enrollment is locked unless faceReEnrollmentAllowed is true. */
+  faceEnrollmentStatus: string | null;
+  faceReEnrollmentAllowed: boolean;
 }
 
 export const authApi = {
