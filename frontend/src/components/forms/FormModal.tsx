@@ -25,9 +25,6 @@ export function FormModal({ visible, title, onClose, children, footer, scrollabl
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      {/* Keyboard-avoiding: pushes the card up as the keyboard opens so whichever field is
-       * focused stays visible above it, instead of being hidden underneath - same behaviour as
-       * the chat composer. */}
       <KeyboardAvoidingView
         style={s.backdrop}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -44,11 +41,16 @@ export function FormModal({ visible, title, onClose, children, footer, scrollabl
               </Pressable>
             </View>
             {scrollable ? (
-              <ScrollView style={s.body} keyboardShouldPersistTaps="handled">
+              <ScrollView
+                style={s.body}
+                contentContainerStyle={s.bodyContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
                 {children}
               </ScrollView>
             ) : (
-              <View style={s.body}>{children}</View>
+              <View style={[s.body, s.bodyContent]}>{children}</View>
             )}
             {footer ? <View style={s.footer}>{footer}</View> : null}
           </View>
@@ -66,10 +68,12 @@ const makeStyles = (t: AppTheme) => ({
     flex: 1,
     backgroundColor: t.colors.overlay,
     justifyContent: 'center' as const,
+    alignItems: 'center' as const,
     padding: t.spacing.lg,
   },
   backdropTouchable: { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0 },
   card: {
+    width: '100%' as const,
     maxHeight: '85%' as const,
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.lg,
@@ -79,15 +83,24 @@ const makeStyles = (t: AppTheme) => ({
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
-    marginBottom: t.spacing.md,
+    marginBottom: t.spacing.lg,
     gap: t.spacing.md,
   },
   headerTitle: { flex: 1 },
-  body: { flexGrow: 0 },
+  body: {
+    flexGrow: 0,
+  },
+  bodyContent: {
+    flexDirection: 'column' as const,
+    alignItems: 'stretch' as const,
+    gap: t.spacing.md, // Sabhi dropdowns aur inputs ke beech ek barabar space rahega
+    paddingVertical: t.spacing.xs,
+  },
   footer: {
     flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     justifyContent: 'flex-end' as const,
     gap: t.spacing.sm,
-    marginTop: t.spacing.md,
+    marginTop: t.spacing.lg,
   },
 });

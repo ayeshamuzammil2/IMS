@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearSession().finally(() => {
         signingOutRef.current = false;
       });
-      Toast.show({ type: 'error', text1: 'Your session expired', text2: 'Please sign in again.' });
+      Toast.show({ type: 'error', text1: 'Session expired', text2: 'Please sign in again.' });
     });
   }, [clearSession]);
 

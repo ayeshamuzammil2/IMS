@@ -92,7 +92,7 @@ export function IdCardScreen() {
 
   const handleDownload = async () => {
     if (!cardShotRef.current?.capture) {
-      Toast.show({ type: 'error', text1: 'ID Card preview not ready' });
+      Toast.show({ type: 'error', text1: 'ID card preview not ready' });
       return;
     }
     setDownloading(true);

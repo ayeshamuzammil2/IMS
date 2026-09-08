@@ -69,7 +69,7 @@ const InternCertificateCard = ({ intern, isAdmin, theme, s }: any) => {
         name: asset.name,
         mimeType: asset.mimeType ?? null,
       });
-      Toast.show({ type: 'success', text1: 'Document uploaded successfully!' });
+      Toast.show({ type: 'success', text1: 'Document uploaded' });
       invalidateCert();
     } catch (error: any) {
       Toast.show({ type: 'error', text1: 'Could not upload document', text2: error?.message });

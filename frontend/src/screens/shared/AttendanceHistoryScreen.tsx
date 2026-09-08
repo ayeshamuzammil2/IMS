@@ -130,7 +130,7 @@ export function AttendanceHistoryScreen() {
       ]);
       const fileName = `attendance-${startDate}-to-${endDate}.csv`;
       await writeTextToDownloads(csv, fileName, 'text/csv');
-      Toast.show({ type: 'success', text1: 'Saved to Phone Downloads!', text2: fileName });
+      Toast.show({ type: 'success', text1: 'Saved to Downloads', text2: fileName });
     } catch (error: any) {
       Toast.show({ type: 'error', text1: 'Could not export CSV', text2: error?.message });
     } finally {

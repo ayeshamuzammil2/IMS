@@ -328,7 +328,7 @@ function ExtraDocumentCard({
 
         <View style={s.cardHeaderText}>
           <Text variant="bodyStrong" style={s.cardTitle} numberOfLines={1}>
-            Extra Document
+            Optional Document
           </Text>
           <Text variant="caption" tone="muted" style={s.subText} numberOfLines={2}>
             Portfolio, certificate, or writing sample.

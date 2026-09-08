@@ -134,7 +134,7 @@ export function AssignProjectScreen() {
   const handleAssign = async () => {
     setTouched(true);
     if (!internProfileId || !title.trim() || !description.trim() || !dueDate || (!pickedFile && !editingId)) {
-      Toast.show({ type: 'error', text1: 'Please fill in Title, Description, Due Date, and attach a file' });
+      Toast.show({ type: 'error', text1: 'Title, description, due date, and an attachment are required' });
       return;
     }
     setSubmitting(true);
@@ -155,7 +155,7 @@ export function AssignProjectScreen() {
             file: pickedFile,
           });
         }
-        Toast.show({ type: 'success', text1: 'Project updated successfully' });
+        Toast.show({ type: 'success', text1: 'Project updated' });
       } else {
         await projectsApi.assign(internProfileId, {
           title: title.trim(),
@@ -163,7 +163,7 @@ export function AssignProjectScreen() {
           dueDate,
           file: pickedFile,
         });
-        Toast.show({ type: 'success', text1: 'Project assigned successfully' });
+        Toast.show({ type: 'success', text1: 'Project assigned' });
       }
       resetForm();
       refetch();

@@ -146,8 +146,7 @@ export function FaceEnrollmentScreen() {
           </Text>
           <Text variant="body" tone="secondary" style={s.message}>
             Face enrollment will unlock automatically once your mentor/admin approves all of your
-            mandatory documents (Profile Picture, CNIC Front & Back, CV/Resume, Reference
-            Letter). Please upload any missing documents from the Documents tab and wait for
+            mandatory documents. Please upload any missing documents from the Documents tab and wait for
             approval.
           </Text>
         </View>
@@ -166,8 +165,7 @@ export function FaceEnrollmentScreen() {
             Personal Details Required
           </Text>
           <Text variant="body" tone="secondary" style={s.message}>
-            Face enrollment will unlock once you fill in your personal details (address,
-            emergency contact, blood group) on your Dashboard.
+            Face enrollment will unlock once you fill in your personal details on your Dashboard.
           </Text>
         </View>
       </Screen>
@@ -320,7 +318,7 @@ const makeStyles = (t: AppTheme) => ({
     elevation: 2,
   },
   iconWrap: { alignItems: 'center' as const, marginTop: t.spacing.md, marginBottom: t.spacing.md },
-  message: { textAlign: 'center' as const, lineHeight: 22 },
+  message: { textAlign: 'justify' as const, lineHeight: 22 },
   centerLoading: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const, paddingTop: t.spacing.xl * 2 },
   header: { alignItems: 'center' as const, gap: t.spacing.xs, marginTop: t.spacing.md, marginBottom: t.spacing.xl },
   title: { textAlign: 'center' as const, letterSpacing: 0.5 },

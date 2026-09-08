@@ -185,22 +185,42 @@ function SelfDetailsForm({ initial, onSubmitted }: { initial: InternDashboardDto
   const [bloodGroup, setBloodGroup] = useState(initial.bloodGroup ?? '');
   const [submitting, setSubmitting] = useState(false);
 
+  // Field errors state
+  const [errors, setErrors] = useState<{
+    address?: string;
+    emergencyName?: string;
+    emergencyPhone?: string;
+    bloodGroup?: string;
+  }>({});
+
   const handleSubmit = async () => {
     const cleanAddress = address.trim();
     const cleanEmName = emergencyName.trim();
     const cleanEmPhone = emergencyPhone.trim() === '+92' ? '' : emergencyPhone.trim();
     const cleanBloodGroup = bloodGroup.trim();
 
-    // Validation Check: Make sure fields are not empty before submitting
-    if (!cleanAddress || !cleanEmName || !cleanEmPhone || !cleanBloodGroup) {
-      Toast.show({ 
-        type: 'error', 
-        text1: 'Missing Details', 
-        text2: 'Please fill in your self details first before saving.' 
-      });
+    // Validation Check
+    const newErrors: typeof errors = {};
+
+    if (!cleanAddress) {
+      newErrors.address = 'Address is required';
+    }
+    if (!cleanEmName) {
+      newErrors.emergencyName = 'Emergency contact name is required';
+    }
+    if (!cleanEmPhone) {
+      newErrors.emergencyPhone = 'Emergency contact phone is required';
+    }
+    if (!cleanBloodGroup) {
+      newErrors.bloodGroup = 'Blood group is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
+    setErrors({});
     setSubmitting(true);
     try {
       await documentsApi.submitSelfDetails({
@@ -209,7 +229,7 @@ function SelfDetailsForm({ initial, onSubmitted }: { initial: InternDashboardDto
         emergencyContactPhone: cleanEmPhone,
         bloodGroup: cleanBloodGroup,
       });
-      Toast.show({ type: 'success', text1: 'Details saved successfully' });
+      Toast.show({ type: 'success', text1: 'Details saved' });
       onSubmitted();
     } catch (error: any) {
       Toast.show({ type: 'error', text1: 'Could not save details', text2: error?.message });
@@ -220,16 +240,47 @@ function SelfDetailsForm({ initial, onSubmitted }: { initial: InternDashboardDto
 
   return (
     <View style={s.formGroup}>
-      <Input label="Address" value={address} onChangeText={setAddress} multiline />
-      <Input label="Emergency Contact Name" value={emergencyName} onChangeText={setEmergencyName} />
+      <Input
+        label="Address"
+        value={address}
+        onChangeText={(text) => {
+          setAddress(text);
+          if (errors.address) setErrors((prev) => ({ ...prev, address: undefined }));
+        }}
+        error={errors.address}
+        multiline
+      />
+      <Input
+        label="Emergency Contact Name"
+        value={emergencyName}
+        onChangeText={(text) => {
+          setEmergencyName(text);
+          if (errors.emergencyName) setErrors((prev) => ({ ...prev, emergencyName: undefined }));
+        }}
+        error={errors.emergencyName}
+      />
       <Input
         label="Emergency Contact Phone"
         value={emergencyPhone}
-        onChangeText={(text) => setEmergencyPhone(formatPhone(text))}
+        onChangeText={(text) => {
+          const formatted = formatPhone(text);
+          setEmergencyPhone(formatted);
+          if (errors.emergencyPhone) setErrors((prev) => ({ ...prev, emergencyPhone: undefined }));
+        }}
+        error={errors.emergencyPhone}
         keyboardType="phone-pad"
         placeholder="+92 3XX XXXXXXX"
       />
-      <Input label="Blood Group" value={bloodGroup} onChangeText={setBloodGroup} placeholder="e.g. O+" />
+      <Input
+        label="Blood Group"
+        value={bloodGroup}
+        onChangeText={(text) => {
+          setBloodGroup(text);
+          if (errors.bloodGroup) setErrors((prev) => ({ ...prev, bloodGroup: undefined }));
+        }}
+        error={errors.bloodGroup}
+        placeholder="e.g. O+"
+      />
       <Button label="Save Details" onPress={handleSubmit} loading={submitting} fullWidth style={s.saveBtn} />
     </View>
   );

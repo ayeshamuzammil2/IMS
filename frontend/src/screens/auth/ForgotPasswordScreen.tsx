@@ -58,7 +58,7 @@ export function ForgotPasswordScreen() {
 
       Toast.show({
         type: 'success',
-        text1: 'Password reset successful',
+        text1: 'Password reset',
         text2: 'You can now sign in with your new password.',
       });
 
