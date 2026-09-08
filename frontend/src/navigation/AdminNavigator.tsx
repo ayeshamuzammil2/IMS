@@ -1,6 +1,6 @@
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
-import { LayoutDashboard, Users, GraduationCap, CalendarCheck, ShieldAlert, History, FileCheck2, Building2, IdCard, Award, MessageCircle } from 'lucide-react-native';
+import { LayoutDashboard, Users, GraduationCap, CalendarCheck, ShieldAlert, History, FileCheck2, ScanFace, Building2, IdCard, Award, MessageCircle } from 'lucide-react-native';
 import { useTheme } from '../providers/ThemeProvider';
 import { DrawerContent } from './DrawerContent';
 import { SharedModalStack } from './stacks/SharedModalStack';
@@ -14,6 +14,7 @@ import { TeamAttendanceScreen } from '../screens/shared/TeamAttendanceScreen';
 import { AttendanceReviewScreen } from '../screens/shared/AttendanceReviewScreen';
 import { AttendanceHistoryScreen } from '../screens/shared/AttendanceHistoryScreen';
 import { DocumentReviewScreen } from '../screens/shared/DocumentReviewScreen';
+import { FaceEnrollmentReviewScreen } from '../screens/shared/FaceEnrollmentReviewScreen';
 import { DashboardScreen } from '../screens/shared/DashboardScreen';
 import { ChatScreen } from '../screens/shared/ChatScreen';
 import type { AdminDrawerParamList } from './types';
@@ -27,6 +28,7 @@ const AttendanceStack = makeSectionStack('Attendance', 'Attendance', TeamAttenda
 const AttendanceReviewStack = makeSectionStack('AttendanceReview', 'Attendance Review', AttendanceReviewScreen);
 const AttendanceHistoryStack = makeSectionStack('AttendanceHistory', 'Attendance History', AttendanceHistoryScreen);
 const DocumentsStack = makeSectionStack('Documents', 'Document Review', DocumentReviewScreen);
+const FaceEnrollmentReviewStack = makeSectionStack('FaceEnrollmentReview', 'Face Enrollment Review', FaceEnrollmentReviewScreen);
 const DepartmentsStack = makeSectionStack('Departments', 'Departments', DepartmentsScreen);
 const IdCardsStack = makeSectionStack('IdCards', 'ID Cards', IdCardOversightScreen);
 const CertificatesStack = makeSectionStack('Certificates', 'Internship Certificates', CertificateOversightScreen);
@@ -51,6 +53,7 @@ export function AdminNavigator() {
       <Drawer.Screen name="AttendanceReview" component={AttendanceReviewStack} options={{ title: 'Attendance Review', drawerIcon: ({ color, size }) => <ShieldAlert color={color} size={size} /> }} />
       <Drawer.Screen name="AttendanceHistory" component={AttendanceHistoryStack} options={{ title: 'Attendance History', drawerIcon: ({ color, size }) => <History color={color} size={size} /> }} />
       <Drawer.Screen name="Documents" component={DocumentsStack} options={{ title: 'Document Review', drawerIcon: ({ color, size }) => <FileCheck2 color={color} size={size} /> }} />
+      <Drawer.Screen name="FaceEnrollmentReview" component={FaceEnrollmentReviewStack} options={{ title: 'Face Enrollment Review', drawerIcon: ({ color, size }) => <ScanFace color={color} size={size} /> }} />
       <Drawer.Screen name="Departments" component={DepartmentsStack} options={{ drawerIcon: ({ color, size }) => <Building2 color={color} size={size} /> }} />
       <Drawer.Screen name="IdCards" component={IdCardsStack} options={{ title: 'ID Cards', drawerIcon: ({ color, size }) => <IdCard color={color} size={size} /> }} />
       <Drawer.Screen name="Certificates" component={CertificatesStack} options={{ title: 'Internship Certificates', drawerIcon: ({ color, size }) => <Award color={color} size={size} /> }} />

@@ -22,6 +22,7 @@ public enum FileCategory
     GeneratedCertificate,
     GeneratedIdCard,
     ExtraDocument,
+    FaceEnrollmentCapture,
 }
 
 public enum JobTrigger

@@ -121,4 +121,16 @@ public static class NotificationTemplates
         "Face re-enrollment unlocked",
         "An administrator has unlocked one face re-enrollment for you ({{ reason }}). You can update your enrolled face once from the Face Enrollment screen; it will lock again automatically afterward.",
         NotificationType.Info, NotificationCategory.Account, null, null);
+
+    public static readonly NotificationTemplate FaceEnrollmentApproved = new(
+        "biometric.enrollment_approved",
+        "Face enrollment approved",
+        "Your mentor/admin has reviewed and approved your face enrollment. Biometric attendance is now unlocked.",
+        NotificationType.Success, NotificationCategory.Account, null, null);
+
+    public static readonly NotificationTemplate FaceEnrollmentRejected = new(
+        "biometric.enrollment_rejected",
+        "Face enrollment needs to be redone",
+        "Your face enrollment was rejected on review: {{ reason }}. Please enroll again from the Face Enrollment screen.",
+        NotificationType.Warning, NotificationCategory.Account, null, null);
 }

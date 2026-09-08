@@ -25,6 +25,13 @@ public class FaceTemplate
     public decimal? IntraSetMinScore { get; set; }
     public EnrollmentReason EnrollmentReason { get; set; }
 
+    /// <summary>The best (sharpest) captured frame from this enrollment session, stored as a
+    /// StoredFile (FileCategory.FaceEnrollmentCapture) so a mentor/admin can visually compare it
+    /// against the intern's approved profile photo during manual review - the embedding above is
+    /// just numbers, not something a human can eyeball. Null for templates created before this
+    /// field existed.</summary>
+    public Guid? CapturedImageFileId { get; set; }
+
     public bool IsActive { get; set; } = true;
     public int CreatedByUserId { get; set; }
     public DateTime CreatedAtUtc { get; set; }

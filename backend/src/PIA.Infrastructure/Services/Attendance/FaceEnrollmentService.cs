@@ -318,6 +318,26 @@ public sealed class FaceEnrollmentService(
 
         var previousActive = await db.FaceTemplates.Where(t => t.InternProfileId == profile.Id && t.IsActive).ToListAsync(ct);
 
+        // Persist the actual captured photo (not just its embedding) so a mentor/admin can
+        // visually compare it against the approved profile photo during manual review - the
+        // embedding alone is just numbers, not something a human can eyeball.
+        Guid? capturedImageFileId = null;
+        try
+        {
+            await using var captureStream = new MemoryStream(bestCrop);
+            var savedCapture = await fileStorage.SaveAsync(
+                new FileSaveRequest(captureStream, "enrollment-capture.jpg", "image/jpeg", FileCategory.FaceEnrollmentCapture, profile.UserId, currentUser.UserId),
+                ct);
+            capturedImageFileId = savedCapture.Id;
+        }
+        catch (Exception ex)
+        {
+            // Never block enrollment itself over a review-image save failure - the biometric
+            // template (embedding) is what actually matters for attendance; the photo is only for
+            // the manual review step, which will simply show "no image" if this happens.
+            logger.LogWarning(ex, "Could not save the enrollment capture image for intern {InternProfileId} - review will proceed without a photo.", profile.Id);
+        }
+
         var template = new FaceTemplate
         {
             InternProfileId = profile.Id,
@@ -333,6 +353,7 @@ public sealed class FaceEnrollmentService(
             CrossMatchScore = (decimal)crossMatchScore,
             IntraSetMinScore = intraSetMin is null ? null : (decimal)intraSetMin.Value,
             EnrollmentReason = isRefresh ? EnrollmentReason.Refresh : EnrollmentReason.Initial,
+            CapturedImageFileId = capturedImageFileId,
             IsActive = true,
             CreatedByUserId = currentUser.UserId,
         };
@@ -346,8 +367,12 @@ public sealed class FaceEnrollmentService(
             old.SupersededByTemplateId = template.Id;
         }
 
+        // Passing every automatic check (liveness, intra-set consistency, cross-match against the
+        // approved photo) is necessary but not sufficient - a mentor/admin must look at the
+        // captured photo and explicitly approve before attendance actually unlocks (see
+        // DecideReviewAsync). This is deliberately a human-in-the-loop gate, not a rubber stamp.
         var trackedProfile = await db.InternProfiles.FirstAsync(p => p.Id == profile.Id, ct);
-        trackedProfile.FaceEnrollmentStatus = FaceEnrollmentStatus.Active;
+        trackedProfile.FaceEnrollmentStatus = FaceEnrollmentStatus.Pending;
         // Consume the one-time admin unlock (if this was a refresh) so the lock re-engages
         // immediately after this enrollment - it is never a standing "always unlocked" toggle.
         trackedProfile.FaceReEnrollmentAllowed = false;
@@ -357,7 +382,106 @@ public sealed class FaceEnrollmentService(
         session.CompletedAtUtc = clock.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        return new EnrollmentResult(true, "Active", "Face enrollment completed.", newVersion);
+        return new EnrollmentResult(true, "Pending", "Face enrollment captured - awaiting your mentor/admin's review before attendance unlocks.", newVersion);
+    }
+
+    public async Task<IReadOnlyList<FaceEnrollmentReviewQueueItemDto>> GetPendingReviewsAsync(CancellationToken ct)
+    {
+        var profileQuery = db.InternProfiles.Include(p => p.User).ThenInclude(u => u.Department).AsQueryable();
+        if (currentUser.Role == UserRole.Mentor)
+        {
+            profileQuery = profileQuery.Where(p => p.MentorId == currentUser.UserId);
+        }
+
+        var pendingProfiles = await profileQuery
+            .Where(p => p.FaceEnrollmentStatus == FaceEnrollmentStatus.Pending)
+            .ToListAsync(ct);
+
+        var profileIds = pendingProfiles.Select(p => p.Id).ToList();
+        var latestActiveTemplates = await db.FaceTemplates.AsNoTracking()
+            .Where(t => profileIds.Contains(t.InternProfileId) && t.IsActive)
+            .ToListAsync(ct);
+
+        return pendingProfiles
+            .Join(latestActiveTemplates, p => p.Id, t => t.InternProfileId,
+                (p, t) => new FaceEnrollmentReviewQueueItemDto(
+                    p.Id, p.User.FullName, p.InternCode, p.User.Department?.Name,
+                    t.Id, t.Version, t.CreatedAtUtc))
+            .OrderBy(x => x.CreatedAtUtc)
+            .ToList();
+    }
+
+    public async Task<FaceEnrollmentReviewDetailDto> GetReviewDetailAsync(int internProfileId, CancellationToken ct)
+    {
+        var profile = await db.InternProfiles.Include(p => p.User).ThenInclude(u => u.Department)
+            .FirstOrDefaultAsync(p => p.Id == internProfileId, ct)
+            ?? throw new NotFoundException(nameof(InternProfile), internProfileId);
+
+        if (currentUser.Role == UserRole.Mentor && profile.MentorId != currentUser.UserId)
+        {
+            throw new ForbiddenException("You can only review enrollments for your own interns.");
+        }
+
+        var template = await db.FaceTemplates.AsNoTracking()
+            .Where(t => t.InternProfileId == internProfileId && t.IsActive)
+            .OrderByDescending(t => t.Version)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new NotFoundException(nameof(FaceTemplate), internProfileId);
+
+        return new FaceEnrollmentReviewDetailDto(
+            profile.Id, profile.User.FullName, profile.InternCode, profile.User.Department?.Name,
+            template.Id, template.Version, profile.ApprovedPhotoFileId, template.CapturedImageFileId,
+            template.QualityScore, template.CrossMatchScore, template.IntraSetMinScore,
+            template.EnrollmentReason.ToString(), template.CreatedAtUtc);
+    }
+
+    public async Task DecideReviewAsync(int internProfileId, DecideFaceEnrollmentRequest request, CancellationToken ct)
+    {
+        var profile = await db.InternProfiles.FirstOrDefaultAsync(p => p.Id == internProfileId, ct)
+            ?? throw new NotFoundException(nameof(InternProfile), internProfileId);
+
+        if (currentUser.Role == UserRole.Mentor && profile.MentorId != currentUser.UserId)
+        {
+            throw new ForbiddenException("You can only review enrollments for your own interns.");
+        }
+
+        if (profile.FaceEnrollmentStatus != FaceEnrollmentStatus.Pending)
+        {
+            throw new ConflictException("This intern has no pending face enrollment awaiting review.");
+        }
+
+        var template = await db.FaceTemplates
+            .Where(t => t.InternProfileId == internProfileId && t.IsActive)
+            .OrderByDescending(t => t.Version)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new NotFoundException(nameof(FaceTemplate), internProfileId);
+
+        if (request.Approve)
+        {
+            profile.FaceEnrollmentStatus = FaceEnrollmentStatus.Active;
+            await db.SaveChangesAsync(ct);
+
+            await auditLogger.LogAsync("FaceEnrollment.Approved", nameof(InternProfile), internProfileId.ToString(), null, ct);
+            await notifications.NotifyUserAsync(profile.UserId, NotificationTemplates.FaceEnrollmentApproved, new Dictionary<string, object?>(), ct);
+        }
+        else
+        {
+            var reason = string.IsNullOrWhiteSpace(request.Reason) ? "No reason given." : request.Reason;
+
+            // Deactivate the rejected template outright - unlike RevokeAsync (an admin wiping an
+            // already-Active enrollment), a Pending-but-rejected template was never actually
+            // trusted for attendance, so there's nothing to "supersede" and no reason to require
+            // the extra FaceReEnrollmentAllowed unlock before the intern can just try again.
+            template.IsActive = false;
+            template.RevokedAtUtc = clock.UtcNow;
+            template.RevokedReason = reason;
+            profile.FaceEnrollmentStatus = FaceEnrollmentStatus.None;
+            await db.SaveChangesAsync(ct);
+
+            await auditLogger.LogAsync("FaceEnrollment.Rejected", nameof(InternProfile), internProfileId.ToString(), null, ct);
+            await notifications.NotifyUserAsync(profile.UserId, NotificationTemplates.FaceEnrollmentRejected,
+                new Dictionary<string, object?> { ["reason"] = reason }, ct);
+        }
     }
 
     private async Task<byte[]> ReadApprovedPhotoAsync(Guid fileId, CancellationToken ct)

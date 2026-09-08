@@ -54,6 +54,11 @@ export const endpoints = {
     enrollment: {
       sessions: '/attendance/enrollment/sessions',
       submit: (sessionId: string) => `/attendance/enrollment/sessions/${sessionId}/submit`,
+      review: {
+        queue: '/attendance/enrollment/review/queue',
+        detail: (internProfileId: number) => `/attendance/enrollment/review/${internProfileId}`,
+        decide: (internProfileId: number) => `/attendance/enrollment/review/${internProfileId}/decide`,
+      },
     },
     review: {
       queue: '/attendance/review/queue',

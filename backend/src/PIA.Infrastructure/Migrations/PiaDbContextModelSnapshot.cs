@@ -1239,6 +1239,10 @@ namespace PIA.Infrastructure.Migrations
                         .HasColumnType("int")
                         .HasColumnName("created_by_user_id");
 
+                    b.Property<Guid?>("CapturedImageFileId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("captured_image_file_id");
+
                     b.Property<decimal?>("CrossMatchScore")
                         .HasColumnType("decimal(65,30)")
                         .HasColumnName("cross_match_score");

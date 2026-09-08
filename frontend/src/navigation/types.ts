@@ -13,6 +13,7 @@ export type AdminDrawerParamList = {
   AttendanceReview: undefined;
   AttendanceHistory: undefined;
   Documents: undefined;
+  FaceEnrollmentReview: undefined;
   Departments: undefined;
   IdCards: undefined;
   Certificates: undefined;
@@ -26,6 +27,7 @@ export type MentorDrawerParamList = {
   AttendanceReview: undefined;
   AttendanceHistory: undefined;
   Documents: undefined;
+  FaceEnrollmentReview: undefined;
   Certificate: undefined;
   IdCard: undefined;
   GithubRepo: undefined;
