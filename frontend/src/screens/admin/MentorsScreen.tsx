@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Pressable, ActivityIndicator, Alert, FlatList } from 'react-native';
+import { View, Pressable, ActivityIndicator, FlatList } from 'react-native';
+import { appAlert } from '../../lib/appAlert';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -208,7 +209,7 @@ export function MentorsScreen() {
       toggleActiveMutation.mutate(mentor);
       return;
     }
-    Alert.alert('Deactivate mentor', `Deactivate ${mentor.fullName}? They will lose access until reactivated.`, [
+    appAlert.alert('Deactivate mentor', `Deactivate ${mentor.fullName}? They will lose access until reactivated.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Deactivate', style: 'destructive', onPress: () => toggleActiveMutation.mutate(mentor) },
     ]);
@@ -220,7 +221,7 @@ export function MentorsScreen() {
   };
 
   const confirmDelete = (mentor: MentorDto) => {
-    Alert.alert('Delete mentor', `Permanently delete ${mentor.fullName}? This cannot be undone.`, [
+    appAlert.alert('Delete mentor', `Permanently delete ${mentor.fullName}? This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(mentor.id) },
     ]);

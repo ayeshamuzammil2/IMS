@@ -1,15 +1,16 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Modal, ActivityIndicator } from 'react-native';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
-import { ShieldCheck, Lock } from 'lucide-react-native';
+import { ShieldCheck, Lock, FileWarning, UserCog } from 'lucide-react-native';
 import { Screen } from '../../components/layout/Screen';
 import { Text } from '../../components/primitives/Text';
 import { Button } from '../../components/primitives/Button';
 import { ChallengeCaptureView } from '../../components/capture/ChallengeCaptureView';
 import { enrollmentApi, type EnrollmentSessionResponse, type CapturedFrame } from '../../api/resources/attendance.api';
 import { authApi } from '../../api/resources/auth.api';
+import { documentsApi } from '../../api/resources/documents.api';
 import { getOrCreateDeviceId } from '../../lib/deviceId';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
@@ -52,9 +53,28 @@ export function FaceEnrollmentScreen() {
     staleTime: 0,
   });
 
+  // Face enrollment must stay locked until BOTH gates clear: every mandatory document approved,
+  // and the self-details form (address/emergency contact/blood group) submitted. Both come from
+  // the same dashboard payload the Documents/Dashboard screens already use, so no backend change
+  // was needed to add this gate.
+  const dashboardQuery = useQuery({
+    queryKey: ['documents', 'dashboard', 'faceEnrollmentGate'],
+    queryFn: documentsApi.getDashboard,
+    staleTime: 0,
+  });
+
+  const documentsApproved = dashboardQuery.data?.verificationStatus === 'Verified';
+  const selfDetailsComplete = Boolean(dashboardQuery.data?.selfDetailsSubmitted);
+  const gateBlockedReason: 'documents' | 'selfDetails' | null = !documentsApproved
+    ? 'documents'
+    : !selfDetailsComplete
+      ? 'selfDetails'
+      : null;
+
   useFocusEffect(
     useCallback(() => {
       meQuery.refetch();
+      dashboardQuery.refetch();
       return () => {
         setCooldownEndsAt(null);
         setCooldownSecondsLeft(0);
@@ -103,11 +123,49 @@ export function FaceEnrollmentScreen() {
     }
   };
 
-  if (meQuery.isLoading) {
+  if (meQuery.isLoading || dashboardQuery.isLoading) {
     return (
       <Screen scroll={false}>
         <View style={s.centerLoading}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (gateBlockedReason === 'documents') {
+    return (
+      <Screen scroll style={s.container}>
+        <View style={s.card}>
+          <View style={s.iconWrap}>
+            <FileWarning size={56} color={theme.colors.warning} />
+          </View>
+          <Text variant="bodyStrong" style={{ textAlign: 'center', marginBottom: 8 }}>
+            Documents Not Approved Yet
+          </Text>
+          <Text variant="body" tone="secondary" style={s.message}>
+            Face enrollment will unlock automatically once your mentor/admin approves all of your
+            mandatory documents. Please upload any missing documents from the Documents tab and wait for
+            approval.
+          </Text>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (gateBlockedReason === 'selfDetails') {
+    return (
+      <Screen scroll style={s.container}>
+        <View style={s.card}>
+          <View style={s.iconWrap}>
+            <UserCog size={56} color={theme.colors.warning} />
+          </View>
+          <Text variant="bodyStrong" style={{ textAlign: 'center', marginBottom: 8 }}>
+            Personal Details Required
+          </Text>
+          <Text variant="body" tone="secondary" style={s.message}>
+            Face enrollment will unlock once you fill in your personal details on your Dashboard.
+          </Text>
         </View>
       </Screen>
     );
@@ -239,7 +297,7 @@ const makeStyles = (t: AppTheme) => ({
     elevation: 2,
   },
   iconWrap: { alignItems: 'center' as const, marginTop: t.spacing.md, marginBottom: t.spacing.md },
-  message: { textAlign: 'center' as const, lineHeight: 22 },
+  message: {textAlign: 'justify' as const, lineHeight: 22, },
   centerLoading: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const, paddingTop: t.spacing.xl * 2 },
   header: { alignItems: 'center' as const, gap: t.spacing.xs, marginTop: t.spacing.md, marginBottom: t.spacing.xl },
   title: { textAlign: 'center' as const, letterSpacing: 0.5 },

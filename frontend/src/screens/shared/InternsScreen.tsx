@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Pressable, ActivityIndicator, Alert, FlatList } from 'react-native';
+import { View, Pressable, ActivityIndicator, FlatList } from 'react-native';
+import { appAlert } from '../../lib/appAlert';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -264,7 +265,7 @@ export function InternsScreen() {
       toggleActiveMutation.mutate(intern);
       return;
     }
-    Alert.alert('Deactivate intern', `Deactivate ${intern.fullName}? They will lose access until reactivated.`, [
+    appAlert.alert('Deactivate intern', `Deactivate ${intern.fullName}? They will lose access until reactivated.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Deactivate', style: 'destructive', onPress: () => toggleActiveMutation.mutate(intern) },
     ]);
@@ -276,7 +277,7 @@ export function InternsScreen() {
   };
 
   const confirmDelete = (intern: InternDto) => {
-    Alert.alert('Delete intern', `Permanently delete ${intern.fullName}? This cannot be undone.`, [
+    appAlert.alert('Delete intern', `Permanently delete ${intern.fullName}? This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(intern.id) },
     ]);
@@ -292,7 +293,7 @@ export function InternsScreen() {
   });
 
   const confirmUnlock = (intern: InternDto) => {
-    Alert.alert(
+    appAlert.alert(
       'Unlock account',
       `Unlock ${intern.fullName}'s account and reset their failed face-verification counter to zero?`,
       [
@@ -313,7 +314,7 @@ export function InternsScreen() {
   });
 
   const confirmUnlockFaceEnrollment = (intern: InternDto) => {
-    Alert.alert(
+    appAlert.alert(
       'Unlock face re-enrollment',
       `${intern.fullName}'s face is already enrolled and locked. Grant one-time permission to re-enroll?`,
       [

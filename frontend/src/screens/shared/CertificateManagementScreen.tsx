@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Pressable, ActivityIndicator, FlatList, Alert } from 'react-native';
+import { View, Pressable, ActivityIndicator, FlatList } from 'react-native';
+import { appAlert } from '../../lib/appAlert';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import Toast from 'react-native-toast-message';
@@ -104,7 +105,7 @@ const InternCertificateCard = ({ intern, isAdmin, theme, s }: any) => {
 
   // 3. Delete
   const handleDelete = () => {
-    Alert.alert('Delete Document', 'Are you sure you want to delete this document?', [
+    appAlert.alert('Delete Document', 'Are you sure you want to delete this document?', [
       { text: 'Cancel', style: 'cancel' },
       { 
         text: 'Delete', 
@@ -180,6 +181,13 @@ const InternCertificateCard = ({ intern, isAdmin, theme, s }: any) => {
           </Text>
         </View>
       </View>
+
+      {cert?.attendanceRemark ? (
+        <Text variant="caption" tone="muted" style={{ marginTop: 4 }} numberOfLines={2}>
+          Remarks: {cert.attendanceRemark}
+          {cert.attendancePercentage !== null ? ` (${cert.attendancePercentage}% attendance)` : ''}
+        </Text>
+      ) : null}
 
       <View style={s.divider} />
 

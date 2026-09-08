@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { View, Pressable, Alert, ActivityIndicator } from 'react-native';
+import { View, Pressable, ActivityIndicator } from 'react-native';
+import { appAlert } from '../../lib/appAlert';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
@@ -209,7 +210,7 @@ export function AssignProjectScreen() {
   });
 
   const confirmDelete = (assignment: ProjectAssignmentDto) => {
-    Alert.alert('Delete project', `Delete "${assignment.title}"? This cannot be undone.`, [
+    appAlert.alert('Delete project', `Delete "${assignment.title}"? This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(assignment.id) },
     ]);

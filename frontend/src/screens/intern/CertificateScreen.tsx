@@ -135,7 +135,7 @@ export function CertificateScreen() {
       </View>
 
       {/* Certificate Details Meta Card */}
-      {(data.certificateNumber || data.issueDate) && (
+      {(data.certificateNumber || data.issueDate || data.attendanceRemark) && (
         <View style={s.card}>
           <View style={s.cardHeader}>
             <Award size={16} color={theme.colors.primary} />
@@ -159,6 +159,18 @@ export function CertificateScreen() {
                 <Text variant="caption" style={s.detailLabel}>Issued On</Text>
                 <Text variant="body" style={s.detailValue}>
                   {new Date(data.issueDate).toLocaleDateString()}
+                </Text>
+              </View>
+            ) : null}
+
+            {(data.certificateNumber || data.issueDate) && data.attendanceRemark ? <View style={s.rowDivider} /> : null}
+
+            {data.attendanceRemark ? (
+              <View style={s.detailRow}>
+                <Text variant="caption" style={s.detailLabel}>Remarks</Text>
+                <Text variant="body" style={[s.detailValue, { textAlign: 'right', flexShrink: 1 }]}>
+                  {data.attendanceRemark}
+                  {data.attendancePercentage !== null ? ` (${data.attendancePercentage}% attendance)` : ''}
                 </Text>
               </View>
             ) : null}

@@ -695,6 +695,21 @@ public sealed class AttendanceService(
             AddBoth(AttendanceBlocker.OutsideInternshipPeriod);
         }
 
+        // The intern's own assigned shift window (set when their internship was created), not the
+        // wider organization-level sanity guard (Options.Earliest/LatestMarkHourLocal). A small
+        // grace margin either side reuses the same allowances already used to flag "late"/"early".
+        var localTimeNow = TimeOnly.FromDateTime(clock.NowInPakistan.DateTime);
+        var windowOpensAt = profile.DailyStartTime.Add(TimeSpan.FromMinutes(-Options.LateGraceMinutes));
+        var windowClosesAt = profile.DailyEndTime.Add(TimeSpan.FromMinutes(Options.EarlyLeaveGraceMinutes));
+        var withinDailyWindow = windowOpensAt <= windowClosesAt
+            ? localTimeNow >= windowOpensAt && localTimeNow <= windowClosesAt
+            // Handles the (unusual) case of a shift that crosses midnight.
+            : localTimeNow >= windowOpensAt || localTimeNow <= windowClosesAt;
+        if (!withinDailyWindow)
+        {
+            AddBoth(AttendanceBlocker.OutsideDailyTimeWindow);
+        }
+
         var isHoliday = await db.Holidays.AnyAsync(h => h.Date == todayPk && (h.DepartmentId == null || h.DepartmentId == department.Id), ct);
         if (isHoliday)
         {
@@ -735,6 +750,7 @@ public sealed class AttendanceService(
         nameof(AttendanceBlocker.NotVerified) => "Your documents are still pending verification. Attendance unlocks once your mentor approves all of them.",
         nameof(AttendanceBlocker.NoDepartmentAssigned) => "No department is assigned to your account.",
         nameof(AttendanceBlocker.OutsideInternshipPeriod) => "Today is outside your internship period.",
+        nameof(AttendanceBlocker.OutsideDailyTimeWindow) => "This is not your internship time. Attendance can only be marked during your assigned daily hours.",
         nameof(AttendanceBlocker.HolidayToday) => "Today is a holiday.",
         nameof(AttendanceBlocker.OnApprovedLeave) => "You are on approved leave today.",
         nameof(AttendanceBlocker.ArrivalAlreadyMarked) => "Arrival has already been marked today.",

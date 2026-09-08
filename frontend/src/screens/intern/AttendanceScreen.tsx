@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, ActivityIndicator, Modal, Alert } from 'react-native';
+import { View, ActivityIndicator, Modal, Platform, Linking, AppState } from 'react-native';
 import * as Location from 'expo-location';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
@@ -15,6 +15,8 @@ import { attendanceApi, type AttendanceEventType, type AttendanceSessionResponse
 import { distanceInMeters, classifyGeofence, type GeofenceState } from '../../lib/geo';
 import { getOrCreateDeviceId } from '../../lib/deviceId';
 import { notifyNow } from '../../lib/localNotifications';
+import { appAlert } from '../../lib/appAlert';
+import { isDeviceClockWrong } from '../../lib/deviceTimeSync';
 import { useThemedStyles } from '../../theme/useThemedStyles';
 import { useTheme } from '../../providers/ThemeProvider';
 import { useAuth } from '../../providers/AuthProvider';
@@ -35,12 +37,13 @@ const blockerMessages: Record<string, string> = {
   OutsideInternshipPeriod: 'Today is outside your internship period.',
   HolidayToday: 'Today is a holiday.',
   OnApprovedLeave: 'You are on approved leave today.',
-  ArrivalAlreadyMarked: 'Arrival has already been marked today.',
-  DepartureAlreadyMarked: 'Departure has already been marked today.',
+  ArrivalAlreadyMarked: 'Check IN has already been marked today.',
+  DepartureAlreadyMarked: 'Check OUT has already been marked today.',
   ArrivalNotYetMarked: 'Mark arrival before departure.',
   ActiveSessionAlreadyOpen: 'An attendance session is already in progress.',
   NotVerified: 'Your documents are still pending verification. Attendance unlocks once your mentor approves all of them.',
   FaceNotReady: 'Attendance locked. Pending Profile Picture approval or Face Enrollment.',
+  OutsideDailyTimeWindow: 'This is not your internship time. Attendance can only be marked during your assigned daily hours.',
 };
 
 interface ActiveSession {
@@ -59,36 +62,96 @@ export function AttendanceScreen() {
   const queryClient = useQueryClient();
   const [position, setPosition] = useState<Location.LocationObject | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationServicesOff, setLocationServicesOff] = useState(false);
   const [startingEvent, setStartingEvent] = useState<AttendanceEventType | null>(null);
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
-  const [cooldownEndsAt, setCooldownEndsAt] = useState<number | null>(null);
-  const [cooldownSecondsLeft, setCooldownSecondsLeft] = useState(0);
-  const watchSubscription = useRef<Location.LocationSubscription | null>(null);
 
+  const [arrivalCooldownEndsAt, setArrivalCooldownEndsAt] = useState<number | null>(null);
+  const [arrivalCooldownSecondsLeft, setArrivalCooldownSecondsLeft] = useState(0);
+  const [departureCooldownEndsAt, setDepartureCooldownEndsAt] = useState<number | null>(null);
+  const [departureCooldownSecondsLeft, setDepartureCooldownSecondsLeft] = useState(0);
+  
+  const watchSubscription = useRef<Location.LocationSubscription | null>(null);
+  const gpsPromptShownRef = useRef(false);
+  const submittingEventTypeRef = useRef<AttendanceEventType | null>(null);
+  const isLocOffRef = useRef(false); // Track location status to avoid closure staleness
+
+  const [deviceClockWrong, setDeviceClockWrong] = useState(() => isDeviceClockWrong());
+
+  // Cooldown timers
   useEffect(() => {
-    if (!cooldownEndsAt) return;
+    if (!arrivalCooldownEndsAt) return;
     const tick = () => {
-      const remaining = Math.max(0, Math.ceil((cooldownEndsAt - Date.now()) / 1000));
-      setCooldownSecondsLeft(remaining);
-      if (remaining <= 0) setCooldownEndsAt(null);
+      const remaining = Math.max(0, Math.ceil((arrivalCooldownEndsAt - Date.now()) / 1000));
+      setArrivalCooldownSecondsLeft(remaining);
+      if (remaining <= 0) setArrivalCooldownEndsAt(null);
     };
     tick();
     const interval = setInterval(tick, 250);
     return () => clearInterval(interval);
-  }, [cooldownEndsAt]);
+  }, [arrivalCooldownEndsAt]);
+
+  useEffect(() => {
+    if (!departureCooldownEndsAt) return;
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((departureCooldownEndsAt - Date.now()) / 1000));
+      setDepartureCooldownSecondsLeft(remaining);
+      if (remaining <= 0) setDepartureCooldownEndsAt(null);
+    };
+    tick();
+    const interval = setInterval(tick, 250);
+    return () => clearInterval(interval);
+  }, [departureCooldownEndsAt]);
 
   const { data: today, isLoading, refetch } = useQuery({
     queryKey: ['attendance', 'today'],
     queryFn: () => attendanceApi.today(),
   });
 
-  const startWatching = useCallback(async () => {
+  const startWatching = useCallback(async (showPromptIfOff: boolean) => {
+    const servicesEnabled = await Location.hasServicesEnabledAsync();
+    if (!servicesEnabled) {
+      isLocOffRef.current = true;
+      setLocationServicesOff(true);
+      setLocationError('Location is turned off. Turn it on to mark attendance.');
+      if (showPromptIfOff && !gpsPromptShownRef.current) {
+        gpsPromptShownRef.current = true;
+        appAlert.alert(
+          'Turn on Location',
+          'Location needs to be turned on to mark your attendance. Would you like to turn it on now?',
+          [
+            { text: 'Not now', style: 'cancel', onPress: () => { gpsPromptShownRef.current = false; } },
+            {
+              text: 'Turn On',
+              onPress: async () => {
+                gpsPromptShownRef.current = false;
+                try {
+                  if (Platform.OS === 'android') {
+                    await Location.enableNetworkProviderAsync();
+                  } else {
+                    await Linking.openSettings();
+                  }
+                } catch {}
+                startWatching(false);
+              },
+            },
+          ]
+        );
+      }
+      return;
+    }
+
+    isLocOffRef.current = false;
+    setLocationServicesOff(false);
+    gpsPromptShownRef.current = false;
+
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       setLocationError('Location permission is required to mark attendance.');
       return;
     }
     setLocationError(null);
+    watchSubscription.current?.remove();
     watchSubscription.current = await Location.watchPositionAsync(
       { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 2 },
       (loc) => setPosition(loc),
@@ -97,20 +160,72 @@ export function AttendanceScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      startWatching();
+      let isActive = true;
+      startWatching(true);
       refetch();
+      setDeviceClockWrong(isDeviceClockWrong());
+
+      const checkStatus = async () => {
+        if (!isActive) return;
+
+        // 1. Update Time Instantly
+        setDeviceClockWrong(isDeviceClockWrong());
+
+        // 2. Update Location Instantly
+        try {
+          const enabled = await Location.hasServicesEnabledAsync();
+          if (!isActive) return;
+
+          const isCurrentlyOff = !enabled;
+
+          // If location status changed from background / control center
+          if (isCurrentlyOff !== isLocOffRef.current) {
+            isLocOffRef.current = isCurrentlyOff;
+            setLocationServicesOff(isCurrentlyOff);
+
+            if (isCurrentlyOff) {
+              setLocationError('Location is turned off. Turn it on to mark attendance.');
+              setPosition(null); // Clear position so banner updates to error immediately
+            } else {
+              setLocationError(null);
+              startWatching(false); // Restart watching
+            }
+          }
+
+          // Fallback recovery if location is ON but subscription dropped
+          if (enabled && !watchSubscription.current) {
+            startWatching(false);
+          }
+        } catch (e) {}
+      };
+
+      // Aggressive 1-second polling while screen is focused
+      const interval = setInterval(checkStatus, 1000);
+
+      const subscription = AppState.addEventListener('change', (nextAppState) => {
+        if (nextAppState === 'active') checkStatus();
+      });
+
       return () => {
+        isActive = false;
+        clearInterval(interval);
+        subscription.remove();
+
         watchSubscription.current?.remove();
         watchSubscription.current = null;
-        
         setPosition(null);
         setLocationError(null);
+        setLocationServicesOff(false);
+        isLocOffRef.current = false;
+        gpsPromptShownRef.current = false;
         setStartingEvent(null);
         setActiveSession(null);
-        setCooldownEndsAt(null);
-        setCooldownSecondsLeft(0);
+        setArrivalCooldownEndsAt(null);
+        setArrivalCooldownSecondsLeft(0);
+        setDepartureCooldownEndsAt(null);
+        setDepartureCooldownSecondsLeft(0);
       };
-    }, [startWatching, refetch]),
+    }, [startWatching, refetch])
   );
 
   const distance = position && today ? distanceInMeters(today.departmentLatitude, today.departmentLongitude, position.coords.latitude, position.coords.longitude) : null;
@@ -139,14 +254,18 @@ export function AttendanceScreen() {
     },
     onError: (error: any) => {
       if (error?.code === 'UNOFFICIAL_ACTIVITY_LOCKOUT') {
-        Alert.alert('Account locked', error?.message ?? 'Your account has been locked due to unofficial activity.', [
+        appAlert.alert('Account locked', error?.message ?? 'Your account has been locked due to unofficial activity.', [
           { text: 'OK', onPress: () => signOut() },
         ]);
         return;
       }
       if (FACE_FAILURE_CODES.has(error?.code)) {
-        Alert.alert('Face mismatch detected', error?.message ?? 'Please try again.');
-        setCooldownEndsAt(Date.now() + RETRY_COOLDOWN_SECONDS * 1000);
+        appAlert.alert('Face mismatch detected', error?.message ?? 'Please try again.');
+        if (submittingEventTypeRef.current === 'Departure') {
+          setDepartureCooldownEndsAt(Date.now() + RETRY_COOLDOWN_SECONDS * 1000);
+        } else {
+          setArrivalCooldownEndsAt(Date.now() + RETRY_COOLDOWN_SECONDS * 1000);
+        }
         return;
       }
       Toast.show({ type: 'error', text1: 'Could not mark attendance', text2: error?.message });
@@ -154,6 +273,13 @@ export function AttendanceScreen() {
   });
 
   const onStart = async (eventType: AttendanceEventType) => {
+    if (isDeviceClockWrong()) return;
+
+    if (locationServicesOff) {
+      startWatching(true);
+      return;
+    }
+
     if (!position) {
       Toast.show({ type: 'error', text1: 'Waiting for your location', text2: 'Please try again in a moment.' });
       return;
@@ -171,7 +297,7 @@ export function AttendanceScreen() {
       setActiveSession({ eventType, session, latitude, longitude, accuracyMeters, mocked });
     } catch (error: any) {
       if (error?.code === 'UNOFFICIAL_ACTIVITY_LOCKOUT') {
-        Alert.alert('Account locked', error?.message ?? 'Your account has been locked due to unofficial activity.', [
+        appAlert.alert('Account locked', error?.message ?? 'Your account has been locked due to unofficial activity.', [
           { text: 'OK', onPress: () => signOut() },
         ]);
       } else {
@@ -182,19 +308,31 @@ export function AttendanceScreen() {
     }
   };
 
-  const onCooldown = cooldownSecondsLeft > 0;
-  const arrivalBlocked = (today?.arrivalBlockers.length ?? 0) > 0 || geofenceState === 'Outside' || geofenceState === null || onCooldown;
-  const departureBlocked = (today?.departureBlockers.length ?? 0) > 0 || geofenceState === 'Outside' || geofenceState === null || onCooldown;
-  const arrivalReason = onCooldown
-    ? `Please wait ${cooldownSecondsLeft}s before trying again.`
-    : today?.arrivalBlockers[0]
-      ? blockerMessages[today.arrivalBlockers[0]]
-      : null;
-  const departureReason = onCooldown
-    ? `Please wait ${cooldownSecondsLeft}s before trying again.`
-    : today?.departureBlockers[0]
-      ? blockerMessages[today.departureBlockers[0]]
-      : null;
+  const arrivalOnCooldown = arrivalCooldownSecondsLeft > 0;
+  const departureOnCooldown = departureCooldownSecondsLeft > 0;
+
+  const arrivalBlocked =
+    (today?.arrivalBlockers.length ?? 0) > 0 || geofenceState === 'Outside' || geofenceState === null || arrivalOnCooldown || deviceClockWrong;
+  const departureBlocked =
+    (today?.departureBlockers.length ?? 0) > 0 || geofenceState === 'Outside' || geofenceState === null || departureOnCooldown || deviceClockWrong;
+
+  const arrivalReason = deviceClockWrong
+    ? "Your phone's date/time is incorrect. Please fix it to mark attendance."
+    : arrivalOnCooldown
+      ? `Please wait ${arrivalCooldownSecondsLeft}s before trying again.`
+      : today?.arrivalBlockers[0]
+        ? blockerMessages[today.arrivalBlockers[0]]
+        : null;
+
+  const departureReason = deviceClockWrong
+    ? "Your phone's date/time is incorrect. Please fix it to mark attendance."
+    : departureOnCooldown
+      ? `Please wait ${departureCooldownSecondsLeft}s before trying again.`
+      : today?.departureBlockers[0]
+        ? blockerMessages[today.departureBlockers[0]]
+        : null;
+
+  const activeReason = departureReason || arrivalReason;
 
   if (isLoading || !today) {
     return (
@@ -224,28 +362,48 @@ export function AttendanceScreen() {
 
         <View style={s.badgeContainer}>
           {locationError ? (
-            <View style={[s.statusBanner, { backgroundColor: `${theme.colors.error}15` }]}>
-              <ShieldAlert size={14} color={theme.colors.error} />
-              <Text variant="caption" style={{ color: theme.colors.error }}>{locationError}</Text>
+            <View
+              style={[
+                s.statusBanner,
+                {
+                  backgroundColor: locationServicesOff ? `${theme.colors.warning}10` : `${theme.colors.error}10`,
+                  borderColor: locationServicesOff ? `${theme.colors.warning}30` : `${theme.colors.error}30`,
+                },
+              ]}
+            >
+              <ShieldAlert
+                size={16}
+                color={locationServicesOff ? theme.colors.warning : theme.colors.error}
+                style={s.bannerIcon}
+              />
+              <Text
+                variant="caption"
+                style={[
+                  s.statusBannerText,
+                  { color: locationServicesOff ? theme.colors.warning : theme.colors.error },
+                ]}
+              >
+                {locationError}
+              </Text>
             </View>
           ) : geofenceState === 'Outside' ? (
-            <View style={[s.statusBanner, { backgroundColor: `${theme.colors.error}15` }]}>
-              <AlertCircle size={14} color={theme.colors.error} />
-              <Text variant="caption" style={{ color: theme.colors.error }}>
+            <View style={[s.statusBanner, { backgroundColor: `${theme.colors.error}10`, borderColor: `${theme.colors.error}30` }]}>
+              <AlertCircle size={16} color={theme.colors.error} style={s.bannerIcon} />
+              <Text variant="caption" style={[s.statusBannerText, { color: theme.colors.error }]}>
                 Move within {today.geofenceRadiusMeters}m to mark attendance
               </Text>
             </View>
           ) : geofenceState === 'Uncertain' ? (
-            <View style={[s.statusBanner, { backgroundColor: `${theme.colors.warning}15` }]}>
-              <AlertCircle size={14} color={theme.colors.warning} />
-              <Text variant="caption" style={{ color: theme.colors.warning }}>
+            <View style={[s.statusBanner, { backgroundColor: `${theme.colors.warning}10`, borderColor: `${theme.colors.warning}30` }]}>
+              <AlertCircle size={16} color={theme.colors.warning} style={s.bannerIcon} />
+              <Text variant="caption" style={[s.statusBannerText, { color: theme.colors.warning }]}>
                 Close to boundary - flagged for mentor review
               </Text>
             </View>
           ) : geofenceState === 'Inside' ? (
-            <View style={[s.statusBanner, { backgroundColor: `${theme.colors.success}15` }]}>
-              <CheckCircle2 size={14} color={theme.colors.success} />
-              <Text variant="caption" style={{ color: theme.colors.success }}>
+            <View style={[s.statusBanner, { backgroundColor: `${theme.colors.success}10`, borderColor: `${theme.colors.success}30` }]}>
+              <CheckCircle2 size={16} color={theme.colors.success} style={s.bannerIcon} />
+              <Text variant="caption" style={[s.statusBannerText, { color: theme.colors.success }]}>
                 Inside {today.departmentName} radius
               </Text>
             </View>
@@ -285,16 +443,7 @@ export function AttendanceScreen() {
           disabled={arrivalBlocked || startingEvent !== null}
           loading={startingEvent === 'Arrival'}
           fullWidth
-          style={s.actionButton}
         />
-        {arrivalReason ? (
-          <View style={s.reasonBox}>
-            <AlertCircle size={14} color={theme.colors.textSecondary} />
-            <Text variant="caption" style={s.reasonText}>
-              {arrivalReason}
-            </Text>
-          </View>
-        ) : null}
 
         <Button
           label={startingEvent === 'Departure' ? 'Initializing...' : 'Check OUT'}
@@ -303,13 +452,13 @@ export function AttendanceScreen() {
           disabled={departureBlocked || startingEvent !== null}
           loading={startingEvent === 'Departure'}
           fullWidth
-          style={s.actionButton}
         />
-        {departureReason ? (
+
+        {activeReason ? (
           <View style={s.reasonBox}>
-            <AlertCircle size={14} color={theme.colors.textSecondary} />
+            <AlertCircle size={16} color={theme.colors.textSecondary} style={s.reasonIcon} />
             <Text variant="caption" style={s.reasonText}>
-              {departureReason}
+              {activeReason}
             </Text>
           </View>
         ) : null}
@@ -321,6 +470,7 @@ export function AttendanceScreen() {
             key={activeSession.session.sessionId}
             challenge={activeSession.session.challenge}
             onComplete={(frames) => {
+              submittingEventTypeRef.current = activeSession.eventType;
               setActiveSession(null);
               submitMutation.mutate(frames);
             }}
@@ -365,135 +515,29 @@ function formatTime(iso: string | null): string {
 }
 
 const makeStyles = (t: AppTheme) => ({
-  container: {
-    paddingHorizontal: 18,
-    paddingTop: 15,
-    paddingBottom: t.spacing.xl,
-  },
-  centerLoading: {
-    flex: 1,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-    gap: t.spacing.sm,
-  },
-  loadingText: {
-    color: t.colors.textSecondary,
-  },
-  statusCard: {
-    alignItems: 'center' as const,
-    backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
-    borderWidth: 1.5,
-    paddingVertical: t.spacing.sm, 
-    paddingHorizontal: t.spacing.md,
-    marginBottom: t.spacing.md,
-    shadowColor: t.colors.textPrimary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  iconBadge: {
-    width: 44, 
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    marginBottom: 2,
-  },
-  distanceText: {
-    fontSize: 26, 
-    fontWeight: '800' as const,
-    color: t.colors.textPrimary,
-    letterSpacing: -0.5,
-  },
-  departmentText: {
-    color: t.colors.textSecondary,
-    fontSize: 13,
-  },
-  deptName: {
-    color: t.colors.textPrimary,
-    fontWeight: '600' as const,
-  },
-  badgeContainer: {
-    marginTop: t.spacing.xs, 
-    width: '100%' as const,
-  },
-  statusBanner: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    gap: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: t.radii.full,
-  },
-  card: {
-    backgroundColor: t.colors.surface,
-    borderRadius: t.radii.lg,
-    borderWidth: 1,
-    borderColor: t.colors.border,
-    padding: t.spacing.lg,
-    marginBottom: t.spacing.lg,
-  },
-  cardHeader: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 6,
-    marginBottom: t.spacing.md,
-  },
-  cardTitle: {
-    color: t.colors.textSecondary,
-    fontWeight: '700' as const,
-    letterSpacing: 0.8,
-    fontSize: 11,
-  },
-  metricsRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-  },
-  metricBox: {
-    flex: 1,
-    alignItems: 'center' as const,
-    gap: 2,
-  },
-  metricDivider: {
-    width: 1,
-    height: '70%' as const,
-    backgroundColor: t.colors.border,
-  },
-  metricLabel: {
-    color: t.colors.textSecondary,
-    fontSize: 12,
-  },
-  metricValue: {
-    fontSize: 16,
-    fontWeight: '700' as const,
-    color: t.colors.textPrimary,
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: t.radii.full,
-    marginTop: 4,
-  },
-  actionsGroup: {
-    gap: t.spacing.xs,
-  },
-  actionButton: {
-    marginTop: t.spacing.xs,
-  },
-  reasonBox: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    gap: 6,
-    paddingHorizontal: t.spacing.sm,
-    marginBottom: t.spacing.sm,
-  },
-  reasonText: {
-    textAlign: 'center' as const,
-    color: t.colors.textSecondary,
-    fontSize: 12,
-  },
+  container: { paddingHorizontal: 18, paddingTop: 15, paddingBottom: t.spacing.xl },
+  centerLoading: { flex: 1, justifyContent: 'center' as const, alignItems: 'center' as const, gap: t.spacing.sm },
+  loadingText: { color: t.colors.textSecondary },
+  statusCard: { alignItems: 'center' as const, backgroundColor: t.colors.surface, borderRadius: t.radii.lg, borderWidth: 1.5, paddingVertical: t.spacing.md, paddingHorizontal: t.spacing.md, marginBottom: t.spacing.md, shadowColor: t.colors.textPrimary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
+  iconBadge: { width: 44, height: 44, borderRadius: 22, alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: 4 },
+  distanceText: { fontSize: 28, fontWeight: '800' as const, color: t.colors.textPrimary, letterSpacing: -0.5 },
+  departmentText: { color: t.colors.textSecondary, fontSize: 13 },
+  deptName: { color: t.colors.textPrimary, fontWeight: '600' as const },
+  badgeContainer: { marginTop: t.spacing.md, width: '100%' as const },
+  statusBanner: { flexDirection: 'row' as const, alignItems: 'flex-start' as const, paddingVertical: 10, paddingHorizontal: 12, borderRadius: t.radii.md, borderWidth: 1, width: '100%' as const, gap: 10 },
+  bannerIcon: { marginTop: 2 },
+  statusBannerText: { fontSize: 12, lineHeight: 18, fontWeight: '500' as const, textAlign: 'left' as const, flex: 1 },
+  card: { backgroundColor: t.colors.surface, borderRadius: t.radii.lg, borderWidth: 1, borderColor: t.colors.border, padding: t.spacing.lg, marginBottom: t.spacing.lg },
+  cardHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, marginBottom: t.spacing.md },
+  cardTitle: { color: t.colors.textSecondary, fontWeight: '700' as const, letterSpacing: 0.8, fontSize: 11 },
+  metricsRow: { flexDirection: 'row' as const, alignItems: 'center' as const },
+  metricBox: { flex: 1, alignItems: 'center' as const, gap: 2 },
+  metricDivider: { width: 1, height: '70%' as const, backgroundColor: t.colors.border },
+  metricLabel: { color: t.colors.textSecondary, fontSize: 12 },
+  metricValue: { fontSize: 16, fontWeight: '700' as const, color: t.colors.textPrimary },
+  badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: t.radii.full, marginTop: 4 },
+  actionsGroup: { gap: t.spacing.sm },
+  reasonBox: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: t.colors.surfaceSunken, paddingVertical: 12, paddingHorizontal: 16, borderRadius: t.radii.md, marginTop: 4, gap: 8, width: '100%' as const },
+  reasonIcon: { flexShrink: 0 },
+  reasonText: { flexShrink: 1, textAlign: 'left' as const, color: t.colors.textSecondary, fontSize: 12, fontWeight: '500' as const, lineHeight: 18 },
 });

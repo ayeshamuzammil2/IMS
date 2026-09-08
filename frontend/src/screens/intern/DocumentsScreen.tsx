@@ -137,7 +137,7 @@ export function DocumentsScreen() {
         contentContainerStyle={s.screenContainer}
         showsVerticalScrollIndicator={false}
       >
-        {data?.verificationStatus ? (
+        {data?.verificationStatus && data.verificationStatus !== 'Verified' ? (
           <EnhancedVerificationBanner status={data.verificationStatus} />
         ) : null}
 

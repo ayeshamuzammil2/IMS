@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { View, Pressable, Alert } from 'react-native';
+import { View, Pressable } from 'react-native';
+import { appAlert } from '../../lib/appAlert';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { Search, X, Trash2 } from 'lucide-react-native';
@@ -149,7 +150,7 @@ export function IdCardManagementScreen() {
 
   const handleDelete = () => {
     if (!internProfileId) return;
-    Alert.alert('Delete ID Card', 'Are you sure you want to delete this ID card?', [
+    appAlert.alert('Delete ID Card', 'Are you sure you want to delete this ID card?', [
       { text: 'Cancel', style: 'cancel' },
       { 
         text: 'Delete', 

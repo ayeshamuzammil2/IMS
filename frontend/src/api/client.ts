@@ -2,6 +2,7 @@ import axios, { AxiosError } from 'axios';
 import Constants from 'expo-constants';
 import { emitUnauthorized } from './authEvents';
 import { endpoints } from './endpoints';
+import { recordServerDate } from '../lib/deviceTimeSync';
 
 export interface ApiError {
   status: number;
@@ -44,7 +45,10 @@ client.interceptors.request.use((config) => {
 });
 
 client.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    recordServerDate(response.headers?.date);
+    return response;
+  },
   (error: AxiosError) => {
     const isLoginCall = error.config?.url === endpoints.auth.login;
     if (error.response?.status === 401 && !isLoginCall) {

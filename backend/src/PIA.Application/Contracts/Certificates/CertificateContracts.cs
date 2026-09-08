@@ -25,7 +25,14 @@ public sealed record CertificateDto(
     string Status,
     Guid? GeneratedFileId,
     DateOnly? IssueDate,
-    string? RejectionReason);
+    string? RejectionReason,
+    /// <summary>Attendance percentage across the intern's recorded working days (Present+Late /
+    /// Present+Late+Absent, i.e. holidays/approved leave don't count against them). Null only if
+    /// no attendance has been recorded yet. Computed on the fly - not persisted.</summary>
+    double? AttendancePercentage,
+    /// <summary>Short, human-readable performance remark auto-derived from AttendancePercentage -
+    /// intended to appear on the certificate/next to it. See CertificateService.DeriveRemark.</summary>
+    string? AttendanceRemark);
 
 public sealed record GenerateCertificateRequest(int TemplateId);
 

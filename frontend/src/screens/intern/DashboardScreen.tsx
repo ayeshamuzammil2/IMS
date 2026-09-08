@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import { Pressable, View, ActivityIndicator, ScrollView } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -68,31 +68,6 @@ export function DashboardScreen() {
       }
     }, [refetch]),
   );
-
-  // Purane status ko track karne ke liye useRef ka istemal
-  const prevStatusRef = useRef(data?.verificationStatus);
-
-  useEffect(() => {
-    const currentStatus = data?.verificationStatus?.toUpperCase();
-    const prevStatus = prevStatusRef.current?.toUpperCase();
-
-    // Sirf tab Toast dikhao jab status update hua ho aur pehli dafa load na ho raha ho
-    if (
-      currentStatus && 
-      ['VERIFIED', 'APPROVED', 'COMPLETED'].includes(currentStatus) &&
-      prevStatus !== currentStatus && 
-      prevStatus !== undefined 
-    ) {
-      Toast.show({ 
-        type: 'success', 
-        text1: 'Verification Completed', 
-        text2: 'Your documents verification has been successfully completed.' 
-      });
-    }
-
-    // Current status ko ref mein save kar lein next time compare karne ke liye
-    prevStatusRef.current = data?.verificationStatus;
-  }, [data?.verificationStatus]);
 
   const goToDocuments = () => (navigation.getParent()?.navigate as (name: string) => void)?.('Documents');
 

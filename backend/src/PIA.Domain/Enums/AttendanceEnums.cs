@@ -81,6 +81,10 @@ public enum AttendanceBlocker
     /// <summary>Phase 5 dual-lock: both an Admin/Mentor-approved profile photo AND a completed
     /// face enrollment are required before the camera may even open, not just before submit.</summary>
     FaceNotReady,
+    /// <summary>Outside the intern's own assigned DailyStartTime/DailyEndTime window (with a
+    /// small grace margin) - distinct from OutsideInternshipPeriod, which is about the calendar
+    /// date range, not the time of day.</summary>
+    OutsideDailyTimeWindow,
 }
 
 /// <summary>Actions the server can request during a challenge sequence (Phase 5). MLKit reports the

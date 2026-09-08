@@ -25,14 +25,14 @@ public sealed class CertificateService(
             ?? throw new NotFoundException(nameof(InternProfile), internProfileId);
         var certificate = await db.Certificates.AsNoTracking().FirstOrDefaultAsync(c => c.InternProfileId == internProfileId, ct);
 
-        return ToDto(certificate, profile);
+        return await ToDtoAsync(certificate, profile, ct);
     }
 
     public async Task<CertificateDto> GetForInternAsync(int internProfileId, CancellationToken ct)
     {
         var profile = await LoadProfileWithScopeCheckAsync(internProfileId, ct);
         var certificate = await db.Certificates.AsNoTracking().FirstOrDefaultAsync(c => c.InternProfileId == internProfileId, ct);
-        return ToDto(certificate, profile);
+        return await ToDtoAsync(certificate, profile, ct);
     }
 
     public async Task<IReadOnlyList<CertificateDto>> ListAsync(int? departmentId, CancellationToken ct)
@@ -51,7 +51,8 @@ public sealed class CertificateService(
         }
 
         var certificates = await certQuery.OrderBy(c => c.InternProfile.User.Department!.Name).ThenBy(c => c.InternProfile.User.FullName).ToListAsync(ct);
-        return certificates.Select(c => ToDto(c, c.InternProfile)).ToList();
+        var percentages = await ComputeAttendancePercentagesAsync(certificates.Select(c => c.InternProfile).ToList(), ct);
+        return certificates.Select(c => BuildDto(c, c.InternProfile, percentages[c.InternProfileId])).ToList();
     }
 
     public async Task<CertificateDto> GenerateAsync(int internProfileId, GenerateCertificateRequest request, CancellationToken ct)
@@ -101,7 +102,7 @@ public sealed class CertificateService(
         certificate.RejectionReason = null;
         await db.SaveChangesAsync(ct);
 
-        return ToDto(certificate, profile);
+        return await ToDtoAsync(certificate, profile, ct);
     }
 
     public async Task<CertificateDto> ApproveAsync(int internProfileId, CancellationToken ct)
@@ -117,7 +118,7 @@ public sealed class CertificateService(
         certificate.ApprovedAtUtc = clock.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        return ToDto(certificate, profile);
+        return await ToDtoAsync(certificate, profile, ct);
     }
 
     public async Task<CertificateDto> IssueAsync(int internProfileId, CancellationToken ct)
@@ -136,7 +137,7 @@ public sealed class CertificateService(
 
         await notifications.NotifyUserAsync(profile.UserId, NotificationTemplates.CertificateIssued, new Dictionary<string, object?>(), ct);
 
-        return ToDto(certificate, profile);
+        return await ToDtoAsync(certificate, profile, ct);
     }
 
     public async Task<CertificateDto> UploadAsync(int internProfileId, UploadCertificateRequest request, CancellationToken ct)
@@ -181,7 +182,7 @@ public sealed class CertificateService(
         certificate.RejectionReason = null;
         await db.SaveChangesAsync(ct);
 
-        return ToDto(certificate, profile);
+        return await ToDtoAsync(certificate, profile, ct);
     }
 
     public async Task DeleteAsync(int internProfileId, CancellationToken ct)
@@ -227,8 +228,56 @@ public sealed class CertificateService(
         return profile;
     }
 
-    private static CertificateDto ToDto(Certificate? c, InternProfile profile) => new(
+    private async Task<CertificateDto> ToDtoAsync(Certificate? c, InternProfile profile, CancellationToken ct)
+    {
+        var percentages = await ComputeAttendancePercentagesAsync(new[] { profile }, ct);
+        return BuildDto(c, profile, percentages[profile.Id]);
+    }
+
+    /// <summary>Attendance percentage per intern profile over their own internship-to-date window
+    /// (Present+Late / Present+Late+Absent - holidays and approved leave don't count against
+    /// them). Batched into one query regardless of how many profiles are asked for, so ListAsync
+    /// doesn't pay an N+1 cost per certificate row.</summary>
+    private async Task<Dictionary<int, double?>> ComputeAttendancePercentagesAsync(IReadOnlyList<InternProfile> profiles, CancellationToken ct)
+    {
+        var ids = profiles.Select(p => p.Id).ToList();
+        var rows = await db.AttendanceDays.AsNoTracking()
+            .Where(d => ids.Contains(d.InternProfileId))
+            .Select(d => new { d.InternProfileId, d.WorkDate, d.Status })
+            .ToListAsync(ct);
+
+        var result = new Dictionary<int, double?>();
+        var today = clock.TodayInPakistan;
+        foreach (var profile in profiles)
+        {
+            var endInclusive = today < profile.InternshipEndDate ? today : profile.InternshipEndDate;
+            var relevant = rows.Where(r => r.InternProfileId == profile.Id
+                    && r.WorkDate >= profile.InternshipStartDate && r.WorkDate <= endInclusive
+                    && r.Status != AttendanceStatus.Holiday && r.Status != AttendanceStatus.Leave)
+                .ToList();
+
+            result[profile.Id] = relevant.Count == 0
+                ? null
+                : Math.Round(relevant.Count(r => r.Status is AttendanceStatus.Present or AttendanceStatus.Late) * 100.0 / relevant.Count, 1);
+        }
+        return result;
+    }
+
+    /// <summary>Short, auto-derived performance remark shown next to the certificate - purely a
+    /// display convenience computed from attendance percentage, not stored anywhere.</summary>
+    private static string? DeriveRemark(double? percentage) => percentage switch
+    {
+        null => "Attendance record not yet available.",
+        >= 95 => "Excellent attendance throughout the internship.",
+        >= 85 => "Very good attendance record.",
+        >= 75 => "Satisfactory attendance.",
+        >= 60 => "Attendance was below expectations.",
+        _ => "Attendance record needs significant improvement.",
+    };
+
+    private static CertificateDto BuildDto(Certificate? c, InternProfile profile, double? attendancePercentage) => new(
         profile.Id, profile.User.FullName, profile.InternCode, profile.User.Department?.Name,
         c?.CertificateNumber, (c?.Status ?? CertificateStatus.Locked).ToString(),
-        c?.GeneratedFileId, c?.IssueDate, c?.RejectionReason);
+        c?.GeneratedFileId, c?.IssueDate, c?.RejectionReason,
+        attendancePercentage, DeriveRemark(attendancePercentage));
 }

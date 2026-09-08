@@ -22,6 +22,12 @@ export interface CertificateDto {
   generatedFileId: string | null;
   issueDate: string | null;
   rejectionReason: string | null;
+  /** Attendance percentage across the intern's recorded working days so far. Null if no
+   * attendance has been recorded yet. Computed by the backend, not stored. */
+  attendancePercentage: number | null;
+  /** Short remark auto-derived from attendancePercentage, meant to display next to the
+   * certificate (e.g. "Excellent attendance throughout the internship."). */
+  attendanceRemark: string | null;
 }
 
 export const certificatesApi = {

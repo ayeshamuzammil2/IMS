@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Pressable, ActivityIndicator, Alert, FlatList } from 'react-native';
+import { View, Pressable, ActivityIndicator, FlatList } from 'react-native';
+import { appAlert } from '../../lib/appAlert';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -133,14 +134,14 @@ export function DepartmentsScreen() {
       toggleActiveMutation.mutate(dept);
       return;
     }
-    Alert.alert('Deactivate department', `Deactivate "${dept.name}"? Mentors and interns already assigned will keep their access until reassigned.`, [
+    appAlert.alert('Deactivate department', `Deactivate "${dept.name}"? Mentors and interns already assigned will keep their access until reassigned.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Deactivate', style: 'destructive', onPress: () => toggleActiveMutation.mutate(dept) },
     ]);
   };
 
   const confirmDelete = (dept: DepartmentDto) => {
-    Alert.alert('Delete department', `Permanently delete "${dept.name}"? This cannot be undone.`, [
+    appAlert.alert('Delete department', `Permanently delete "${dept.name}"? This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(dept.id) },
     ]);
